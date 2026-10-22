@@ -1,0 +1,220 @@
+/* ============================================================
+ * manager.css — Staff section (Manager / Cashier / Waiter / Kitchen)
+ *
+ * Staff UI uses an information-dense, functional palette that lives
+ * inside the same K-SPICY token system (see assets/main.css).
+ * This file maps the legacy --mgr-* tokens onto the brand tokens so
+ * existing dashboard styles keep working but no longer drift.
+ * ============================================================ */
+
+:root {
+    /* Surfaces (alias to brand tokens) */
+    --mgr-cream:        var(--color-cream);
+    --mgr-cream-dark:   var(--color-cream-dark);
+    --mgr-white:        var(--color-white);
+
+    /* Text */
+    --mgr-charcoal-black: var(--color-charcoal-black);
+    --mgr-charcoal:       var(--color-charcoal);
+    --mgr-charcoal-soft:  var(--color-charcoal-light);
+    --mgr-gray-900: var(--color-gray-900);
+    --mgr-gray-800: var(--color-gray-800);
+    --mgr-gray-700: var(--color-gray-700);
+    --mgr-gray-600: var(--color-gray-600);
+    --mgr-gray-500: var(--color-gray-500);
+    --mgr-gray-400: var(--color-gray-400);
+    --mgr-gray-300: var(--color-gray-300);
+    --mgr-gray-200: var(--color-gray-200);
+    --mgr-gray-100: var(--color-gray-100);
+    --mgr-gray-50:  var(--color-gray-50);
+
+    /* Brand */
+    --mgr-chili-red:   var(--color-chili-red);
+    --mgr-dark-red:    var(--color-dark-red);
+    --mgr-golden:      var(--color-golden);
+    --mgr-fresh-green: var(--color-fresh-green);
+
+    /* Status */
+    --mgr-success:     var(--color-success);
+    --mgr-success-bg:  var(--color-success-bg);
+    --mgr-warning:     var(--color-warning);
+    --mgr-warning-bg:  var(--color-warning-bg);
+    --mgr-error:       var(--color-error);
+    --mgr-error-bg:    var(--color-error-bg);
+    --mgr-info:        var(--color-info);
+    --mgr-info-bg:     var(--color-info-bg);
+
+    /* Shadows */
+    --mgr-shadow-sm: var(--shadow-sm);
+    --mgr-shadow-md: var(--shadow-md);
+    --mgr-shadow-lg: var(--shadow-lg);
+    --mgr-shadow-red: var(--shadow-red);
+
+    /* Radius */
+    --mgr-radius-sm:   var(--radius-sm);
+    --mgr-radius-md:   var(--radius-md);
+    --mgr-radius-lg:   var(--radius-lg);
+    --mgr-radius-xl:   var(--radius-xl);
+    --mgr-radius-2xl:  var(--radius-2xl);
+    --mgr-radius-full: var(--radius-full);
+}
+
+/* ============================================================
+ * Legacy layout — preserved for existing manager pages.
+ * ============================================================ */
+
+.manager-shell {
+    font-family: var(--font-family-base);
+    color: var(--mgr-charcoal-black);
+    background: var(--color-cream);
+}
+
+.manager-shell .staff-content {
+    max-width: 1600px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: var(--space-7);
+}
+
+.manager-shell .manager-sidebar {
+    background: var(--color-brand-dark);
+    width: 240px;
+}
+
+.manager-shell .nav-item.active {
+    background: var(--color-brand-action);
+}
+
+.manager-shell .nav-item.active::before {
+    background: var(--color-white);
+}
+
+.manager-shell .staff-header {
+    gap: var(--space-4);
+}
+
+.manager-shell .page-title {
+    font-size: 22px;
+}
+
+.manager-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+    margin-bottom: var(--space-2);
+}
+
+.manager-heading h2 {
+    font-size: 26px;
+    letter-spacing: -0.6px;
+    margin: var(--space-2) 0;
+    color: var(--color-charcoal-black);
+}
+
+.manager-heading p,
+.result-count {
+    color: var(--color-gray-500);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.manager-shell .eyebrow {
+    color: var(--color-chili-red);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.manager-button {
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    background: var(--color-white);
+    color: var(--color-charcoal-black);
+    cursor: pointer;
+    font: 600 13px var(--font-family-base);
+    white-space: nowrap;
+    transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.manager-button:hover {
+    background: var(--color-cream-dark);
+    border-color: var(--color-chili-red);
+}
+
+.manager-search {
+    padding: 12px 16px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    font: inherit;
+    background: var(--color-white);
+    transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.manager-search:focus {
+    outline: none;
+    border-color: var(--color-chili-red);
+}
+
+.manager-notice {
+    padding: var(--space-5);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-lg);
+    background: var(--color-white);
+    color: var(--color-gray-500);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.manager-notice.error {
+    border-color: var(--color-error);
+    color: #991b1b;
+    background: var(--color-error-bg);
+}
+
+.manager-shell button:disabled,
+.manager-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.manager-shell :is(button, input, select, a):focus-visible {
+    outline: 2px solid var(--color-chili-red);
+    outline-offset: 2px;
+}
+
+.manager-shell :is(.kpi-card, .dashboard-card, .menu-card, .staff-card, .chart-card, .rank-card) {
+    border: 1px solid var(--color-gray-200);
+    box-shadow: none;
+    border-radius: var(--radius-lg);
+}
+
+.manager-shell .kpi-card { padding: var(--space-6); }
+.manager-shell .kpi-card:is(.kpi-primary, .primary) {
+    background: var(--color-chili-red);
+    color: white;
+}
+.manager-shell .kpi-value {
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 800;
+}
+.manager-shell .kpi-label {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.manager-shell :is(.role-tab.active, .period-tab.active, .btn-apply, .staff-avatar) {
+    background: var(--color-chili-red);
+    border-color: var(--color-chili-red);
+}
+
+.manager-shell :is(.bar-fill, .trend-bar) {
+    background: var(--color-chili-red);
+}
+
+.manager-shell .rank-num { color: var(--color-chili-red); }

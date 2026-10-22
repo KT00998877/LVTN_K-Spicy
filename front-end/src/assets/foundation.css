@@ -1,0 +1,221 @@
+/* =====================================================
+   K-SPICY — Foundation: Form Primitives
+   Transactional UI baseline.
+   Keep transactional UI calm and predictable.
+
+   SCOPING:
+   ---------
+   All rules below are scoped under `.customer-scope` so they
+   ONLY apply to customer-facing routes (homepage, menu, checkout,
+   reservation, login, register, account, ...). Staff/Admin views
+   do not have this class on <body>, so their raw <input>/<select>/
+   <textarea>/<label> keep their current styling untouched.
+
+   The `.customer-scope` class is toggled by router.afterEach in
+   `src/router/index.ts`.
+
+   Use:
+   -----
+   - `<input class="form-control" ... />`
+   - `<label class="form-label"> ... </label>`
+   - `<textarea class="form-control" ...></textarea>`
+   - `<select class="form-control" ...> ... </select>`
+   - `<span class="form-help">...</span>`
+   - `<span class="form-error">...</span>`
+   - `<div class="form-group"> ... </div>`
+   - `<div class="form-row"> ... </div>`
+   ===================================================== */
+
+.customer-scope {
+    --form-height:        48px;
+    --form-height-lg:     52px;
+    --form-pad-x:         var(--space-4);
+    --form-radius:        var(--radius-button);
+
+    --form-bg:            var(--color-surface);
+    --form-border:        var(--color-border);
+    --form-text:          var(--color-text);
+    --form-placeholder:   var(--color-text-subtle);
+
+    --form-label-size:    14px;
+    --form-label-weight:  var(--weight-medium);
+
+    --form-help-size:     13px;
+}
+
+/* ===== LABEL ===== */
+
+.customer-scope label,
+.customer-scope .form-label {
+    display: inline-block;
+    font-size: var(--form-label-size);
+    font-weight: var(--form-label-weight);
+    color: var(--color-text);
+    margin-bottom: var(--space-2);
+    line-height: 1.2;
+}
+
+/* ===== INPUT / TEXTAREA / SELECT (class-based) ===== */
+
+.customer-scope .form-control,
+.customer-scope input.form-control,
+.customer-scope textarea.form-control,
+.customer-scope select.form-control {
+    display: block;
+    width: 100%;
+    min-height: var(--form-height);
+    padding: 0 var(--form-pad-x);
+    font-family: inherit;
+    font-size: var(--font-size-body);
+    line-height: var(--leading-form);
+    color: var(--form-text);
+    background-color: var(--form-bg);
+    border: var(--border-width) solid var(--form-border);
+    border-radius: var(--form-radius);
+    transition:
+        border-color var(--dur-fast) var(--ease-out),
+        background-color var(--dur-fast) var(--ease-out),
+        box-shadow var(--dur-fast) var(--ease-out);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.customer-scope textarea.form-control {
+    min-height: calc(var(--form-height) * 2);
+    padding: var(--space-3) var(--form-pad-x);
+    resize: vertical;
+}
+
+.customer-scope select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23151515' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--form-pad-x) center;
+    padding-right: calc(var(--form-pad-x) * 2.5);
+}
+
+.customer-scope .form-control::placeholder,
+.customer-scope input.form-control::placeholder,
+.customer-scope textarea.form-control::placeholder {
+    color: var(--form-placeholder);
+    opacity: 1;
+}
+
+/* Hover */
+.customer-scope .form-control:hover:not(:disabled):not(:focus),
+.customer-scope input.form-control:hover:not(:disabled):not(:focus),
+.customer-scope select.form-control:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-border-strong);
+}
+
+/* Focus */
+.customer-scope .form-control:focus,
+.customer-scope input.form-control:focus,
+.customer-scope textarea.form-control:focus,
+.customer-scope select.form-control:focus {
+    outline: none;
+    border-color: var(--color-brand-action);
+    box-shadow: 0 0 0 3px rgba(228, 38, 61, 0.18);
+}
+
+/* Disabled */
+.customer-scope .form-control:disabled,
+.customer-scope input.form-control:disabled,
+.customer-scope textarea.form-control:disabled,
+.customer-scope select.form-control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background-color: var(--neutral-50);
+}
+
+/* Read-only */
+.customer-scope .form-control[readonly],
+.customer-scope input.form-control[readonly],
+.customer-scope textarea.form-control[readonly] {
+    background-color: var(--neutral-50);
+    color: var(--color-text-muted);
+}
+
+/* Error */
+.customer-scope .form-control.is-invalid,
+.customer-scope input.form-control.is-invalid,
+.customer-scope textarea.form-control.is-invalid,
+.customer-scope select.form-control.is-invalid {
+    border-color: var(--status-error);
+}
+.customer-scope .form-control.is-invalid:focus,
+.customer-scope input.form-control.is-invalid:focus,
+.customer-scope textarea.form-control.is-invalid:focus,
+.customer-scope select.form-control.is-invalid:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+/* Success */
+.customer-scope .form-control.is-valid,
+.customer-scope input.form-control.is-valid,
+.customer-scope textarea.form-control.is-valid,
+.customer-scope select.form-control.is-valid {
+    border-color: var(--status-success);
+}
+.customer-scope .form-control.is-valid:focus,
+.customer-scope input.form-control.is-valid:focus,
+.customer-scope textarea.form-control.is-valid:focus,
+.customer-scope select.form-control.is-valid:focus {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+/* ===== HELP / ERROR TEXT ===== */
+
+.customer-scope .form-help {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: var(--form-help-size);
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
+.customer-scope .form-error {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: var(--form-help-size);
+    line-height: 1.4;
+    color: var(--status-error-text);
+    font-weight: var(--weight-medium);
+}
+
+/* ===== FORM GROUP / ROW ===== */
+
+.customer-scope .form-group {
+    margin-bottom: var(--space-5);
+}
+
+.customer-scope .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.customer-scope .form-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.customer-scope .form-row > label {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+/* ===== CHECKBOX / RADIO (still class-based to avoid staff override) ===== */
+
+.customer-scope input[type='checkbox'].form-control,
+.customer-scope input[type='radio'].form-control,
+.customer-scope input.form-control[type='checkbox'],
+.customer-scope input.form-control[type='radio'] {
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    padding: 0;
+    accent-color: var(--color-brand-action);
+    cursor: pointer;
+    margin-right: var(--space-2);
+    vertical-align: middle;
+}
