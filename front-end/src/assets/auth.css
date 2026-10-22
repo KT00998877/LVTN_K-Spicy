@@ -1,0 +1,394 @@
+/* =============================
+   Auth pages - shared CSS
+   ============================= */
+
+:root {
+    --au-primary: var(--color-brand-action);
+    --au-primary-dark: var(--color-brand-action-hover);
+    --au-secondary: var(--color-golden);
+    --au-dark: var(--color-brand-ink);
+    --au-text: var(--color-text);
+    --au-muted: var(--color-text-muted);
+    --au-border: var(--color-border);
+    --au-bg: var(--color-background);
+    --au-error: #dc2626;
+    --au-success: #16a34a;
+    --au-warning: #f59e0b;
+    --au-info: #3b82f6;
+}
+
+.au-page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--au-bg);
+}
+
+.au-hero {
+    background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-dark));
+    color: #fff;
+    padding: 60px 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.au-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 30%, rgba(255, 183, 3, 0.18) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(94, 15, 24, 0.5) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.au-hero-content {
+    position: relative;
+}
+
+.au-hero-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 60px;
+}
+
+.au-hero-brand-mark { width: 80px; height: 80px; object-fit: contain; border-radius: var(--radius-button); flex-shrink: 0; }
+
+.au-hero-title {
+    font-size: 40px;
+    font-weight: 800;
+    margin: 0 0 16px;
+    line-height: 1.2;
+}
+
+.au-hero-sub {
+    font-size: 16px;
+    line-height: 1.7;
+    opacity: 0.92;
+    margin: 0;
+    max-width: 440px;
+}
+
+.au-hero-bullets {
+    position: relative;
+    margin-top: 40px;
+    list-style: none;
+    padding: 0;
+}
+
+.au-hero-bullets li {
+    padding: 10px 0;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.au-hero-bullets li::before {
+    content: '✓';
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    background: rgba(255, 183, 3, 0.95);
+    color: var(--color-brand-dark);
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.au-hero-footer {
+    position: relative;
+    font-size: 13px;
+    opacity: 0.7;
+}
+
+.au-form-side {
+    padding: 60px 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.au-form-wrap {
+    width: 100%;
+    max-width: 420px;
+}
+
+.au-form-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.au-form-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-brand-ink);
+    margin: 0 0 8px;
+}
+
+.au-form-sub {
+    color: var(--au-muted);
+    font-size: 14px;
+    margin: 0;
+}
+
+.au-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.au-field { display: flex; flex-direction: column; gap: 6px; }
+
+.au-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--au-text);
+}
+
+.au-input {
+    height: 46px;
+    padding: 0 14px;
+    border: 1.5px solid var(--au-border);
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+    transition: all 0.18s;
+}
+
+.au-input:focus {
+    outline: none;
+    border-color: var(--au-primary);
+    box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
+}
+
+.au-input.has-error {
+    border-color: var(--au-error);
+}
+
+.au-input.has-error:focus {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.au-input-wrap {
+    position: relative;
+}
+
+.au-pw-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--au-muted);
+    cursor: pointer;
+    padding: 6px;
+    font-size: 14px;
+}
+
+.au-pw-toggle:hover { color: var(--au-primary); }
+
+.au-error-msg {
+    color: var(--au-error);
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.au-form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--au-muted);
+    margin-top: -4px;
+}
+
+.au-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.au-checkbox input { cursor: pointer; }
+
+.au-link {
+    color: var(--au-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.au-link:hover { text-decoration: underline; }
+
+.au-btn {
+    height: 48px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.au-btn-primary {
+    background: var(--au-primary);
+    color: #fff;
+}
+
+.au-btn-primary:hover:not(:disabled) {
+    background: var(--au-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(230, 57, 70, 0.25);
+}
+
+.au-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.au-alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.au-alert-error {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.au-alert-success {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.au-alert-info {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.au-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--au-muted);
+    font-size: 12px;
+    margin: 20px 0 4px;
+}
+
+.au-divider::before,
+.au-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--au-border);
+}
+
+.au-social {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.au-social-btn {
+    height: 44px;
+    border: 1.5px solid var(--au-border);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.18s;
+    color: var(--au-text);
+}
+
+.au-social-btn:hover {
+    background: var(--color-brand-soft);
+    border-color: #d1d5db;
+}
+
+.au-form-footer {
+    text-align: center;
+    margin-top: 22px;
+    font-size: 14px;
+    color: var(--au-muted);
+}
+
+/* Password strength meter */
+.au-strength {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.au-strength-bar {
+    flex: 1;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.au-strength-fill {
+    height: 100%;
+    transition: width 0.3s, background-color 0.3s;
+}
+
+.au-strength-label {
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 56px;
+    text-align: right;
+}
+
+/* Spinner */
+.au-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: au-spin 0.7s linear infinite;
+}
+
+@keyframes au-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+    .au-page { grid-template-columns: 1fr; }
+    .au-hero {
+        padding: 40px 28px;
+        min-height: 220px;
+    }
+    .au-hero-title { font-size: 26px; }
+    .au-hero-brand { margin-bottom: 24px; }
+    .au-hero-bullets { display: none; }
+    .au-form-side { padding: 36px 22px 56px; }
+}

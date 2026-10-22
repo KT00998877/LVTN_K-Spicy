@@ -1,0 +1,685 @@
+/* =====================================================
+   K-SPICY — Spicy Editorial System
+   Korean spicy noodle restaurant, premium & food-first.
+
+   This file is the SINGLE SOURCE OF TRUTH for the customer
+   design foundation: color tokens, typography, spacing,
+   shape language, breakpoints, elevation, motion, links,
+   focus-visible baseline, and form primitives.
+
+   Rules of the road:
+   - Brand surfaces may be expressive; transactional UI stays calm.
+   - Spicy Editorial System = bold outside, disciplined inside.
+   - Components must consume tokens; do NOT hard-code colors.
+
+   Compatibility:
+   - All `--color-*` tokens from the previous foundation are
+     preserved as semantic aliases. New tokens use the
+     `--spicy-*` / `--chili-*` Spicy Editorial palette.
+   ===================================================== */
+
+/* ===== Google Fonts: Be Vietnam Pro (display) + Inter (UI) ===== */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+    /* =====================================================
+       1. PRIMITIVE PALETTE — locked values
+       ===================================================== */
+
+    /* Spicy Editorial palette */
+    --spicy-red:       #C81924;  /* Brand surfaces — hero, campaign, navigation */
+    --chili-red:       #D71920;  /* Primary actions and prices */
+    --chili-red-hover: #B5111B;
+    --brand-dark:      #5E0F18;
+    --brand-ink:       #861923;
+    --brand-highlight: #FFA89D;
+    --brand-muted-inverse: #FFD8CE;
+
+    --cream:           #FFF7F5;  /* Warm red-tinted page background */
+    --cream-alt:       #FBE9E5;
+    --cream-deep:      #FFE1DB;
+
+    --charcoal:        #241516;
+    --soft-black:      #351A1C;
+
+    --warm-border:     #EACCC5;
+    --warm-border-strong: #DDB1A9;
+    --peach:           #F3B8A9;  /* Decorative */
+
+    --white:           #FFFFFF;
+    --black:           #000000;
+
+    /* Spicy level scale (used by SpicyLevelSection + future selector) */
+    --spicy-0:         #22C55E;
+    --spicy-1:         #FFB000;
+    --spicy-2:         #FF7A00;
+    --spicy-3:         #E83A14;
+    --spicy-4:         #A80F17;
+
+    /* Neutrals (tinted, matches existing scale) */
+    --neutral-50:      #FFFAF8;
+    --neutral-100:     #FAEEEA;
+    --neutral-200:     #EFDAD4;
+    --neutral-300:     #DFC3BC;
+    --neutral-400:     #8F7773;
+    --neutral-500:     #705957;
+    --neutral-600:     #57413F;
+    --neutral-700:     #3D2928;
+    --neutral-800:     #2A1A1B;
+    --neutral-900:     #1C1113;
+
+    /* Status (functional only) */
+    --status-success:        #22C55E;
+    --status-success-bg:     #DCFCE7;
+    --status-success-text:   #166534;
+    --status-warning:        #F59E0B;
+    --status-warning-bg:     #FEF3C7;
+    --status-warning-text:   #92400E;
+    --status-error:          #EF4444;
+    --status-error-bg:       #FEE2E2;
+    --status-error-text:     #991B1B;
+    --status-info:           #3B82F6;
+    --status-info-bg:        #DBEAFE;
+
+    /* =====================================================
+       2. SEMANTIC ALIASES — consume these in components
+       ===================================================== */
+
+    /* Brand */
+    --color-brand-primary:    var(--spicy-red);
+    --color-spicy-red:        var(--spicy-red);
+    --color-brand-dark:       var(--brand-dark);
+    --color-brand-ink:        var(--brand-ink);
+    --color-brand-highlight:  var(--brand-highlight);
+    --color-brand-muted-inverse: var(--brand-muted-inverse);
+    --color-brand-border-inverse: rgba(255, 216, 206, 0.24);
+    --color-brand-overlay:    rgba(255, 216, 206, 0.12);
+    --color-brand-soft:       var(--cream-alt);
+    --color-brand-action:     var(--chili-red);
+    --color-brand-action-hover: var(--chili-red-hover);
+
+    /* Surfaces */
+    --color-background:       var(--cream);
+    --color-background-alt:   var(--cream-alt);
+    --color-background-deep:  var(--cream-deep);
+    --color-surface:          var(--white);
+    --color-surface-dark:     var(--charcoal);
+    --color-surface-soft:     var(--soft-black);
+    --color-operations-background: #21161A;
+    --color-operations-surface: #302026;
+    --color-operations-raised: #3C2A31;
+
+    /* Shared compatibility for customer detail pages */
+    --hp-dark: var(--color-text);
+    --hp-muted: var(--color-text-muted);
+
+    /* Text */
+    --color-text:             var(--charcoal);
+    --color-text-inverse:     var(--white);
+    --color-text-muted:       var(--neutral-500);
+    --color-text-subtle:      var(--neutral-400);
+
+    /* Borders */
+    --color-border:           var(--warm-border);
+    --color-border-strong:    var(--warm-border-strong);
+
+    /* Spicy (signature interaction) */
+    --color-spicy-0:          var(--spicy-0);
+    --color-spicy-1:          var(--spicy-1);
+    --color-spicy-2:          var(--spicy-2);
+    --color-spicy-3:          var(--spicy-3);
+    --color-spicy-4:          var(--spicy-4);
+
+    /* =====================================================
+       3. LEGACY COMPATIBILITY ALIASES
+       Existing components reference these tokens. They now
+       map to the Spicy Editorial palette so nothing breaks
+       during migration.
+       ===================================================== */
+
+    --color-chili-red:        var(--chili-red);
+    --color-dark-red:         var(--chili-red-hover);
+    --color-crimson:          #B91C1C;
+    --color-charcoal-black:   var(--charcoal);
+    --color-charcoal:         var(--soft-black);
+    --color-charcoal-light:   #2D2D2D;
+    --color-gray-warm:        var(--neutral-600);
+    --color-cream:            var(--cream);
+    --color-cream-dark:       var(--cream-alt);
+    --color-cream-deep:       var(--cream-deep);
+    --color-white:            var(--white);
+    --color-golden:           #FFB000;
+    --color-golden-light:     #FFC94D;
+    --color-fresh-green:      var(--status-success);
+    --color-fresh-green-light: var(--status-success-bg);
+
+    --color-gray-50:          var(--neutral-50);
+    --color-gray-100:         var(--neutral-100);
+    --color-gray-200:         var(--neutral-200);
+    --color-gray-300:         var(--neutral-300);
+    --color-gray-400:         var(--neutral-400);
+    --color-gray-500:         var(--neutral-500);
+    --color-gray-600:         var(--neutral-600);
+    --color-gray-700:         var(--neutral-700);
+    --color-gray-800:         var(--neutral-800);
+    --color-gray-900:         var(--neutral-900);
+
+    --color-success:          var(--status-success);
+    --color-success-bg:       var(--status-success-bg);
+    --color-warning:          var(--status-warning);
+    --color-warning-bg:       var(--status-warning-bg);
+    --color-error:            var(--status-error);
+    --color-error-bg:         var(--status-error-bg);
+    --color-info:             var(--status-info);
+    --color-info-bg:          var(--status-info-bg);
+
+    /* =====================================================
+       4. TYPOGRAPHY
+       ===================================================== */
+
+    --font-display: 'Be Vietnam Pro', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-ui:      'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-base: var(--font-ui);
+
+    /* Type scale (fluid via clamp()).
+       Transactional UI (forms, checkout, cart) keeps body on the
+       smaller end. Display scale is for brand surfaces only. */
+    --font-size-hero:        clamp(56px, 9vw, 160px);
+    --font-size-display:     clamp(48px, 7vw, 96px);
+    --font-size-h1:          clamp(40px, 5.6vw, 72px);
+    --font-size-h2:          clamp(32px, 4.4vw, 56px);
+    --font-size-h3:          clamp(24px, 3vw, 36px);
+    --font-size-section:     clamp(22px, 2.4vw, 28px);
+    --font-size-product:     clamp(18px, 1.6vw, 22px);
+    --font-size-body:        16px;
+    --font-size-body-sm:     15px;
+    --font-size-ui:          14px;
+    --font-size-small:       13px;
+    --font-size-micro:       11px;
+
+    /* Line heights */
+    --leading-display:       0.84;   /* For display only — never body */
+    --leading-tight:         1.05;
+    --leading-snug:          1.2;
+    --leading-body:          1.55;   /* Body & UI default */
+    --leading-form:          1.5;
+
+    /* Letter spacing */
+    --tracking-display:      -0.04em; /* Display only */
+    --tracking-heading:      -0.02em;
+    --tracking-eyebrow:      0.12em;  /* Editorial kicker */
+    --tracking-ui:           -0.005em;
+
+    /* Weights */
+    --weight-regular:        400;
+    --weight-medium:         500;
+    --weight-semibold:       600;
+    --weight-bold:           700;
+    --weight-extrabold:      800;
+    --weight-black:          900;
+
+    /* =====================================================
+       5. SPACING SCALE (4px base)
+       ===================================================== */
+
+    --space-1:  4px;
+    --space-2:  8px;
+    --space-3:  12px;
+    --space-4:  16px;
+    --space-5:  20px;
+    --space-6:  24px;
+    --space-7:  32px;
+    --space-8:  40px;
+    --space-9:  48px;
+    --space-10: 64px;
+    --space-11: 80px;
+    --space-12: 96px;
+    --space-13: 128px;
+    --space-14: 160px;
+
+    /* Semantic spacing roles */
+    --space-ui-tight:        var(--space-2);    /* 8 — inline gap, icon gap */
+    --space-ui-cozy:         var(--space-4);    /* 16 — control padding */
+    --space-ui-comfortable:  var(--space-6);    /* 24 — section internal */
+    --space-ui-spacious:     var(--space-7);    /* 32 — control block gap */
+    --space-editorial:       var(--space-10);   /* 64 — between editorial bands */
+    --space-editorial-lg:    var(--space-12);   /* 96 — between major sections */
+    --space-editorial-xl:    var(--space-13);   /* 128 — between hero-class sections */
+    --space-editorial-2xl:   var(--space-14);   /* 160 — signature finale */
+
+    /* =====================================================
+       6. CONTAINER SYSTEM
+       ===================================================== */
+
+    --container-functional:  1280px;  /* Forms, checkout, product info, nav */
+    --container-functional-narrow: 960px;
+    --container-editorial:   1440px;  /* Hero, campaigns, editorial gallery */
+    --container-edge:        100vw;   /* Full bleed */
+
+    /* Legacy alias — UiContainer default still references this. */
+    --container-max-width:   var(--container-functional);
+    --container-narrow:      var(--container-functional-narrow);
+    --container-wide:        var(--container-editorial);
+
+    /* Section vertical rhythm */
+    --section-y:             var(--space-editorial-lg);    /* 96 */
+    --section-y-tight:       var(--space-editorial);       /* 64 */
+    --section-y-mobile:      var(--space-9);               /* 48 */
+    --section-y-hero:        var(--space-editorial-xl);    /* 128 — hero only */
+
+    /* =====================================================
+       7. SHAPE LANGUAGE — locked
+       ===================================================== */
+
+    --radius-image:        0px;       /* Editorial / hero — sharp */
+    --radius-image-soft:   8px;       /* Optional small soften */
+    --radius-card:         8px;       /* Product card */
+    --radius-button:       12px;      /* Buttons, inputs */
+    --radius-input:        8px;       /* Alias */
+    --radius-modal:        16px;      /* Modal, drawer */
+    --radius-drawer:       16px;
+    --radius-pill:         999px;     /* Badges, chips, status */
+
+    /* Legacy aliases */
+    --radius-xs:           4px;
+    --radius-sm:           8px;
+    --radius-md:           var(--radius-button);
+    --radius-lg:           12px;
+    --radius-xl:           var(--radius-modal);
+    --radius-2xl:          24px;
+    --radius-full:         var(--radius-pill);
+
+    /* =====================================================
+       8. BORDER SYSTEM
+       ===================================================== */
+
+    --border-width:        1px;
+    --border-width-strong: 1.5px;
+    --border-width-bold:   2px;
+    --border-color:        var(--color-border);
+    --border-color-strong: var(--color-border-strong);
+
+    /* =====================================================
+       9. ELEVATION / SHADOW
+       Depth via contrast, layout, future motion.
+       Use shadow sparingly. Reserved for: modal, dropdown,
+       popover, cart drawer, elevated overlay.
+       ===================================================== */
+
+    --shadow-none:     none;
+    --shadow-xs:       0 1px 2px rgba(17, 17, 17, 0.04);
+    --shadow-sm:       0 1px 3px rgba(17, 17, 17, 0.06), 0 1px 2px rgba(17, 17, 17, 0.04);
+    --shadow-md:       0 4px 12px rgba(17, 17, 17, 0.06), 0 2px 4px rgba(17, 17, 17, 0.04);
+    --shadow-lg:       0 10px 28px rgba(17, 17, 17, 0.08), 0 4px 8px rgba(17, 17, 17, 0.04);
+    --shadow-xl:       0 24px 56px rgba(17, 17, 17, 0.10), 0 8px 16px rgba(17, 17, 17, 0.04);
+
+    /* Brand-tinted shadows (used only on commerce CTA + final craving) */
+    --shadow-red:      0 8px 24px -4px rgba(228, 38, 61, 0.35);
+    --shadow-red-soft: 0 4px 14px -4px rgba(228, 38, 61, 0.25);
+    --shadow-spicy:    0 8px 24px -4px rgba(221, 53, 8, 0.30);
+    --shadow-gold:     0 8px 24px -4px rgba(255, 176, 0, 0.30);
+
+    /* =====================================================
+       10. MOTION
+       ===================================================== */
+
+    --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out:     cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* UI motion — 150–300ms range */
+    --dur-fast:        150ms;
+    --dur-base:        240ms;
+    --dur-slow:        320ms;
+
+    /* Brand entrance (reserved for future phases; not used in Phase 1). */
+    --dur-brand:       600ms;
+    --dur-cinematic:   900ms;
+
+    /* =====================================================
+       11. Z-INDEX
+       ===================================================== */
+
+    --z-base:          1;
+    --z-raised:        10;
+    --z-dropdown:      20;
+    --z-sticky:        40;
+    --z-overlay:       100;
+    --z-modal:         200;
+    --z-popover:       220;
+    --z-toast:         300;
+    --z-tooltip:       320;
+
+    /* =====================================================
+       12. CUSTOMER SHELL — Navbar metrics
+       Consumed by NavbarHome + inner pages padding-top.
+       ===================================================== */
+    --navbar-height:        76px;
+    --navbar-height-mobile: 62px;
+}
+
+/* =====================================================
+   RESET / FOUNDATION
+   ===================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    scroll-behavior: smooth;
+    font-family: var(--font-ui);
+    font-size: var(--font-size-body);
+    line-height: var(--leading-body);
+    color: var(--color-text);
+    background-color: var(--color-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+}
+
+#app {
+    min-height: 100vh;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+/* Legacy action classes share the same foundation as UiButton. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 12px 22px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-button);
+    background: var(--color-surface);
+    color: var(--color-brand-ink);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-out),
+        border-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out);
+}
+.btn-primary {
+    background: var(--color-brand-action);
+    border-color: var(--color-brand-action);
+    color: var(--color-white);
+}
+.btn-primary:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--color-brand-action-hover);
+    border-color: var(--color-brand-action-hover);
+}
+.btn-outline {
+    background: var(--color-surface);
+    border-color: var(--color-brand-action);
+    color: var(--color-brand-action);
+}
+.btn-outline:hover:not(:disabled):not([aria-disabled='true']) {
+    background: var(--color-brand-soft);
+}
+.btn.btn-danger {
+    background: var(--color-error-bg);
+    border-color: var(--color-error);
+    color: var(--status-error-text);
+}
+.btn:disabled, .btn[aria-disabled='true'] {
+    opacity: .55;
+    cursor: not-allowed;
+}
+.btn:focus-visible {
+    outline: 3px solid var(--color-brand-action);
+    outline-offset: 3px;
+}
+
+/* Small native actions without a component class still receive a clear style.
+   Page-specific button selectors retain precedence over this fallback. */
+:where(button:not([class])) {
+    padding: 10px 16px;
+    border: 1px solid var(--color-brand-action);
+    border-radius: var(--radius-button);
+    background: var(--color-brand-action);
+    color: var(--color-white);
+    font: 600 14px/1.4 var(--font-ui);
+}
+:where(button:not([class])):hover:not(:disabled) {
+    background: var(--color-brand-action-hover);
+}
+:where(button:not([class])):disabled { opacity: .55; cursor: not-allowed; }
+
+input,
+textarea,
+select {
+    font-family: inherit;
+}
+
+/* =====================================================
+   GLOBAL TYPOGRAPHY BASELINE
+   ===================================================== */
+
+/* Display typography — Brand only. Do NOT use on forms/checkout. */
+.display,
+.display-1,
+.display-2,
+h1.display,
+h2.display {
+    font-family: var(--font-display);
+    font-weight: var(--weight-extrabold);
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+    color: var(--color-text);
+}
+
+.heading-1 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-extrabold);
+    font-size: var(--font-size-h1);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-heading);
+    color: var(--color-text);
+}
+
+.heading-2 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-bold);
+    font-size: var(--font-size-h2);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-heading);
+    color: var(--color-text);
+}
+
+.heading-3 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-bold);
+    font-size: var(--font-size-h3);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-heading);
+    color: var(--color-text);
+}
+
+.section-title {
+    font-family: var(--font-display);
+    font-weight: var(--weight-bold);
+    font-size: var(--font-size-section);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-heading);
+    color: var(--color-text);
+}
+
+.product-title {
+    font-family: var(--font-ui);
+    font-weight: var(--weight-semibold);
+    font-size: var(--font-size-product);
+    line-height: var(--leading-snug);
+    color: var(--color-text);
+}
+
+.text-body { font-size: var(--font-size-body); line-height: var(--leading-body); }
+.text-body-sm { font-size: var(--font-size-body-sm); line-height: var(--leading-body); }
+.text-small { font-size: var(--font-size-ui); line-height: var(--leading-snug); }
+.text-micro { font-size: var(--font-size-micro); line-height: var(--leading-snug); }
+
+/* =====================================================
+   LINKS
+   ===================================================== */
+
+a {
+    color: inherit;
+    text-decoration: none;
+    transition:
+        color var(--dur-fast) var(--ease-out),
+        background-color var(--dur-fast) var(--ease-out);
+}
+
+a:hover {
+    color: var(--color-brand-action);
+}
+
+a:active {
+    color: var(--color-brand-action-hover);
+}
+
+/* Navigation links never change layout on hover (no shift). */
+.nav-link {
+    transition: color var(--dur-fast) var(--ease-out);
+}
+.nav-link:hover { color: var(--color-text); }
+
+/* =====================================================
+   FOCUS-VISIBLE — keyboard baseline
+   Replaces browser default. Calm and visible.
+   ===================================================== */
+
+:focus {
+    outline: none;
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-brand-action);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* =====================================================
+   CUSTOMER SHELL — global body lock when mobile menu is open
+   Toggled by useNavbarState composable.
+   Honors prefers-reduced-motion (no scroll restoration animation).
+   ===================================================== */
+
+body.is-mobile-menu-open {
+    /* Lock only document scroll. Allow inner scrollable containers
+       (mobile menu, etc.) to still scroll with touch. */
+    overflow: hidden;
+}
+
+/* =====================================================
+   CUSTOMER SHELL — utility classes
+   Used by inner customer pages with a fixed Navbar above.
+   Centralizes the navbar offset so individual pages don't
+   reinvent it. Token-based — change --navbar-height to reflow all.
+   ===================================================== */
+
+.has-customer-navbar {
+    padding-top: var(--navbar-height);
+}
+@media (max-width: 768px) {
+    .has-customer-navbar {
+        padding-top: var(--navbar-height-mobile);
+    }
+}
+
+/* =====================================================
+   LAYOUT PRIMITIVES
+   ===================================================== */
+
+.container {
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.container-narrow {
+    max-width: var(--container-narrow);
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.container-editorial {
+    max-width: var(--container-editorial);
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.text-center { text-align: center; }
+
+/* =====================================================
+   UTILITY CLASSES (semantic only)
+   ===================================================== */
+
+.font-bold { font-weight: var(--weight-bold); }
+.font-semibold { font-weight: var(--weight-semibold); }
+.font-extrabold { font-weight: var(--weight-extrabold); }
+.font-display { font-family: var(--font-display); }
+.font-ui { font-family: var(--font-ui); }
+
+.text-spicy { color: var(--color-brand-primary); }
+.text-chili { color: var(--color-brand-action); }
+.text-inverse { color: var(--color-text-inverse); }
+.text-muted { color: var(--color-text-muted); }
+.text-subtle { color: var(--color-text-subtle); }
+
+.bg-cream { background-color: var(--color-background); }
+.bg-cream-alt { background-color: var(--color-background-alt); }
+.bg-white { background-color: var(--color-surface); }
+.bg-dark { background-color: var(--color-surface-dark); color: var(--color-text-inverse); }
+.bg-spicy { background-color: var(--color-brand-primary); color: var(--color-text-inverse); }
+
+/* =====================================================
+   REDUCED MOTION
+   ===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* =====================================================
+   BREAKPOINT DOCUMENTATION
+   (CSS doesn't read these, but referenced from JS/components.)
+
+   sm   : 480px   (small phone)
+   md   : 768px   (tablet portrait)
+   lg   : 1024px  (tablet landscape / small laptop)
+   xl   : 1280px  (desktop)
+   2xl  : 1536px  (wide desktop)
+
+   Use these as `@media (min-width: 768px)` etc.
+   ===================================================== */
