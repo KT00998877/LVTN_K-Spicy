@@ -1,0 +1,48 @@
+{
+  "name": "front-end",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:staff-notifications": "node --test tests/staff-notifications.test.mjs",
+    "test:payments": "node --test tests/payment-flow.test.mjs",
+    "test:realtime": "node --test tests/realtime.test.mjs tests/realtime-stores.test.mjs",
+    "test:reservations": "node --test tests/reservation.test.mjs tests/reservation-form.test.mjs",
+    "test:customer": "node --test tests/customer-session.test.mjs",
+    "dev": "vite",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "preview": "vite preview",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build"
+  },
+  "dependencies": {
+    "@tinymce/tinymce-vue": "^6.3.0",
+    "axios": "^1.20.0",
+    "chart.js": "^4.5.1",
+    "laravel-echo": "^2.5.0",
+    "leaflet": "^1.9.4",
+    "pinia": "^4.0.2",
+    "pusher-js": "^8.6.0",
+    "tinymce": "^8.9.3",
+    "tinymce-i18n": "^26.9.28",
+    "vue": "^3.5.40",
+    "vue-chartjs": "^5.3.4",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "npm-run-all2": "^9.0.2",
+    "typescript": "~6.0.0",
+    "vite": "^8.1.5",
+    "vite-plugin-static-copy": "^4.1.1",
+    "vite-plugin-vue-devtools": "^8.1.5",
+    "vue-tsc": "^3.3.7"
+  },
+  "engines": {
+    "node": "^22.18.0 || >=24.12.0"
+  }
+}
