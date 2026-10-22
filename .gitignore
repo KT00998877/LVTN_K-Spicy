@@ -1,0 +1,279 @@
+# =============================================================================
+# K-Spicy (LVTN-QLNH) - Root .gitignore
+# Monorepo: back-end (Laravel) | front-end (Vue3+Vite) | mobile (Flutter) | AI-service (Python FastAPI)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1. ENVIRONMENT / SECRETS  (highest priority - keep .env.example tracked)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key35
+*.p12
+*.pfx
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+auth.json
+credentials.json
+secrets.json
+service-account*.json
+
+# ---------------------------------------------------------------------------
+# 2. OS / SYSTEM
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---------------------------------------------------------------------------
+# 3. IDE / EDITOR
+# ---------------------------------------------------------------------------
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.kotlin/
+
+# Zed / Nova / PhpStorm misc
+.zed/
+.nova/
+.phpactor.json
+*.code-snippets
+
+# Vim / swap
+*.swp
+*.swo
+*~
+.vim/
+/.github/
+# ---------------------------------------------------------------------------
+# 4. AI AGENT CONFIG  (keep .cursor/rules - project design rules)
+# ---------------------------------------------------------------------------
+/.cursor/
+/.agents/
+/.claude/
+/.vscode/
+.cursor/skills/
+.cursor/.claude/
+.agents/skills/
+.claude/skills/
+.codex/
+.aider*
+.cursorignore
+
+# ---------------------------------------------------------------------------
+# 5. LOGS
+# ---------------------------------------------------------------------------
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+debug.log
+dev.log
+
+# ---------------------------------------------------------------------------
+# 6. ARCHIVE  (legacy code - 122MB, superseded by active dirs)
+# ---------------------------------------------------------------------------
+/archive/
+
+# ---------------------------------------------------------------------------
+# 7. DOCS / ARTIFACTS  (keep .md, .svg, .png source of truth)
+# ---------------------------------------------------------------------------
+/docs/
+docs/luan-van/*.zip
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+*.iso
+*.dmg
+
+# ---------------------------------------------------------------------------
+# 8. ROOT SCRIPTS / LOCAL TOOLS
+# ---------------------------------------------------------------------------
+restart-chatbot.cmd
+*.pid
+*.seed
+
+# ===========================================================================
+# back-end/  (Laravel 11)
+# ===========================================================================
+/back-end/vendor/
+/back-end/node_modules/
+/back-end/public/build/
+/back-end/public/hot
+/public/storage
+/back-end/public/fonts-manifest.dev.json
+/back-end/storage/*.key
+/back-end/storage/pail
+/back-end/storage/app/public/*
+!/back-end/storage/app/public/.gitignore
+/back-end/storage/app/private/*
+!/back-end/storage/app/private/.gitignore
+/back-end/storage/framework/cache/data/*
+!/back-end/storage/framework/cache/data/.gitignore
+/back-end/storage/framework/sessions/*
+!/back-end/storage/framework/sessions/.gitignore
+/back-end/storage/framework/testing/*
+!/back-end/storage/framework/testing/.gitignore
+/back-end/storage/framework/views/*
+!/back-end/storage/framework/views/.gitignore
+/back-end/storage/logs/*
+!/back-end/storage/logs/.gitignore
+/back-end/bootstrap/cache/*
+!/back-end/bootstrap/cache/.gitignore
+/back-end/database/*.sqlite
+/back-end/database/*.sqlite-journal
+/back-end/database/*.sqlite-shm
+/back-end/database/*.sqlite-wal
+/back-end/database/*.db
+/back-end/.phpunit.result.cache
+/back-end/.phpunit.cache/
+/back-end/tests/_output/
+/back-end/_ide_helper.php
+/back-end/.phpunit.xml.bak
+Homestead.json
+Homestead.yaml
+
+# ===========================================================================
+# front-end/  (Vue 3 + Vite + TypeScript)
+# ===========================================================================
+/front-end/node_modules/
+/front-end/dist/
+/front-end/dist-ssr/
+/front-end/coverage/
+/front-end/.vite/
+/front-end/.vite-inspect/
+/front-end/.eslintcache
+/front-end/.stylelintcache
+/front-end/*.tsbuildinfo
+/front-end/*.local
+/front-end/cypress/videos/
+/front-end/cypress/screenshots/
+/front-end/test-results/
+/front-end/playwright-report/
+/front-end/blob-report/
+/front-end/.playwright/
+/front-end/__screenshots__/
+/front-end/src/**/*.timestamp-*-*.mjs
+
+# ===========================================================================
+# mobile/  (Flutter)
+# ===========================================================================
+/mobile/.dart_tool/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/.packages
+/mobile/.pub-cache/
+/mobile/.pub/
+/mobile/build/
+/mobile/coverage/
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/
+/mobile/ios/Flutter/Flutter.framework
+/mobile/ios/Flutter/Flutter.podspec
+/mobile/ios/Flutter/ephemeral/
+/mobile/ios/Runner.xcworkspace/xcuserdata/
+/mobile/ios/Runner.xcodeproj/xcuserdata/
+/mobile/ios/Runner/GeneratedPluginRegistrant.*
+/mobile/android/.gradle/
+/mobile/android/local.properties
+/mobile/android/key.properties
+/mobile/android/app/release/
+/mobile/android/app/debug/
+/mobile/android/app/profile/
+/mobile/*.iml
+/mobile/analysis_options.yaml.local
+/mobile/**/generated_plugin_registrant.dart
+/mobile/**/GeneratedPluginRegistrant.dart
+
+# ===========================================================================
+# AI-service/  (Python FastAPI + RAG)
+# ===========================================================================
+/AI-service/venv/
+/AI-service/.venv/
+/AI-service/env/
+/AI-service/ENV/
+/AI-service/.eggs/
+/AI-service/*.egg-info/
+/AI-service/.pytest_cache/
+/AI-service/.tox/
+/AI-service/.mypy_cache/
+/AI-service/.ruff_cache/
+/AI-service/.coverage
+/AI-service/htmlcov/
+/AI-service/dist/
+/AI-service/build/
+/AI-service/*.whl
+/AI-service/knowledge_base/embeddings/local/
+/AI-service/knowledge_base/index/
+/AI-service/knowledge_base/processed/
+/AI-service/knowledge_base/versions/
+/AI-service/knowledge_base/**/*.bin
+/AI-service/knowledge_base/**/*.faiss
+/AI-service/knowledge_base/**/*.pkl
+
+# Python bytecode / caches (global - covers scripts/, archive/, AI-service/)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===========================================================================
+# 7. DATABASE DUMPS (keep migrations/seeders/factories - source of truth)
+# ===========================================================================
+*.sql
+*.sql.gz
+*.dump
+
+# ===========================================================================
+# 8. MISC / TEMP
+# ============================================================================
+*.tmp
+*.temp
+*.orig
+*.rej
+.cache/
+.temp/
+.tmp/
+coverage/
+htmlcov/
+.nyc_output/
+coverage-final.json
+node_modules/
+/restart-chatbot.cmd
+/B2205886_TruongVanAnhKiet_LVTN.doc
