@@ -1,0 +1,63 @@
+name: micay_app
+description: "Mì Cay Restaurant — Customer + Shipper mobile app"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.6.2
+
+  # HTTP client + interceptor
+  dio: ^5.7.0
+
+  # Local storage
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.3
+
+  # Maps (OpenStreetMap, free)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^14.0.2
+
+  # Image
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+
+  # Utility
+  intl: ^0.19.0
+  url_launcher: ^6.3.1
+  connectivity_plus: ^6.1.0
+  uuid: ^4.6.0
+
+  # Deep link — nhận VNPay return URL (micay://payment/return?code=...)
+  app_links: ^6.3.2
+
+  # .env loader — đọc BASE_URL_WEB / BASE_URL_MOBILE khi khởi động
+  flutter_dotenv: ^5.2.1
+
+  # OSRM polyline decode: tự implement (~30 LOC, xem PolylineCodec).
+
+  # UI helpers
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1   # Be Vietnam Pro / Inter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mocktail: ^1.0.4       # mock for unit tests
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
