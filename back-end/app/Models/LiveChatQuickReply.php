@@ -11,15 +11,14 @@ use Illuminate\Database\Eloquent\Model;
  * để bấm, kể cả khi dịch vụ AI gián đoạn.
  *
  * @property int $id
- * @property string $title
  * @property string $content
+ * @property string $category
  */
 class LiveChatQuickReply extends Model
 {
     protected $table = 'live_chat_quick_replies';
 
     protected $fillable = [
-        'title',
         'content',
         'category',
         'sort_order',

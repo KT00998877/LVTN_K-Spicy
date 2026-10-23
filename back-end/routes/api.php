@@ -519,9 +519,11 @@ Route::prefix('chatbot')->group(function () {
 | vừa mở phiên tư vấn với nhân viên. Hệ thống này tách hoàn toàn khỏi
 | `chat_sessions` nên luồng chatbot cũ không bị ảnh hưởng.
 |
-| Khách: BẮT BUỘC đăng nhập (`auth:sanctum`). Khách vãng lai dùng chatbot
-| (không cần đăng nhập) nhưng tư vấn trực tiếp cần biết khách là ai để
-| nhân viên phục vụ và lưu lại lịch sử.
+| Khách: BẮT BUỘC đăng nhập. Dùng `AuthenticateSanctumOrGuest` (resolve user
+| nếu có token, không chặn request) rồi controller tự trả 401 kèm cờ
+| `requires_login` — widget cần biết để mời khách đăng nhập thay vì báo lỗi
+| kỹ thuật. Khách vãng lai dùng chatbot (không cần đăng nhập) nhưng tư vấn
+| trực tiếp cần biết khách là ai để nhân viên phục vụ và lưu lịch sử.
 |
 | Nhân viên: yêu cầu đăng nhập + role quản lý/nhân viên.
 */
@@ -529,7 +531,7 @@ Route::prefix('live-chat')->group(function () {
     $liveChat = \App\Http\Controllers\Api\LiveChatController::class;
     $manager = \App\Http\Controllers\Api\LiveChatManagerController::class;
 
-    Route::middleware('auth:sanctum')->group(function () use ($liveChat) {
+    Route::middleware(\App\Http\Middleware\AuthenticateSanctumOrGuest::class)->group(function () use ($liveChat) {
         Route::post('/sessions',                    [$liveChat, 'start']);
         Route::get('/sessions/{id}',                [$liveChat, 'show'])->whereNumber('id');
         Route::post('/sessions/{id}/messages',      [$liveChat, 'sendMessage'])->whereNumber('id');
@@ -538,7 +540,7 @@ Route::prefix('live-chat')->group(function () {
 
     // Xác thực kênh realtime riêng cho live chat: route broadcasting chuẩn bị
     // khoá cho nhân viên nên khách không đi qua được.
-    Route::middleware('auth:sanctum')
+    Route::middleware(\App\Http\Middleware\AuthenticateSanctumOrGuest::class)
         ->post('/broadcast-auth', [\App\Http\Controllers\Api\LiveChatBroadcastAuthController::class, 'authenticate']);
 
     // Phía nhân viên: xem hàng chờ, nhận và trả lời phiên.

@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * LiveChatSession — một phiên tư vấn trực tiếp giữa khách và nhân viên.
  *
+ * Cột bám theo bảng `live_chat_sessions` đã có sẵn: `subject` (chủ đề khách
+ * nêu), `guest_token` và `metadata` là cột dự phòng.
+ *
  * @property int $id
  * @property int $user_id
  * @property int|null $assigned_staff_id
@@ -20,18 +23,20 @@ class LiveChatSession extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_token',
         'assigned_staff_id',
         'customer_name',
         'customer_phone',
-        'customer_email',
+        'subject',
         'status',
-        'topic',
+        'metadata',
         'accepted_at',
         'closed_at',
         'last_message_at',
     ];
 
     protected $casts = [
+        'metadata' => 'array',
         'accepted_at' => 'datetime',
         'closed_at' => 'datetime',
         'last_message_at' => 'datetime',
@@ -60,7 +65,7 @@ class LiveChatSession extends Model
         return $query->where('status', 'waiting');
     }
 
-    /** Phiên nhân viên đang xử lý (chưa đóng). */
+    /** Phiên chưa kết thúc — dùng để tái sử dụng phiên của khách. */
     public function scopeActive($query)
     {
         return $query->whereIn('status', ['waiting', 'accepted']);

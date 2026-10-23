@@ -63,11 +63,11 @@ class LiveChatController extends Controller
 
         $session = LiveChatSession::create([
             'user_id' => $user->id,
+            'guest_token' => null,
             'customer_name' => $user->full_name ?: $user->name,
             'customer_phone' => $user->phone,
-            'customer_email' => $user->email,
             'status' => 'waiting',
-            'topic' => $request->input('topic'),
+            'subject' => $request->input('topic'),
         ]);
 
         // Nhân viên cần biết có khách mới ngay, nên phát sự kiện hàng chờ.
@@ -210,7 +210,7 @@ class LiveChatController extends Controller
             'id' => $session->id,
             'status' => $session->status,
             'customer_name' => $session->customer_name,
-            'topic' => $session->topic,
+            'subject' => $session->subject,
             'assigned_staff_id' => $session->assigned_staff_id,
             'assigned_staff_name' => $session->assignedStaff?->name,
             'last_message_at' => $session->last_message_at?->toIso8601String(),

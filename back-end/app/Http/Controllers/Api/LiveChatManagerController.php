@@ -283,7 +283,7 @@ class LiveChatManagerController extends Controller
             'status' => $session->status,
             'customer_name' => $session->customer_name,
             'customer_phone' => $session->customer_phone,
-            'topic' => $session->topic,
+            'subject' => $session->subject,
             'assigned_staff_id' => $session->assigned_staff_id,
             'assigned_staff_name' => $session->assignedStaff?->name,
             'last_message_at' => $session->last_message_at?->toIso8601String(),
