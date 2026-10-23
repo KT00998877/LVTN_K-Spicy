@@ -58,8 +58,11 @@ class LiveChatController extends Controller
         }
 
         $request->validate([
+            'subject' => 'nullable|string|max:500',
             'topic' => 'nullable|string|max:500',
         ]);
+
+        $subject = $request->input('subject') ?: $request->input('topic');
 
         $session = LiveChatSession::create([
             'user_id' => $user->id,
@@ -67,7 +70,7 @@ class LiveChatController extends Controller
             'customer_name' => $user->full_name ?: $user->name,
             'customer_phone' => $user->phone,
             'status' => 'waiting',
-            'subject' => $request->input('topic'),
+            'subject' => $subject,
         ]);
 
         // Nhân viên cần biết có khách mới ngay, nên phát sự kiện hàng chờ.

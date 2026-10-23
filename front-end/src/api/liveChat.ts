@@ -39,7 +39,7 @@ export interface LiveChatSession {
     status: LiveChatStatus
     customer_name: string
     customer_phone?: string | null
-    topic?: string | null
+    subject?: string | null
     assigned_staff_id: number | null
     assigned_staff_name: string | null
     last_message_at: string | null
@@ -65,8 +65,8 @@ export interface LiveChatSuggestions {
  *
  * Yêu cầu đăng nhập — backend trả 401 nếu khách chưa đăng nhập.
  */
-export async function startSession(topic?: string): Promise<LiveChatSession> {
-    const { data } = await apiClient.post('/live-chat/sessions', topic ? { topic } : {})
+export async function startSession(subject?: string): Promise<LiveChatSession> {
+    const { data } = await apiClient.post('/live-chat/sessions', subject ? { subject } : {})
     return data.data
 }
 
