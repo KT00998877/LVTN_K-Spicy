@@ -17,7 +17,7 @@ import dev_chatbot
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PORTS = (8000, 8001, 8002, 5173)
+PORTS = (8000, 8001, 8002, 8080, 5173)
 
 
 def service_root(port: int, process: psutil.Process) -> psutil.Process | None:
@@ -27,7 +27,11 @@ def service_root(port: int, process: psutil.Process) -> psutil.Process | None:
         cwd = Path(process.cwd()).resolve()
         if port in (8000, 8002):
             expected = (ROOT / "back-end").resolve()
-            if cwd != expected / "public" or "-s" not in command or f"127.0.0.1:{port}" not in command:
+            # The two Laravel processes may bind 127.0.0.1 or 0.0.0.0 (the
+            # latter so a phone on the LAN can reach them), so accept both.
+            if cwd != expected / "public" or "-s" not in command or not any(
+                f"{host}:{port}" in command for host in ("127.0.0.1", "0.0.0.0")
+            ):
                 return None
             for parent in process.parents():
                 args = [part.lower() for part in parent.cmdline()]
@@ -39,11 +43,39 @@ def service_root(port: int, process: psutil.Process) -> psutil.Process | None:
             return None
         if port == 8001:
             return process if cwd == (ROOT / "AI-service").resolve() and "app.py" in command else None
+        if port == 8080:
+            # Reverb phục vụ WebSocket cho tư vấn trực tiếp.
+            expected = (ROOT / "back-end").resolve()
+            return process if cwd == expected and "artisan" in command and "reverb:start" in command else None
         if port == 5173:
             return process if cwd == (ROOT / "front-end").resolve() and any("vite.js" in arg for arg in command) else None
     except (psutil.Error, OSError):
         return None
     return None
+
+
+def artisan_workers() -> list[psutil.Process]:
+    """Các tiến trình artisan không lắng nghe cổng nào (queue worker).
+
+    Queue worker không mở cổng nên không dò được qua danh sách listener —
+    phải nhận diện bằng dòng lệnh. Không có worker thì các event còn dùng
+    queue sẽ nằm im trong bảng `jobs` và người dùng phải F5 mới thấy.
+    """
+    expected = (ROOT / "back-end").resolve()
+    workers = []
+    for process in psutil.process_iter(["pid", "cmdline"]):
+        try:
+            command = [part.lower() for part in (process.info["cmdline"] or [])]
+            if "artisan" not in command or not any(
+                arg.startswith("queue:work") or arg.startswith("queue:listen") for arg in command
+            ):
+                continue
+            if Path(process.cwd()).resolve() != expected:
+                continue
+            workers.append(process)
+        except (psutil.Error, OSError, KeyError):
+            continue
+    return workers
 
 
 def main() -> None:
@@ -59,6 +91,10 @@ def main() -> None:
         if root is None:
             raise SystemExit(f"Port {port} is used by an unrecognized process (PID {pid}); nothing was stopped.")
         roots[root.pid] = root
+
+    # Queue worker không mở cổng nên phải dò riêng.
+    for worker in artisan_workers():
+        roots[worker.pid] = worker
 
     # Validate every occupied port before changing any process.
     for root in roots.values():
