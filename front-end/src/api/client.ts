@@ -23,9 +23,19 @@ function getChatGuestToken(): string | null {
     }
 }
 
+/**
+ * Endpoint ký kênh realtime của live chat.
+ *
+ * Nó được gọi bởi CẢ nhân viên (dùng `staff_token`) lẫn khách (dùng
+ * `auth_token`), nên không thể suy ra token từ URL như các endpoint khác.
+ */
+const LIVE_CHAT_AUTH_URL = '/live-chat/broadcast-auth'
+
 /** Credentials never cross the customer/staff boundary. */
 function pickToken(url: string | undefined): string | null {
     if (!url) return null
+    // Caller tự gắn Authorization header — không suy diễn ở đây.
+    if (url.includes(LIVE_CHAT_AUTH_URL)) return null
     const isStaff = url.includes('/staff/') || url.includes('/broadcasting/auth')
     if (isStaff) {
         return localStorage.getItem('staff_token')
@@ -52,6 +62,9 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // ===== Handle 401 globally =====
 function staleSession(config: InternalAxiosRequestConfig | undefined): boolean {
     if (!config) return false
+    // Endpoint ký kênh live chat dùng token nào tuỳ phía gọi (nhân viên hay
+    // khách), nên không thể so sánh với token "hiện tại" của interceptor.
+    if (config.url?.includes(LIVE_CHAT_AUTH_URL)) return false
     const sent = config.headers.Authorization ?? null
     const current = pickToken(config.url)
     return sent !== (current ? `Bearer ${current}` : null)

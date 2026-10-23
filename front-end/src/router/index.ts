@@ -196,6 +196,7 @@ const router = createRouter({
                 { path: 'orders', name: 'manager-orders', component: () => import('../views/staff/manager/ManagerSalesView.vue'), meta: { title: 'Quản lý đơn hàng' } },
                 { path: 'invoices', name: 'manager-invoices', component: () => import('../views/staff/manager/ManagerSalesView.vue'), meta: { title: 'Quản lý hóa đơn' } },
                 { path: 'online-orders', name: 'manager-online-orders', component: () => import('../views/staff/manager/ManagerOnlineOrdersView.vue'), meta: { title: 'Đơn giao hàng', subtitle: 'Xác nhận, từ chối, bàn giao shipper' } },
+                { path: 'live-chat', name: 'manager-live-chat', component: () => import('../views/staff/manager/ManagerLiveChatView.vue'), meta: { title: 'Tư vấn trực tiếp', subtitle: 'Trả lời khách đang chờ' } },
                 { path: 'ingredients', name: 'manager-ingredients', component: ManagerInventoryView, meta: { title: 'Nguyên liệu', subtitle: 'Danh sách nguyên liệu và đơn vị tính' } },
                 { path: 'ingredients/manager', name: 'manager-ingredients-crud', component: ManagerIngredientsView, meta: { title: 'Quản lý nguyên liệu', subtitle: 'CRUD nguyên liệu — Phase 2' } },
                 { path: 'recipes', name: 'manager-recipes', component: ManagerRecipeView, meta: { title: 'Công thức món ăn', subtitle: 'Định lượng nguyên liệu theo món' } },

@@ -112,6 +112,9 @@ const managerGroups = [
         { path: '/staff/manager/staff', label: 'Nhân viên' },
         { path: '/staff/manager/permissions', label: 'Phân quyền' },
     ] },
+    { id: 'service', label: 'Dịch vụ khách hàng', items: [
+        { path: '/staff/manager/live-chat', label: 'Tư vấn trực tiếp' },
+    ] },
     { id: 'reports', label: 'Báo cáo thống kê', items: [
         { path: '/staff/manager/report', label: 'Doanh thu & món bán chạy' },
     ] },
