@@ -7,29 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:micay_app/core/api/dio_client.dart';
 import 'package:micay_app/core/config.dart';
-import 'package:micay_app/features/auth/domain/app_user.dart';
 import 'package:micay_app/features/auth/presentation/auth_controller.dart';
 import 'package:micay_app/features/live_chat/data/live_chat_repository.dart';
-import 'package:micay_app/features/live_chat/domain/live_chat_models.dart';
 import 'package:micay_app/features/live_chat/presentation/live_chat_controller.dart';
 import 'package:micay_app/features/live_chat/presentation/live_chat_screen.dart';
 
 /// Adapter trả về payload tuỳ theo path của request.
 class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter({this.onRequest});
-
-  final void Function(RequestOptions options)? onRequest;
-
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    onRequest?.call(options);
-
     final path = options.path;
     final Map<String, dynamic> body;
 
