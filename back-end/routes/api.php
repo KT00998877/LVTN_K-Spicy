@@ -330,6 +330,7 @@ Route::prefix('staff')->group(function () {
             Route::get('/low-products',   [$ctrl, 'lowProducts']);
             Route::get('/categories',     [$ctrl, 'categories']);
             Route::get('/payments',       [$ctrl, 'payments']);
+            Route::get('/order-types',    [$ctrl, 'orderTypes']);
             Route::get('/customers',      [$ctrl, 'customers']);
             Route::get('/reservations',   [$ctrl, 'reservations']);
             Route::get('/peak-hours',     [$ctrl, 'peakHours']);

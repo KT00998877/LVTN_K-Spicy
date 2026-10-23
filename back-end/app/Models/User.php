@@ -33,6 +33,7 @@ class User extends Authenticatable
         'password',
         'is_active',
         'loyalty_points',
+        'avatar_path',
         'can_close_daily_stock',
     ];
 

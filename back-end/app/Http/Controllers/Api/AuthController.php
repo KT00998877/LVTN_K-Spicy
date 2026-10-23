@@ -8,6 +8,7 @@ use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -173,6 +174,72 @@ class AuthController extends Controller
     }
 
     /**
+     * POST /api/auth/me/avatar
+     * Upload ảnh đại diện. Tạm thời giới hạn ở ảnh vuông để client hiển thị
+     * tròn không bị méo; client nên crop trước khi gửi.
+     */
+    public function updateAvatar(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ], [
+            'avatar.required' => 'Vui lòng chọn ảnh đại diện.',
+            'avatar.image'    => 'Tệp phải là hình ảnh.',
+            'avatar.mimes'    => 'Ảnh phải có định dạng JPG, PNG hoặc WebP.',
+            'avatar.max'      => 'Ảnh đại diện không được vượt quá 4MB.',
+        ]);
+
+        $disk = Storage::disk('public');
+        $extension = strtolower($data['avatar']->getClientOriginalExtension() ?: 'jpg');
+        // Tên random để không lộ tên/đường dẫn thật của khách lên URL.
+        $relativePath = 'avatars/' . $user->id . '-' . bin2hex(random_bytes(8)) . '.' . $extension;
+
+        $disk->put($relativePath, file_get_contents($data['avatar']->getRealPath()));
+
+        // Xóa ảnh cũ để không tích rác trong storage.
+        $previous = $user->avatar_path;
+        if ($previous && $previous !== $relativePath && $disk->exists($previous)) {
+            $disk->delete($previous);
+        }
+
+        $user->avatar_path = $relativePath;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật ảnh đại diện thành công.',
+            'data'    => $this->formatUser($user->fresh()),
+        ]);
+    }
+
+    /**
+     * DELETE /api/auth/me/avatar
+     * Xóa ảnh đại diện, quay về chữ cái đầu.
+     */
+    public function deleteAvatar(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $disk = Storage::disk('public');
+        if ($user->avatar_path && $disk->exists($user->avatar_path)) {
+            $disk->delete($user->avatar_path);
+        }
+
+        $user->avatar_path = null;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã xóa ảnh đại diện.',
+            'data'    => $this->formatUser($user->fresh()),
+        ]);
+    }
+
+    /**
      * POST /api/auth/change-password
      */
     public function changePassword(Request $request): JsonResponse
@@ -270,6 +337,9 @@ class AuthController extends Controller
             'full_name'      => $user->full_name,
             'email'          => $user->email,
             'phone'          => $user->phone,
+            'avatar_url'     => $user->avatar_path
+                ? Storage::disk('public')->url($user->avatar_path)
+                : null,
             'is_active'      => (bool) $user->is_active,
             'can_close_daily_stock' => (bool) $user->can_close_daily_stock,
             'loyalty_points' => (int) ($user->loyalty_points ?? 0),
