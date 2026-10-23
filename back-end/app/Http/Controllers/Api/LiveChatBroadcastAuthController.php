@@ -43,7 +43,15 @@ class LiveChatBroadcastAuthController extends BroadcastController
         }
 
         try {
-            return parent::authenticate($request);
+            // Broadcaster trả về mảng chữ ký (`auth` + `channel_data`), nên phải
+            // bọc lại thành JSON — trả thẳng mảng sẽ lỗi kiểu dữ liệu.
+            $signature = parent::authenticate($request);
+
+            if (is_array($signature)) {
+                return response()->json($signature);
+            }
+
+            return $signature;
         } catch (\Throwable $e) {
             Log::warning('Live chat broadcast auth failed', [
                 'channel' => $channelName,
@@ -65,6 +73,11 @@ class LiveChatBroadcastAuthController extends BroadcastController
         if (!$user->is_active) {
             return false;
         }
+
+        // Pusher/Reverb gửi `channel_name` kèm tiền tố (`private-live-chat-…`),
+        // còn khai báo trong routes/channels.php thì không có. Bỏ tiền tố trước
+        // khi so khớp, nếu không mọi kênh đều bị coi là không hợp lệ.
+        $channelName = preg_replace('/^(private-encrypted-|private-|presence-)/', '', $channelName) ?? $channelName;
 
         $isStaff = $user->roles()->whereIn('code', self::STAFF_ROLES)->exists();
 
