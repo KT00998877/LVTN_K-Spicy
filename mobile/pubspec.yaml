@@ -38,6 +38,9 @@ dependencies:
   connectivity_plus: ^6.1.0
   uuid: ^4.6.0
 
+  # Realtime — WebSocket client cho Laravel Reverb (tư vấn trực tiếp)
+  web_socket_channel: ^3.0.3
+
   # Deep link — nhận VNPay return URL (micay://payment/return?code=...)
   app_links: ^6.3.2
 
