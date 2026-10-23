@@ -143,6 +143,8 @@ Route::prefix('auth')->group(function () {
         Route::post('/logout-all',      [AuthController::class, 'logoutAll']);
         Route::get('/me',               [AuthController::class, 'me']);
         Route::put('/me',               [AuthController::class, 'updateProfile']);
+        Route::post('/me/avatar',       [AuthController::class, 'updateAvatar']);
+        Route::delete('/me/avatar',     [AuthController::class, 'deleteAvatar']);
         Route::post('/change-password', [AuthController::class, 'changePassword']);
     });
 });
@@ -500,10 +502,54 @@ Route::prefix('chatbot')->group(function () {
         // Pending actions (require auth)
         Route::middleware('auth:sanctum')->group(function () use ($chatbot) {
             Route::post('/pending-actions/{id}/confirm',  [$chatbot, 'confirmPendingAction'])->whereNumber('id');
-            Route::post('/pending-actions/{id}/cancel',  [$chatbot, 'cancelPendingAction'])->whereNumber('id');
-            Route::get('/pending-actions/{id}',          [$chatbot, 'getPendingAction'])->whereNumber('id');
-            Route::get('/sessions/{id}/pending-actions',  [$chatbot, 'getSessionPendingActions'])->whereNumber('id');
+            Route::post('/pending-actions/{id}/cancel',   [$chatbot, 'cancelPendingAction'])->whereNumber('id');
+            Route::get('/pending-actions/{id}',           [$chatbot, 'getPendingAction'])->whereNumber('id');
+            Route::get('/sessions/{id}/pending-actions', [$chatbot, 'getSessionPendingActions'])->whereNumber('id');
         });
         });
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Tư vấn trực tiếp — Live Chat
+|--------------------------------------------------------------------------
+|
+| Chạy SONG SONG với chatbot ở trên: cùng một khách có thể vừa hỏi trợ lý ảo,
+| vừa mở phiên tư vấn với nhân viên. Hệ thống này tách hoàn toàn khỏi
+| `chat_sessions` nên luồng chatbot cũ không bị ảnh hưởng.
+|
+| Khách: BẮT BUỘC đăng nhập (`auth:sanctum`). Khách vãng lai dùng chatbot
+| (không cần đăng nhập) nhưng tư vấn trực tiếp cần biết khách là ai để
+| nhân viên phục vụ và lưu lại lịch sử.
+|
+| Nhân viên: yêu cầu đăng nhập + role quản lý/nhân viên.
+*/
+Route::prefix('live-chat')->group(function () {
+    $liveChat = \App\Http\Controllers\Api\LiveChatController::class;
+    $manager = \App\Http\Controllers\Api\LiveChatManagerController::class;
+
+    Route::middleware('auth:sanctum')->group(function () use ($liveChat) {
+        Route::post('/sessions',                    [$liveChat, 'start']);
+        Route::get('/sessions/{id}',                [$liveChat, 'show'])->whereNumber('id');
+        Route::post('/sessions/{id}/messages',      [$liveChat, 'sendMessage'])->whereNumber('id');
+        Route::post('/sessions/{id}/close',         [$liveChat, 'close'])->whereNumber('id');
+    });
+
+    // Xác thực kênh realtime riêng cho live chat: route broadcasting chuẩn bị
+    // khoá cho nhân viên nên khách không đi qua được.
+    Route::middleware('auth:sanctum')
+        ->post('/broadcast-auth', [\App\Http\Controllers\Api\LiveChatBroadcastAuthController::class, 'authenticate']);
+
+    // Phía nhân viên: xem hàng chờ, nhận và trả lời phiên.
+    Route::middleware(['auth:sanctum', 'staff:MANAGER,WAITER,CASHIER,KITCHEN,SHIPPER'])
+        ->prefix('manager')
+        ->group(function () use ($manager) {
+            Route::get('/queue',                          [$manager, 'queue']);
+            Route::get('/sessions/{id}',                 [$manager, 'show'])->whereNumber('id');
+            Route::get('/sessions/{id}/suggestions',     [$manager, 'suggestions'])->whereNumber('id');
+            Route::post('/sessions/{id}/accept',         [$manager, 'accept'])->whereNumber('id');
+            Route::post('/sessions/{id}/messages',       [$manager, 'sendMessage'])->whereNumber('id');
+            Route::post('/sessions/{id}/close',          [$manager, 'close'])->whereNumber('id');
+        });
 });

@@ -14,6 +14,7 @@ from schemas.schemas import (
     StructuredChatResponse,
     ToolCall,
 )
+from schemas.quick_replies import QuickReplyRequest, QuickReplyResponse
 
 __all__ = [
     "ChatMessage",
@@ -24,6 +25,8 @@ __all__ = [
     "HealthResponse",
     "IntentClassification",
     "QuickAction",
+    "QuickReplyRequest",
+    "QuickReplyResponse",
     "ReadyResponse",
     "RestaurantInfoResponse",
     "StructuredChatRequest",

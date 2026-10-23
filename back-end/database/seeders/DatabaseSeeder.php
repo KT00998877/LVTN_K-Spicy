@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             TablesSeeder::class,
             CancellationsSeeder::class,
             VoucherSeeder::class,
+            LiveChatQuickReplySeeder::class,
         ]);
 
         $this->seedDefaultAccounts();
