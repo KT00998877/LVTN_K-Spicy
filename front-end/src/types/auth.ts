@@ -33,6 +33,8 @@ export interface AuthUser {
     full_name: string | null
     email: string
     phone: string | null
+    /** URL ảnh đại diện (storage/…), null nếu khách chưa upload. */
+    avatar_url: string | null
     is_active: boolean
     can_close_daily_stock: boolean
     /** Tổng điểm thưởng hiện tại của khách (chỉ áp dụng cho CUSTOMER). */

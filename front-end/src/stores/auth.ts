@@ -192,6 +192,58 @@ export const useAuthStore = defineStore('auth', {
         },
 
         /**
+         * Upload ảnh đại diện. Trả về true nếu thành công.
+         */
+        async uploadAvatar(file: File): Promise<boolean> {
+            const revision = this.sessionRevision
+            const token = this.token
+            if (!this.isCurrentSession(revision, token)) return false
+            this.loading = true
+            this.error = null
+            this.validationErrors = {}
+            try {
+                const user = await authApi.uploadAvatar(file)
+                if (!this.isCurrentSession(revision, token)) return false
+                this.user = user
+                this.persist()
+                return true
+            } catch (err) {
+                if (!this.isCurrentSession(revision, token)) return false
+                const e = err as AuthError
+                this.validationErrors = e.validationErrors ?? {}
+                this.error = this.extractErrorMessage(e) ?? 'Không tải được ảnh lên.'
+                return false
+            } finally {
+                if (this.isCurrentSession(revision, token)) this.loading = false
+            }
+        },
+
+        /**
+         * Xoá ảnh đại diện. Trả về true nếu thành công.
+         */
+        async deleteAvatar(): Promise<boolean> {
+            const revision = this.sessionRevision
+            const token = this.token
+            if (!this.isCurrentSession(revision, token)) return false
+            this.loading = true
+            this.error = null
+            try {
+                const user = await authApi.deleteAvatar()
+                if (!this.isCurrentSession(revision, token)) return false
+                this.user = user
+                this.persist()
+                return true
+            } catch (err) {
+                if (!this.isCurrentSession(revision, token)) return false
+                const e = err as AuthError
+                this.error = this.extractErrorMessage(e) ?? 'Không xoá được ảnh.'
+                return false
+            } finally {
+                if (this.isCurrentSession(revision, token)) this.loading = false
+            }
+        },
+
+        /**
          * Cập nhật thông tin cá nhân (name, full_name, phone).
          * Trả về true nếu thành công, false nếu thất bại (lưu validationErrors).
          */

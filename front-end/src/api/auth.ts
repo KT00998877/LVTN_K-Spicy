@@ -65,6 +65,38 @@ export async function fetchMe(): Promise<AuthUser> {
 }
 
 /**
+ * POST /api/auth/me/avatar — upload ảnh đại diện (multipart/form-data).
+ * Trả về user đã cập nhật để store có thể đồng bộ ngay.
+ */
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+    try {
+        const body = new FormData()
+        body.append('avatar', file)
+        // KHÔNG đặt Content-Type thủ công — axios sẽ tự gắn kèm boundary.
+        // Đặt tay sẽ khiến Laravel không parse được file.
+        const { data } = await apiClient.post<{ success: boolean; message: string; data: AuthUser }>(
+            `${ENDPOINTS.me}/avatar`,
+            body,
+        )
+        return data.data
+    } catch (err) {
+        throw Object.assign(err as Error, { validationErrors: extractValidationError(err) })
+    }
+}
+
+/** DELETE /api/auth/me/avatar — xoá ảnh đại diện, quay về chữ cái đầu. */
+export async function deleteAvatar(): Promise<AuthUser> {
+    try {
+        const { data } = await apiClient.delete<{ success: boolean; message: string; data: AuthUser }>(
+            `${ENDPOINTS.me}/avatar`,
+        )
+        return data.data
+    } catch (err) {
+        throw Object.assign(err as Error, { validationErrors: extractValidationError(err) })
+    }
+}
+
+/**
  * PUT /api/auth/me — cập nhật thông tin cá nhân (name, full_name, phone).
  */
 export async function updateProfile(payload: {

@@ -44,6 +44,76 @@ const profileEditing = ref(false)
 const fieldErr = (k: 'name' | 'phone' | 'full_name'): string | undefined =>
     validationErrors.value[k]?.[0]
 
+// ===== Avatar =====
+const avatarInput = ref<HTMLInputElement | null>(null)
+const avatarUploading = ref(false)
+const avatarMessage = ref<string | null>(null)
+const avatarError = ref<string | null>(null)
+
+/** Chữ cái đầu tên, dùng khi khách chưa upload ảnh. */
+const avatarInitial = computed(() => {
+    const name = user.value?.full_name || user.value?.name || ''
+    return name.trim() ? name.trim().charAt(0).toUpperCase() : '?'
+})
+
+function openAvatarPicker(): void {
+    avatarMessage.value = null
+    avatarError.value = null
+    avatarInput.value?.click()
+}
+
+function onAvatarSelected(e: Event): void {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    // Reset để chọn lại cùng file vẫn kích hoạt change event.
+    input.value = ''
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+        avatarError.value = 'Vui lòng chọn đúng định dạng ảnh.'
+        return
+    }
+    // Backend giới hạn 4MB — báo trước để khách không mất thời gian upload.
+    if (file.size > 4 * 1024 * 1024) {
+        avatarError.value = 'Ảnh vượt quá 4MB. Vui lòng chọn ảnh nhỏ hơn.'
+        return
+    }
+    void uploadAvatar(file)
+}
+
+async function uploadAvatar(file: File): Promise<void> {
+    avatarUploading.value = true
+    avatarMessage.value = null
+    avatarError.value = null
+    try {
+        const ok = await authStore.uploadAvatar(file)
+        if (!ok) {
+            avatarError.value = authStore.error || 'Không tải được ảnh lên.'
+            return
+        }
+        avatarMessage.value = 'Cập nhật ảnh đại diện thành công!'
+    } finally {
+        avatarUploading.value = false
+    }
+}
+
+async function onDeleteAvatar(): Promise<void> {
+    if (!confirm('Xoá ảnh đại diện? Ảnh sẽ bị xoá khỏi hệ thống.')) return
+    avatarUploading.value = true
+    avatarMessage.value = null
+    avatarError.value = null
+    try {
+        const ok = await authStore.deleteAvatar()
+        if (!ok) {
+            avatarError.value = authStore.error || 'Không xoá được ảnh.'
+            return
+        }
+        avatarMessage.value = 'Đã xoá ảnh đại diện.'
+    } finally {
+        avatarUploading.value = false
+    }
+}
+
 onMounted(() => {
     void authStore.refreshLiveProfile().catch(() => undefined)
     if (user.value) {
@@ -291,9 +361,51 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
         <div class="account-container">
             <!-- Header -->
             <div class="account-header">
-                <div class="account-avatar">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <!-- Avatar + upload -->
+                <div class="avatar-wrap">
+                    <button
+                        type="button"
+                        class="account-avatar"
+                        :disabled="avatarUploading"
+                        :aria-label="user?.avatar_url ? 'Đổi ảnh đại diện' : 'Thêm ảnh đại diện'"
+                        @click="openAvatarPicker"
+                    >
+                        <img
+                            v-if="user?.avatar_url"
+                            :src="user.avatar_url"
+                            :alt="user.full_name || user.name"
+                        />
+                        <span v-else class="account-avatar__initial">{{ avatarInitial }}</span>
+                        <span
+                            v-if="avatarUploading"
+                            class="account-avatar__spinner"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <span class="spinner spinner--sm"></span>
+                        </span>
+                        <span v-else class="account-avatar__camera" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                        </span>
+                    </button>
+                    <button
+                        v-if="user?.avatar_url"
+                        type="button"
+                        class="avatar-remove"
+                        :disabled="avatarUploading"
+                        @click="onDeleteAvatar"
+                    >
+                        Xoá ảnh
+                    </button>
+                    <input
+                        ref="avatarInput"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        class="visually-hidden-input"
+                        @change="onAvatarSelected"
+                    />
                 </div>
+
                 <div class="account-title">
                     <h1>{{ user?.full_name || user?.name }}</h1>
                     <p>{{ user?.email }}</p>
@@ -305,6 +417,16 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
                         <small>điểm thưởng</small>
                     </div>
                 </div>
+            </div>
+
+            <!-- Avatar feedback -->
+            <div v-if="avatarMessage" class="alert alert-success" role="status">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <span>{{ avatarMessage }}</span>
+            </div>
+            <div v-if="avatarError" class="alert alert-error" role="alert">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>{{ avatarError }}</span>
             </div>
 
             <!-- Tabs -->
@@ -822,10 +944,124 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
     border-radius: 50%;
     background: var(--color-chili-red);
     color: var(--color-white);
+    box-shadow: 0 4px 12px rgba(215, 25, 32, 0.3);
+    position: relative;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+    overflow: visible;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.account-avatar:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(215, 25, 32, 0.4);
+}
+
+.account-avatar:disabled {
+    opacity: 0.7;
+    cursor: progress;
+}
+
+.account-avatar:focus-visible {
+    outline: 3px solid var(--color-chili-red);
+    outline-offset: 3px;
+}
+
+.account-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.account-avatar__initial {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 80px;
+    color: var(--color-white);
+}
+
+/* Nút camera góc dưới — luôn hiện để khách biết bấm được. */
+.account-avatar__camera {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-charcoal-black);
+    color: var(--color-white);
+    border: 2px solid var(--color-white);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(215, 25, 32, 0.3);
+    transition: background 0.2s;
+}
+
+.account-avatar:hover .account-avatar__camera {
+    background: var(--color-chili-red);
+}
+
+.account-avatar__spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(215, 25, 32, 0.6);
+    border-radius: 50%;
+}
+
+.spinner--sm {
+    width: 22px;
+    height: 22px;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.4);
+    border-top-color: var(--color-white);
+    margin: 0;
+}
+
+.avatar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.avatar-remove {
+    background: transparent;
+    border: 0;
+    color: var(--color-gray-500);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-md, 6px);
+    transition: color 0.2s;
+}
+
+.avatar-remove:hover:not(:disabled) {
+    color: var(--color-chili-red);
+}
+
+.avatar-remove:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.visually-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .account-title h1 {
