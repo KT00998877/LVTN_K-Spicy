@@ -14,12 +14,8 @@
  * (audit, usage history, toggle) không lẫn vào API marketing cho khách.
  */
 import apiClient from './client'
-import type {
-    ManagerVoucher,
-    ManagerVoucherUsage,
-    Paginated,
-    VoucherPreview,
-} from '@/types/voucher'
+import type { ManagerVoucher, ManagerVoucherUsage, Paginated, VoucherPreview, VoucherPayload } from '@/types/voucher'
+export type { ManagerVoucher, VoucherPayload } from '@/types/voucher'
 
 /* ============================================================
  *  CRUD endpoints
@@ -53,20 +49,6 @@ export function getManagerVoucher(id: number): Promise<ManagerVoucher> {
         .then((r) => r.data.data)
 }
 
-export interface VoucherPayload {
-    code: string
-    name: string
-    description?: string | null
-    type: 'PERCENT' | 'FIXED'
-    value: number
-    max_discount_amount?: number | null
-    min_order_subtotal?: number
-    usage_limit?: number | null
-    usage_limit_per_user?: number | null
-    starts_at?: string | null
-    ends_at?: string | null
-    is_active?: boolean
-}
 
 export function createManagerVoucher(payload: VoucherPayload): Promise<ManagerVoucher> {
     return apiClient

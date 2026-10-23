@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import type { ManagerPromotion } from '@/types/promotion'
+import type { PromotionConfig } from '@/types/promotion'
 
 interface Props {
     rows: ManagerPromotion[]
@@ -115,13 +116,15 @@ function usagePercent(p: ManagerPromotion): number {
 
 function scopeLabel(p: ManagerPromotion): string {
     if (p.kind === 'BXGY') {
-        const ids = (p.config.get_item_ids ?? []).length
+        const config = p.config as Extract<PromotionConfig, { kind: 'BXGY' }>
+        const ids = config.get_item_ids.length
         return `${ids} món tặng`
     }
     if (p.kind === 'COMBO') {
-        return `${p.config.bundle_items.length} món trong combo`
+        const config = p.config as Extract<PromotionConfig, { kind: 'COMBO' }>
+        return `${config.bundle_items.length} món trong combo`
     }
-    const cfg = p.config
+    const cfg = p.config as Extract<PromotionConfig, { kind: 'PERCENT_OFF' | 'FIXED_OFF' }>
     if (cfg.applies_to === 'ALL') return 'Toàn menu'
     if (cfg.applies_to === 'CATEGORY') return `${p.items.length} danh mục`
     if (cfg.applies_to === 'MENU_ITEM') return `${p.items.length} món`

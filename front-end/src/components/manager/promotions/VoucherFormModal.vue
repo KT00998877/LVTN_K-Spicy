@@ -119,7 +119,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import type { ManagerVoucher, VoucherPayload } from '@/types/voucher'
+import type { ManagerVoucher, VoucherPayload } from '@/api/managerVoucher'
 
 interface Props {
     /** Truyền voucher cần sửa; không truyền = tạo mới. */

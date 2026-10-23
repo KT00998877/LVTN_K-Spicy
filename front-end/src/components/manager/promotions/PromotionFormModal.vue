@@ -126,7 +126,7 @@
                             <label>
                                 Phần trăm giảm
                                 <input
-                                    v-model.number="form.config.value"
+                                    v-model.number="(form.config as Extract<PromotionConfig, { kind: 'PERCENT_OFF' }>).value"
                                     type="number"
                                     min="0.1"
                                     max="100"
@@ -138,7 +138,7 @@
                             <label>
                                 Trần giảm / đơn (VND)
                                 <input
-                                    v-model.number="form.config.max_discount"
+                                    v-model.number="(form.config as Extract<PromotionConfig, { kind: 'PERCENT_OFF' }>).max_discount"
                                     type="number"
                                     min="0"
                                     step="1000"
@@ -154,7 +154,7 @@
                         <label>
                             Số tiền giảm (VND)
                             <input
-                                v-model.number="form.config.value"
+                                v-model.number="(form.config as Extract<PromotionConfig, { kind: 'FIXED_OFF' }>).value"
                                 type="number"
                                 min="1000"
                                 step="1000"
@@ -171,7 +171,7 @@
                             <label>
                                 Số lượng mua
                                 <input
-                                    v-model.number="form.config.buy_qty"
+                                    v-model.number="(form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).buy_qty"
                                     type="number"
                                     min="1"
                                     required
@@ -181,7 +181,7 @@
                             <label>
                                 Số lượng tặng
                                 <input
-                                    v-model.number="form.config.get_qty"
+                                    v-model.number="(form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).get_qty"
                                     type="number"
                                     min="1"
                                     required
@@ -191,7 +191,7 @@
                             <label>
                                 % giảm trên món tặng
                                 <input
-                                    v-model.number="form.config.discount_percent"
+                                    v-model.number="(form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).discount_percent"
                                     type="number"
                                     min="0.1"
                                     max="100"
@@ -219,7 +219,7 @@
                         <label>
                             Giá combo (VND)
                             <input
-                                v-model.number="form.config.bundle_price"
+                                v-model.number="(form.config as Extract<PromotionConfig, { kind: 'COMBO' }>).bundle_price"
                                 type="number"
                                 min="1"
                                 required
@@ -230,7 +230,7 @@
                             <span class="field-label">Món trong combo</span>
                             <div class="bundle-list">
                                 <div
-                                    v-for="(row, i) in form.config.bundle_items"
+                                    v-for="(row, i) in (form.config as Extract<PromotionConfig, { kind: 'COMBO' }>).bundle_items"
                                     :key="i"
                                     class="bundle-row"
                                 >
@@ -389,7 +389,9 @@ function emptyConfig(kind: PromotionKind): PromotionConfig {
     }
 }
 
-function blankForm(): PromotionPayload {
+type PromotionForm = PromotionPayload & { campaign_id: number | null; conditions: PromotionConditions }
+
+function blankForm(): PromotionForm {
     return {
         name: '',
         description: null,
@@ -409,7 +411,7 @@ function blankForm(): PromotionPayload {
     }
 }
 
-const form = reactive<PromotionPayload>(blankForm())
+const form = reactive<PromotionForm>(blankForm())
 const bxgyItems = ref('')
 
 function resetForm(): void {
@@ -437,9 +439,7 @@ function loadFrom(p: PromotionPayload | null): void {
     form.is_active = p.is_active ?? true
     form.config = JSON.parse(JSON.stringify(p.config))
     form.items = (p.items ?? []).map((it) => ({ ...it }))
-    if (form.kind === 'BXGY') {
-        bxgyItems.value = (form.config.get_item_ids ?? []).join(', ')
-    }
+    if (form.kind === 'BXGY') bxgyItems.value = (form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).get_item_ids.join(', ')
 }
 
 watch(
@@ -454,7 +454,7 @@ watch(
         if (k === prev) return
         // Đổi kind → reset config để tránh conflict.
         form.config = emptyConfig(k)
-        if (k === 'BXGY') bxgyItems.value = (form.config.get_item_ids ?? []).join(', ')
+        if (k === 'BXGY') bxgyItems.value = (form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).get_item_ids.join(', ')
     },
 )
 
@@ -478,20 +478,20 @@ function commitBxgyItems(): void {
         .split(',')
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => Number.isFinite(n) && n > 0)
-    form.config.get_item_ids = ids
+    ;(form.config as Extract<PromotionConfig, { kind: 'BXGY' }>).get_item_ids = ids
 }
 
 function addBundle(): void {
     if (form.kind !== 'COMBO') return
-    form.config.bundle_items.push({ item_id: 0, qty: 1 })
+    ;(form.config as Extract<PromotionConfig, { kind: 'COMBO' }>).bundle_items.push({ item_id: 0, qty: 1 })
 }
 function removeBundle(i: number): void {
     if (form.kind !== 'COMBO') return
-    form.config.bundle_items.splice(i, 1)
+    ;(form.config as Extract<PromotionConfig, { kind: 'COMBO' }>).bundle_items.splice(i, 1)
 }
 
 const conditionSummary = computed(() => {
-    const c = form.conditions
+    const c = form.conditions ?? {}
     const parts: string[] = []
     if (c.min_subtotal && c.min_subtotal > 0) parts.push(`Đơn ≥ ${c.min_subtotal.toLocaleString('vi-VN')}đ`)
     if (c.days_of_week?.length) parts.push(`${c.days_of_week.length} ngày/tuần`)
@@ -528,11 +528,13 @@ function submit(): void {
     }
     // Loại bỏ key rỗng trong conditions để BE nhận JSON gọn.
     Object.keys(payload.conditions ?? {}).forEach((k) => {
-        const v = payload.conditions?.[k as keyof PromotionConditions]
+        const conditions = payload.conditions ?? {}
+        const v = conditions[k as keyof PromotionConditions]
         if (v === undefined || (Array.isArray(v) && v.length === 0)) {
-            delete payload.conditions?.[k as keyof PromotionConditions]
+            delete conditions[k as keyof PromotionConditions]
         }
     })
+    payload.conditions = payload.conditions ?? {}
     emit('save', { ...(payload as object), id: editingId.value } as PromotionPayload & {
         id?: number
     })

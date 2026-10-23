@@ -26,6 +26,21 @@ export interface Voucher {
     badge: string
 }
 
+export interface VoucherPayload {
+    code: string
+    name: string
+    description?: string | null
+    type: 'PERCENT' | 'FIXED'
+    value: number
+    max_discount_amount?: number | null
+    min_order_subtotal?: number
+    usage_limit?: number | null
+    usage_limit_per_user?: number | null
+    starts_at?: string | null
+    ends_at?: string | null
+    is_active?: boolean
+}
+
 /** Preview voucher (kết quả từ /api/vouchers/preview). */
 export interface VoucherPreview {
     code: string

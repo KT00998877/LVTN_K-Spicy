@@ -37,7 +37,6 @@ import {
     previewManagerPromotion,
     toggleManagerPromotion,
     updateManagerPromotion,
-    type ListPromotionsParams,
     type PreviewPayload as PreviewPromotionPayload,
 } from '@/api/managerPromotion'
 import {
@@ -48,15 +47,16 @@ import {
     listManagerCampaigns,
     toggleManagerCampaign,
     updateManagerCampaign,
-    type ListCampaignsParams,
 } from '@/api/campaign'
 import type {
+    ListCampaignsParams,
     CampaignPayload,
     CampaignStats,
     ManagerCampaign,
     ManagerCampaignDetail,
 } from '@/types/campaign'
 import type {
+    ListPromotionsParams,
     ManagerPromotion,
     ManagerPromotionUsage,
     PromotionKind,
@@ -304,25 +304,27 @@ export const useManagerPromotionsStore = defineStore('managerPromotions', {
          *  Preview (panel)
          * ============================================================ */
 
-        async runPreview(code: string, subtotal: number): Promise<void> {
+        async runPreview(code: string, subtotal: number): Promise<VoucherPreview | null> {
             if (!code.trim()) {
                 this.previewError = 'Nhập mã trước.'
                 this.preview = null
-                return
+                return null
             }
             if (subtotal <= 0) {
                 this.previewError = 'Nhập tạm tính đơn hàng > 0.'
                 this.preview = null
-                return
+                return null
             }
             this.loadingPreview = true
             this.previewError = ''
             try {
                 this.preview = await previewManagerVoucher(code.trim(), subtotal)
+                return this.preview
             } catch (e: unknown) {
                 const err = e as { response?: { data?: { message?: string } } }
                 this.previewError = err.response?.data?.message || 'Mã không hợp lệ hoặc không đủ điều kiện.'
                 this.preview = null
+                return null
             } finally {
                 this.loadingPreview = false
             }
