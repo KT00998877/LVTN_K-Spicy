@@ -31,13 +31,21 @@ function getChatGuestToken(): string | null {
  */
 const LIVE_CHAT_AUTH_URL = '/live-chat/broadcast-auth'
 
+/** Endpoint phía nhân viên nhưng không nằm dưới /staff/ (live chat manager). */
+const STAFF_LIVE_CHAT_URL = '/live-chat/manager/'
+
+/** URL này dùng token staff (đăng nhập khu vực nhân viên). */
+function isStaffUrl(url: string | undefined): boolean {
+    if (!url) return false
+    return url.includes('/staff/') || url.includes('/broadcasting/auth') || url.includes(STAFF_LIVE_CHAT_URL)
+}
+
 /** Credentials never cross the customer/staff boundary. */
 function pickToken(url: string | undefined): string | null {
     if (!url) return null
     // Caller tự gắn Authorization header — không suy diễn ở đây.
     if (url.includes(LIVE_CHAT_AUTH_URL)) return null
-    const isStaff = url.includes('/staff/') || url.includes('/broadcasting/auth')
-    if (isStaff) {
+    if (isStaffUrl(url)) {
         return localStorage.getItem('staff_token')
     }
     return localStorage.getItem('auth_token')
@@ -85,12 +93,16 @@ apiClient.interceptors.response.use(
         console.error('[API ERROR]', error?.response?.status, error?.config?.url, error.message)
 
         const url = error.config?.url || ''
-        const isStaffApi = url.includes('/staff/') || url.includes('/broadcasting/auth')
         const status = error.response?.status
 
         // 401 = token hết hạn / không hợp lệ
         if (status === 401) {
-            if (isStaffApi) {
+            if (url.includes(LIVE_CHAT_AUTH_URL)) {
+                // Ký kênh realtime: token do caller tự truyền, không nên xoá
+                // phiên đăng nhập nào ở đây.
+                return Promise.reject(error)
+            }
+            if (isStaffUrl(url)) {
                 // Token staff hết hạn → xoá staff_token + staff_session
                 localStorage.removeItem('staff_token')
                 localStorage.removeItem('staff_session')

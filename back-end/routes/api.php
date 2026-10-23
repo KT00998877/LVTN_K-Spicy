@@ -541,7 +541,12 @@ Route::prefix('live-chat')->group(function () {
 
     // Xác thực kênh realtime riêng cho live chat: route broadcasting chuẩn bị
     // khoá cho nhân viên nên khách không đi qua được.
-    Route::middleware(\App\Http\Middleware\AuthenticateSanctumOrGuest::class)
+    //
+    // Dùng `auth:sanctum` (không phải AuthenticateSanctumOrGuest): middleware
+    // đó cố tình chặn mọi tài khoản có role khác CUSTOMER, tức là chặn cả
+    // nhân viên — mà nhân viên cần ký kênh hàng chờ. Việc phân quyền kênh do
+    // LiveChatBroadcastAuthController tự kiểm tra theo role.
+    Route::middleware('auth:sanctum')
         ->post('/broadcast-auth', [\App\Http\Controllers\Api\LiveChatBroadcastAuthController::class, 'authenticate']);
 
     // Phía nhân viên: xem hàng chờ, nhận và trả lời phiên.

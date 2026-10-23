@@ -66,15 +66,22 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
             mine.value = queue.mine
             error.value = null
 
-            // Nghe các phiên của tôi để nhận tin nhắn ngay, kể cả khi đang
-            // xem phiên khác.
-            for (const session of queue.mine) {
+            // Nghe kênh của MỌI phiên đang mở, không chỉ phiên của mình.
+            //
+            // Sự kiện `live-chat.session.updated` trên kênh hàng chờ không mang
+            // nội dung tin nhắn, nên nếu chỉ nghe hàng chờ thì tin nhắn của khách
+            // chưa được nhận sẽ không hiện — nhân viên phải bấm tải lại mới thấy.
+            // Nghe kênh từng phiên ngay từ lúc nó vào hàng chờ để chấm đỏ và
+            // nội dung hiện ngay khi khách nhắn.
+            const visible = [...queue.mine, ...queue.waiting]
+            for (const session of visible) {
                 subscribeSessionChannel(session.id)
             }
-            // Phiên không còn của tôi nữa → bỏ đăng ký kênh cũ.
-            const mineIds = new Set(queue.mine.map((s) => s.id))
+            // Phiên không còn trong hàng chờ (đã đóng / người khác nhận) →
+            // bỏ đăng ký kênh cũ.
+            const visibleIds = new Set(visible.map((s) => s.id))
             for (const id of [...sessionChannels.keys()]) {
-                if (!mineIds.has(id)) unsubscribeSessionChannel(id)
+                if (!visibleIds.has(id)) unsubscribeSessionChannel(id)
             }
         } catch (err) {
             // eslint-disable-next-line no-console

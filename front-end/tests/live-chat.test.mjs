@@ -202,6 +202,47 @@ test('nhân viên nghe kênh hàng chờ và kênh từng phiên của mình', a
     store.stop()
 })
 
+test('nhân viên nghe cả phiên đang chờ, không chỉ phiên đã nhận', async () => {
+    // Sự kiện hàng chờ không mang nội dung tin nhắn. Nếu không nghe kênh của
+    // phiên đang chờ, tin khách nhắn sẽ không hiện — nhân viên phải tải lại.
+    const { store, channels } = managerHarness({
+        api: managerApi({
+            managerQueue: async () => ({
+                waiting: [{ id: 13, status: 'waiting', customer_name: 'Anh Tuấn' }],
+                mine: [],
+            }),
+        }),
+    })
+    store.start()
+    await flush()
+    assert.ok(channels.has('live-chat-session.13'), 'phải nghe kênh của phiên đang chờ')
+    store.stop()
+})
+
+test('tin của phiên đang chờ đánh dấu chưa đọc thay vì phải tải lại', async () => {
+    const { store, channels } = managerHarness({
+        api: managerApi({
+            managerQueue: async () => ({
+                waiting: [{ id: 13, status: 'waiting', customer_name: 'Anh Tuấn' }],
+                mine: [],
+            }),
+        }),
+    })
+    store.start()
+    await flush()
+
+    channels.get('live-chat-session.13').handlers['.live-chat.message.sent']({
+        session_id: 13,
+        message: { id: 9, session_id: 13, sender_type: 'customer', content: 'Cho mình hỏi tokbokki' },
+        session: { id: 13, status: 'waiting', customer_name: 'Anh Tuấn' },
+    })
+    await flush()
+
+    assert.equal(store.unreadSessionIds.includes(13), true, 'phải thấy tin ngay khi chưa mở phiên')
+    assert.equal(store.messages.length, 0, 'tin của phiên chưa mở không nhảy vào khung chat')
+    store.stop()
+})
+
 test('tin nhắn của phiên đang mở hiện thẳng trong khung chat', async () => {
     const { store, channels } = managerHarness({
         api: managerApi({
