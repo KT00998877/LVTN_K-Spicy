@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../../../core/api/api_exception.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/dio_client.dart';
@@ -63,9 +64,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 // ── Auth state notifier ─────────────────────────────────────
+/// AuthController — state machine đăng nhập.
+///
+/// [bootstrap] cho phép test bỏ qua việc đọc secure storage lúc khởi tạo
+/// (mặc định `true` — app luôn cần bootstrap).
 class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._repo) : super(AuthState.unknown) {
-    _bootstrap();
+  AuthController(this._repo, {bool bootstrap = true})
+      : super(AuthState.unknown) {
+    if (bootstrap) _bootstrap();
   }
 
   final AuthRepository _repo;
@@ -212,7 +218,97 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// PUT /api/auth/me — cập nhật thông tin cá nhân rồi đồng bộ lại state.
+  Future<void> updateProfile({
+    String? name,
+    String? fullName,
+    String? phone,
+  }) =>
+      _run(() async {
+        final user = await _repo.updateProfile(
+          name: name,
+          fullName: fullName,
+          phone: phone,
+        );
+        await _persistAndApply(AuthResult(token: state.token!, user: user),
+            isStaff: state.isStaff);
+      });
+
+  /// POST /api/auth/change-password.
+  ///
+  /// Cố ý KHÔNG gọi lại `_persistAndApply` với token cũ: backend đã thu hồi
+  /// các token cũ sau khi đổi mật khẩu, nên session hiện tại phải bị đăng xuất
+  /// để khách đăng nhập lại bằng mật khẩu mới.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmation,
+  }) async {
+    await _run(() async {
+      await _repo.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmation: confirmation,
+      );
+    });
+    await expireSession();
+  }
+
+  /// Nạp lại user từ server (dùng sau khi upload/xoá avatar).
+  ///
+  /// Đặc biệt tránh dùng `_run` vì nó không cho phép ghi đè `user` khi
+  /// `isLoading` — ở đây cần cập nhật user tức thì.
+  Future<void> refreshCurrentUser() async {
+    try {
+      final user =
+          state.isStaff ? await _repo.fetchStaffMe() : await _repo.fetchCustomerMe();
+      if (!mounted) return;
+      await secureStorage.write(
+        key: AppConfig.userKey,
+        value: jsonEncode(user.toJson()),
+      );
+      if (!mounted) return;
+      state = AuthState(
+        status: state.status,
+        token: state.token,
+        user: user,
+        isStaff: state.isStaff,
+        error: state.error,
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        state = AuthState(
+          status: state.status,
+          token: state.token,
+          user: state.user,
+          isStaff: state.isStaff,
+          error: e,
+        );
+      }
+      rethrow;
+    }
+  }
+
   // ── Internal ─────────────────────────────────────────────
+
+  /// Ép trạng thái đã đăng nhập — chỉ dùng cho test.
+  @visibleForTesting
+  void debugSetAuthenticated({AppUser? user, String token = 'test-token'}) {
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      token: token,
+      user:
+          user ??
+          AppUser(
+            id: 1,
+            name: 'Chị Lan',
+            email: 'lan@example.com',
+            role: UserRole.customer,
+          ),
+      isStaff: false,
+    );
+  }
+
   Future<void> _persistAndApply(
     AuthResult result, {
     required bool isStaff,

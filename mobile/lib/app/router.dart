@@ -12,7 +12,9 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/cart/presentation/cart_screen.dart';
 import '../features/cart/presentation/checkout_screen.dart';
 import '../features/customer/customer_home_screen.dart';
+import '../features/account/presentation/account_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
+import '../features/live_chat/presentation/live_chat_screen.dart';
 import '../features/menu/presentation/menu_detail_screen.dart';
 import '../features/orders/presentation/orders_list_screen.dart';
 import '../features/orders/presentation/order_detail_screen.dart';
@@ -99,10 +101,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
         if ((loc.startsWith('/home') ||
                 loc.startsWith('/chat') ||
+                loc.startsWith('/live-chat') ||
                 loc.startsWith('/menu') ||
                 loc.startsWith('/cart') ||
                 loc.startsWith('/checkout') ||
                 loc.startsWith('/orders') ||
+                loc.startsWith('/account') ||
                 loc.startsWith('/reservation')) &&
             user.role != UserRole.customer) {
           return _homePathFor(user.role);
@@ -138,6 +142,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/home', builder: (_, __) => const CustomerHomeScreen()),
       GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
+      GoRoute(
+        path: '/live-chat',
+        builder: (_, __) => const LiveChatScreen(),
+      ),
 
       // Deep link target: micay://payment/return?code=...&order_id=...
       // Có thể truy cập trực tiếp khi backend redirect về app.
@@ -158,6 +166,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/cart', builder: (_, __) => const CartScreen()),
+      GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
       GoRoute(path: '/checkout', builder: (_, __) => const CheckoutScreen()),
       GoRoute(path: '/orders', builder: (_, __) => const OrdersListScreen()),
       GoRoute(

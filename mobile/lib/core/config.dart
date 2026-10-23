@@ -47,6 +47,43 @@ class ApiConfig {
         'http://${_defaultMobileHost()}:8000/api';
   }
 
+  /// Cổng của Laravel "chat gateway" — tiến trình PHP riêng phục vụ
+  /// `/api/chatbot/*`.
+  static const int chatGatewayPort = 8002;
+
+  /// Base URL cho endpoint chatbot.
+  ///
+  /// Chatbot KHÔNG được chạy trên cùng tiến trình Laravel với business API.
+  /// `php artisan serve` phục vụ tuần tự: khi nó chờ AI Service trả lời thì
+  /// không còn worker nào trả lời được request khác — mà AI Service lại gọi
+  /// ngược về business API để lấy menu/giỏ/đơn. Hai bên chờ nhau nên bế tắc.
+  /// Đo thực tế trên mobile: cùng cổng 8000 → 3/4 câu hỏi lỗi 503, trung vị
+  /// 15,5s; tách sang gateway riêng → 0/4 lỗi, trung vị 3,0s.
+  ///
+  /// Thứ tự ưu tiên:
+  ///   1. `BASE_URL_CHAT_MOBILE` / `BASE_URL_CHAT_WEB` trong `.env` (nếu có)
+  ///   2. Suy ra từ base URL business, đổi cổng sang chat gateway
+  ///
+  /// Khi triển khai production dùng web server thật (php-fpm/nginx) thì nhiều
+  /// worker chạy song song và không bị bế tắc; khi đó trỏ
+  /// `BASE_URL_CHAT_*` về cùng host business là hợp lý.
+  static String get chatBaseUrl {
+    final explicit = (kIsWeb
+            ? dotenv.env['BASE_URL_CHAT_WEB']
+            : dotenv.env['BASE_URL_CHAT_MOBILE'])
+        ?.trim();
+    if (explicit != null && explicit.isNotEmpty) {
+      return explicit;
+    }
+    final business = Uri.parse(baseUrl);
+    return Uri(
+      scheme: business.scheme,
+      host: business.host,
+      port: chatGatewayPort,
+      path: business.path,
+    ).toString();
+  }
+
   /// URL tuyệt đối cho ảnh backend (`/storage/...`).
   /// Dùng để ẩn `/api` khi resolve ảnh.
   static String get imageOrigin {
@@ -68,6 +105,50 @@ class ApiConfig {
   /// Token lưu trong secure storage
   static const String tokenKey = 'auth_token';
   static const String userKey = 'auth_user';
+
+  /// Guest token của phiên chat khách vãng lai.
+  ///
+  /// Phiên chat có `user_id = null` thì chỉ sở hữu được qua token này.
+  /// Backend yêu cầu header `X-Chat-Guest-Token` cho mọi request chatbot
+  /// của khách chưa đăng nhập — thiếu header thì trả 404 "Không tìm thấy
+  /// phiên chat" dù id phiên vẫn đúng.
+  static const String chatGuestTokenKey = 'chat_guest_token';
+
+  /// Guest token của phiên tư vấn trực tiếp.
+  ///
+  /// Cùng cơ chế với chatbot: phiên của khách chưa đăng nhập có `user_id`
+  /// bằng null nên chỉ sở hữu được qua token này. Khác key với chatbot để
+  /// hai hệ thống không lẫn lộn phiên của nhau.
+  static const String liveChatGuestTokenKey = 'live_chat_guest_token';
+
+  /// Khóa lưu id phiên tư vấn đang mở, để khôi phục sau khi app bị tắt.
+  static String liveChatSessionKey(int? userId) =>
+      'live_chat_session_${userId ?? 0}';
+
+  /// ============================================================
+  /// Realtime (Laravel Reverb) cho tư vấn trực tiếp
+  /// ============================================================
+
+  /// App key của Reverb — cần thiết để client ký kênh.
+  ///
+  /// Thiếu key thì app vẫn chat được qua HTTP, chỉ không có cập nhật tức
+  /// thì: tin nhắn của nhân viên hiện sau khi khách bấm gửi lại.
+  static String get reverbAppKey => dotenv.env['REVERB_APP_KEY'] ?? '';
+
+  /// Host Reverb (mặc định cùng host với backend).
+  static String get reverbHost {
+    final explicit = dotenv.env['REVERB_HOST']?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final business = Uri.parse(baseUrl);
+    return business.host;
+  }
+
+  /// Cổng WebSocket của Reverb.
+  static int get reverbPort =>
+      int.tryParse(dotenv.env['REVERB_PORT'] ?? '') ?? 8080;
+
+  /// Dùng TLS hay không — phụ thuộc vào giao thức của chính backend.
+  static bool get reverbSecure => Uri.parse(baseUrl).scheme == 'https';
 
   /// ============================================================
   /// Default hosts khi .env thiếu biến
@@ -105,6 +186,9 @@ class AppConfig {
   /// Backend URL đang dùng. Tương đương `ApiConfig.baseUrl`.
   static String get apiBaseUrl => ApiConfig.baseUrl;
 
+  /// Base URL cho endpoint chatbot (chat gateway riêng).
+  static String get chatBaseUrl => ApiConfig.chatBaseUrl;
+
   /// Cho phép override runtime (test, dev). Mặc định là `ApiConfig.baseUrl`.
   static String? _override;
   static String get effectiveBaseUrl => _override ?? ApiConfig.baseUrl;
@@ -118,6 +202,16 @@ class AppConfig {
   /// Token lưu trong secure storage
   static String get tokenKey => ApiConfig.tokenKey;
   static String get userKey => ApiConfig.userKey;
+
+  /// Guest token của phiên chat khách vãng lai.
+  static String get chatGuestTokenKey => ApiConfig.chatGuestTokenKey;
+
+  /// Guest token của phiên tư vấn trực tiếp.
+  static String get liveChatGuestTokenKey => ApiConfig.liveChatGuestTokenKey;
+
+  /// Khóa lưu id phiên tư vấn đang mở.
+  static String liveChatSessionKey(int? userId) =>
+      ApiConfig.liveChatSessionKey(userId);
 
   /// Khởi tạo dotenv — forward sang ApiConfig.
   static Future<void> load() => ApiConfig.load();

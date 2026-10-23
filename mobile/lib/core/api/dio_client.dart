@@ -19,6 +19,19 @@ const _secureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
 );
 
+/// True nếu request này thuộc nhóm endpoint chatbot.
+///
+/// Nhóm này phải đi qua chat gateway riêng, không đi qua business API —
+/// xem [ApiConfig.chatBaseUrl] để hiểu vì sao.
+bool isChatbotPath(String path) => path.startsWith('/chatbot/');
+
+/// True nếu request thuộc nhóm endpoint tư vấn trực tiếp.
+///
+/// Khác chatbot, nhóm này KHÔNG đi qua chat gateway: mỗi request chỉ là
+/// ghi/đọc vài bản ghi, không có lượt nào chờ AI nên không có nguy cơ bế tắc
+/// với business API.
+bool isLiveChatPath(String path) => path.startsWith('/live-chat/');
+
 /// Provider Dio instance (overridden trong main.dart với auth provider)
 final sessionExpiredProvider = StateProvider<int>((ref) => 0);
 
@@ -41,12 +54,42 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // Chatbot đi qua chat gateway riêng (cổng khác business API).
+        // `php artisan serve` chỉ phục vụ tuần tự, nếu chatbot chạy chung
+        // tiến trình với business API thì lúc Laravel chờ AI Service, AI
+        // Service gọi ngược lại /api/menu sẽ bị treo → timeout → 503.
+        if (isChatbotPath(options.path)) {
+          options.baseUrl = AppConfig.chatBaseUrl;
+        }
+
         // Bỏ qua public endpoint (không cần token)
         final isPublic = options.extra['public'] == true;
         if (!isPublic) {
           final token = await _secureStorage.read(key: AppConfig.tokenKey);
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
+          }
+        }
+
+        // Phiên chat của khách chưa đăng nhập có user_id = null: backend
+        // chỉ nhận phiên đó qua header X-Chat-Guest-Token. Thiếu header thì
+        // mọi request chatbot trả 404 dù id phiên hoàn toàn đúng.
+        if (isChatbotPath(options.path)) {
+          final guestToken =
+              await _secureStorage.read(key: AppConfig.chatGuestTokenKey);
+          if (guestToken != null && guestToken.isNotEmpty) {
+            options.headers['X-Chat-Guest-Token'] = guestToken;
+          }
+        }
+
+        // Tư vấn trực tiếp dùng chung cơ chế chứng minh quyền sở hữu phiên:
+        // phiên của khách chưa đăng nhập có user_id = null, nên không có token
+        // này thì mọi request trả 404 dù id phiên hoàn toàn đúng.
+        if (isLiveChatPath(options.path)) {
+          final guestToken =
+              await _secureStorage.read(key: AppConfig.liveChatGuestTokenKey);
+          if (guestToken != null && guestToken.isNotEmpty) {
+            options.headers['X-Chat-Guest-Token'] = guestToken;
           }
         }
         handler.next(options);

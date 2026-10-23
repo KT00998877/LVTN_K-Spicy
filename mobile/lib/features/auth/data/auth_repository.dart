@@ -77,6 +77,53 @@ class AuthRepository {
     }
   }
 
+  // ────────────────── Profile ──────────────────────────────
+  /// PUT /api/auth/me — cập nhật họ tên / tên đầy đủ / SĐT.
+  /// Email và password phải đổi qua endpoint riêng (bảo mật).
+  Future<AppUser> updateProfile({
+    String? name,
+    String? fullName,
+    String? phone,
+  }) async {
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '${AppConfig.customerAuthPath}/me',
+        data: {
+          if (name != null) 'name': name,
+          if (fullName != null) 'full_name': fullName,
+          if (phone != null) 'phone': phone,
+        },
+      );
+      return _parseUser(_root(res.data!));
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error! : apiExceptionFromDio(e);
+    }
+  }
+
+  // ────────────────── Password ────────────────────────────
+  /// POST /api/auth/change-password
+  ///
+  /// Backend siết luật: ≥8 ký tự, có chữ hoa + chữ thường + số + ký hiệu,
+  /// và khác mật khẩu hiện tại. Lỗi trả về nằm trong [ApiException.errors].
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmation,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '${AppConfig.customerAuthPath}/change-password',
+        data: {
+          'current_password': currentPassword,
+          'password': newPassword,
+          'password_confirmation': confirmation,
+        },
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error! : apiExceptionFromDio(e);
+    }
+  }
+
   // ────────────────── Staff (Shipper/Manager/...) ───────────
   Future<AuthResult> loginStaff({
     required String email,

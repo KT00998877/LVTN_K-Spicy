@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
-import '../../features/auth/presentation/auth_controller.dart';
+import '../../features/account/presentation/account_screen.dart';
 import '../../features/cart/presentation/cart_controller.dart';
 import '../../features/cart/presentation/cart_tab_screen.dart';
 import '../../features/home/presentation/customer_home_content.dart';
@@ -68,15 +68,37 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
       const CartTabScreen(),
       const OrdersListScreen(),
       const MyReservationsScreen(),
-      const _AccountTab(),
+      // Đây là tab gốc (không có AppBar riêng) nên AccountScreen tự bọc
+      // Scaffold cho chúng ta — mount trực tiếp để giữ trạng thái tab.
+      const AccountScreen(),
     ];
 
     return Scaffold(
       body: IndexedStack(index: _tabIndex, children: pages),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/chat'),
-        icon: const Icon(Icons.chat_bubble_outline_rounded),
-        label: const Text('Trợ lý'),
+      // Hai lối vào hội thoại, cùng hoạt động song song: trợ lý ảo giải quyết
+      // được phần lớn câu hỏi, còn tư vấn trực tiếp dành cho phần chatbot không
+      // trả lời được. Cố tình không theo dõi liveChatController ở đây — chỉ cần
+      // mở phiên khi khách bấm, nếu không sẽ tạo phiên ảo cho mỗi lần mở app.
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'fab-live-chat',
+            onPressed: () => context.push('/live-chat'),
+            backgroundColor: AppColors.charcoal,
+            foregroundColor: AppColors.textOnDark,
+            icon: const Icon(Icons.support_agent_rounded),
+            label: const Text('Tư vấn trực tiếp'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FloatingActionButton.extended(
+            heroTag: 'fab-chatbot',
+            onPressed: () => context.push('/chat'),
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            label: const Text('Trợ lý'),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
@@ -107,50 +129,4 @@ class _Tab {
   const _Tab({required this.icon, required this.label});
   final IconData icon;
   final String label;
-}
-
-/// ───────────────── Account Tab ─────────────────
-class _AccountTab extends ConsumerWidget {
-  const _AccountTab();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Tài khoản')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.spicyRed,
-              child: Text(
-                user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            title: Text(user.name),
-            subtitle: Text(user.email),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.workspace_premium_rounded),
-            title: const Text('Hạng thành viên'),
-            subtitle: Text('${user.loyaltyPoints} điểm'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.lock_outline_rounded),
-            title: const Text('Đổi mật khẩu'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
-            title: const Text(
-              'Đăng xuất',
-              style: TextStyle(color: AppColors.danger),
-            ),
-            onTap: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
-        ],
-      ),
-    );
-  }
 }
