@@ -130,9 +130,10 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
             return true
         } catch (err) {
             const failure = err as { response?: { status?: number; data?: { message?: string } } }
-            error.value = failure.response?.data?.message ?? 'Không nhận được cuộc tư vấn.'
-            // Người khác có thể đã nhận trước → đồng bộ lại hàng chờ.
+            // Người khác có thể đã nhận trước → đồng bộ lại hàng chờ trước,
+            // vì `fetchQueue` xoá `error` khi thành công.
             if (failure.response?.status === 409) await fetchQueue()
+            error.value = failure.response?.data?.message ?? 'Không nhận được cuộc tư vấn.'
             return false
         } finally {
             accepting.value = null
