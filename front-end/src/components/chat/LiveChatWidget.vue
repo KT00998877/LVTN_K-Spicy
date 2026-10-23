@@ -54,6 +54,12 @@ async function handleSend(): Promise<void> {
     await scrollToBottom()
 }
 
+/** Bắt đầu cuộc tư vấn mới: đóng phiên cũ rồi mở phiên trống. */
+async function handleStartNew(): Promise<void> {
+    await liveChat.startNewChat()
+    await scrollToBottom()
+}
+
 async function scrollToBottom(): Promise<void> {
     await nextTick()
     if (messagesEl.value) {
@@ -104,12 +110,22 @@ onMounted(() => {
                         </p>
                     </div>
                 </div>
-                <span
-                    class="livechat-panel__status"
-                    :class="{ 'is-online': connected }"
-                    :title="connected ? 'Kết nối trực tiếp' : 'Đang kết nối...'"
-                    aria-hidden="true"
-                ></span>
+                <div class="livechat-panel__actions">
+                    <span
+                        class="livechat-panel__status"
+                        :class="{ 'is-online': connected }"
+                        :title="connected ? 'Kết nối trực tiếp' : 'Đang kết nối...'"
+                        aria-hidden="true"
+                    ></span>
+                    <button
+                        class="livechat-panel__new"
+                        :disabled="sending || loading"
+                        @click="handleStartNew"
+                        aria-label="Bắt đầu cuộc tư vấn mới"
+                    >
+                        ↻ Mới
+                    </button>
+                </div>
             </header>
 
             <!-- Khách chưa đăng nhập -->
@@ -265,6 +281,14 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+}
+
+.livechat-panel__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
 }
 
 .livechat-panel__avatar {
@@ -302,6 +326,29 @@ onMounted(() => {
 
 .livechat-panel__status.is-online {
     background: #22c55e;
+}
+
+/* Nút mở cuộc tư vấn mới */
+.livechat-panel__new {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.livechat-panel__new:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.livechat-panel__new:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ===== Login prompt ===== */

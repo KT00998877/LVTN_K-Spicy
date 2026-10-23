@@ -145,8 +145,23 @@ export const useLiveChatStore = defineStore('liveChat', () => {
         }
     }
 
+    /**
+     * Bắt đầu cuộc tư vấn mới.
+     *
+     * Phiên cũ phải được đóng trên server trước: backend chỉ tạo phiên mới
+     * khi khách không còn phiên nào đang hoạt động, nếu không sẽ trả lại đúng
+     * phiên cũ và khách vẫn thấy lịch sử cũ.
+     */
     async function startNewChat(): Promise<void> {
+        const previousId = sessionId.value
         forgetSession()
+        if (previousId) {
+            try {
+                await liveChatApi.closeSession(previousId)
+            } catch {
+                // Phiên cũ đã kết thúc sẵn thì không cần đóng lại — bỏ qua.
+            }
+        }
         await startNewSession()
     }
 
