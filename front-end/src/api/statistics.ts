@@ -151,6 +151,10 @@ export interface PaymentStatsData {
     methods: PaymentMethodStat[]
 }
 
+export interface OrderTypeRevenueData {
+    by_order_type: Array<{ code: string; amount: number; count: number }>
+}
+
 /* ====================== Customers ====================== */
 
 export interface CustomerStatsData {
@@ -297,6 +301,10 @@ export const statistics = {
     /** GET /api/staff/manager/statistics/payments */
     payments(q?: StatisticsQuery): Promise<PaymentStatsData> {
         return get<PaymentStatsData>('/staff/manager/statistics/payments', q)
+    },
+
+    orderTypeRevenue(q?: StatisticsQuery): Promise<OrderTypeRevenueData['by_order_type']> {
+        return get<OrderTypeRevenueData>('/staff/manager/statistics/order-types', q).then(d => d.by_order_type)
     },
 
     /** GET /api/staff/manager/statistics/customers */

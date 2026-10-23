@@ -36,6 +36,8 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
         fromDate: '' as string,
         toDate: '' as string,
         topLimit: 10 as number,
+        orderTypeRevenue: [] as Array<{ code: string; amount: number; count: number }>,
+        loadingOrderTypes: false,
 
         // Data
         overview: null as OverviewData | null,
@@ -43,6 +45,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
         orderStatus: null as OrderStatusBreakdown | null,
         topProducts: null as TopProductsData | null,
         lowProducts: null as LowProductsData | null,
+        foodCost: null as FoodCostData | null,
         categories: null as CategoryStatsData | null,
         payments: null as PaymentStatsData | null,
         customers: null as CustomerStatsData | null,
@@ -57,8 +60,10 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
             overview: false,
             revenueChart: false,
             orderStatus: false,
+            orderTypeRevenue: false,
             topProducts: false,
             lowProducts: false,
+            foodCost: false,
             categories: false,
             payments: false,
             customers: false,
@@ -99,6 +104,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 state.orderStatus !== null ||
                 state.topProducts !== null ||
                 state.lowProducts !== null ||
+                state.foodCost !== null ||
                 state.categories !== null ||
                 state.payments !== null ||
                 state.customers !== null ||
@@ -158,11 +164,17 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
         async fetchLowProducts(quiet = false): Promise<void> {
             await this._run('lowProducts', quiet, () => statistics.lowProducts(this.queryTop))
         },
+        async fetchFoodCost(quiet = false): Promise<void> {
+            await this._run('foodCost', quiet, () => statistics.foodCost(this.queryBase))
+        },
         async fetchCategories(quiet = false): Promise<void> {
             await this._run('categories', quiet, () => statistics.categories(this.queryBase))
         },
         async fetchPayments(quiet = false): Promise<void> {
             await this._run('payments', quiet, () => statistics.payments(this.queryBase))
+        },
+        async fetchOrderTypeRevenue(quiet = false): Promise<void> {
+            await this._run('orderTypeRevenue', quiet, () => statistics.orderTypeRevenue(this.queryBase))
         },
         async fetchCustomers(quiet = false): Promise<void> {
             await this._run('customers', quiet, () => statistics.customers(this.queryBase))
@@ -224,8 +236,10 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 this.fetchOrderStatus(quiet),
                 this.fetchTopProducts(quiet),
                 this.fetchLowProducts(quiet),
+                this.fetchFoodCost(quiet),
                 this.fetchCategories(quiet),
                 this.fetchPayments(quiet),
+                this.fetchOrderTypeRevenue(quiet),
                 this.fetchCustomers(quiet),
                 this.fetchReservations(quiet),
                 this.fetchPeakHours(quiet),
@@ -243,8 +257,10 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 orderStatus: () => this.fetchOrderStatus(false),
                 topProducts: () => this.fetchTopProducts(false),
                 lowProducts: () => this.fetchLowProducts(false),
+                foodCost: () => this.fetchFoodCost(false),
                 categories: () => this.fetchCategories(false),
                 payments: () => this.fetchPayments(false),
+                orderTypeRevenue: () => this.fetchOrderTypeRevenue(false),
                 customers: () => this.fetchCustomers(false),
                 reservations: () => this.fetchReservations(false),
                 peakHours: () => this.fetchPeakHours(false),

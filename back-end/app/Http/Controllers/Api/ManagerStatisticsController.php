@@ -77,6 +77,12 @@ class ManagerStatisticsController extends Controller
         return response()->json(['success' => true, 'data' => $this->stats->paymentStats($current, $previous)]);
     }
 
+    public function orderTypes(Request $request): JsonResponse
+    {
+        [$current] = StatisticsService::resolvePeriod($request->all());
+        return response()->json(['success' => true, 'data' => $this->stats->orderTypeRevenue($current)]);
+    }
+
     /** GET /api/staff/manager/statistics/customers */
     public function customers(Request $request): JsonResponse
     {

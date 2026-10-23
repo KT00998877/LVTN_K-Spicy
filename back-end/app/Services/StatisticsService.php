@@ -183,6 +183,7 @@ class StatisticsService
         // Orders
         $totalOrders = (int) DB::table('orders')
             ->whereBetween('placed_at', $current->utcRange())
+            ->where('status', '!=', 'CANCELLED')
             ->count();
         $completedOrders = (int) DB::table('orders')
             ->whereBetween('placed_at', $current->utcRange())
@@ -207,15 +208,20 @@ class StatisticsService
             ->whereIn('i.status', ['UNPAID', 'PENDING', 'FAILED'])
             ->count();
 
-        $avgOrderValue = $totalOrders > 0 ? round($revenue / $totalOrders, 2) : 0.0;
+        // Average paid invoice value: align numerator/denominator to successful payments.
+        $paidInvoiceCount = (int) DB::table('payments')
+            ->where('status', 'SUCCESS')
+            ->whereBetween('processed_at', $current->utcRange())
+            ->distinct()
+            ->count('invoice_id');
+        $avgOrderValue = $paidInvoiceCount > 0 ? round($revenue / $paidInvoiceCount, 2) : 0.0;
 
-        // Sold quantity: tổng quantity của order_items KHÔNG bị CANCELLED,
-        //  thuộc order có placed_at trong period.
+        // Sold quantity is recognized when order completes; excludes cancelled items/orders.
         $soldQuantity = (int) DB::table('order_items as oi')
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
-            ->where('o.status', '!=', 'CANCELLED')
             ->sum('oi.quantity');
 
         // Customers — join qua pivot user_role (DB::table không dùng được whereHas).
@@ -241,12 +247,13 @@ class StatisticsService
         // Previous period growth
         $prevTotalOrders = (int) DB::table('orders')
             ->whereBetween('placed_at', $previous->utcRange())
+            ->where('status', '!=', 'CANCELLED')
             ->count();
         $prevSold = (int) DB::table('order_items as oi')
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
-            ->whereBetween('o.placed_at', $previous->utcRange())
+            ->whereBetween('o.completed_at', $previous->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
-            ->where('o.status', '!=', 'CANCELLED')
             ->sum('oi.quantity');
         $prevNewCustomers = (int) DB::table('users')
             ->join('user_role as ur', 'ur.user_id', '=', 'users.id')
@@ -443,8 +450,8 @@ class StatisticsService
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
             ->join('menu_items as mi', 'mi.id', '=', 'oi.menu_item_id')
             ->leftJoin('categories as c', 'c.id', '=', 'mi.category_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
             ->selectRaw('oi.menu_item_id, oi.item_name, mi.image_url, c.name as category_name,
                          SUM(oi.quantity) as sold_quantity, SUM(oi.subtotal) as revenue')
@@ -456,8 +463,8 @@ class StatisticsService
 
         $totalRevenue = (float) DB::table('order_items as oi')
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
             ->sum('oi.subtotal');
 
@@ -502,8 +509,8 @@ class StatisticsService
                 $q->select('oi.menu_item_id')
                   ->from('order_items as oi')
                   ->join('orders as o', 'o.id', '=', 'oi.order_id')
-                  ->whereBetween('o.placed_at', $current->utcRange())
-                  ->where('o.status', '!=', 'CANCELLED')
+                  ->whereBetween('o.completed_at', $current->utcRange())
+                  ->where('o.status', 'COMPLETED')
                   ->where('oi.status', '!=', 'CANCELLED');
             })
             ->count();
@@ -513,8 +520,8 @@ class StatisticsService
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
             ->join('menu_items as mi', 'mi.id', '=', 'oi.menu_item_id')
             ->leftJoin('categories as c', 'c.id', '=', 'mi.category_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
             ->selectRaw('oi.menu_item_id, oi.item_name, mi.image_url, c.name as category_name,
                          SUM(oi.quantity) as sold_quantity, SUM(oi.subtotal) as revenue')
@@ -555,8 +562,8 @@ class StatisticsService
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
             ->join('menu_items as mi', 'mi.id', '=', 'oi.menu_item_id')
             ->join('categories as c', 'c.id', '=', 'mi.category_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
             ->selectRaw('c.id as category_id, c.name as category_name,
                          SUM(oi.quantity) as sold_quantity, SUM(oi.subtotal) as revenue')
@@ -618,6 +625,26 @@ class StatisticsService
             'total_revenue' => round($totalRevenue, 2),
             'methods'       => $list,
         ];
+    }
+
+    public function orderTypeRevenue(Period $current): array
+    {
+        $rows = DB::table('payments as p')
+            ->join('invoices as i', 'i.id', '=', 'p.invoice_id')
+            ->join('orders as o', 'o.id', '=', 'i.order_id')
+            ->where('p.status', 'SUCCESS')
+            ->whereBetween('p.processed_at', $current->utcRange())
+            ->selectRaw('o.order_type, SUM(p.amount) as amount, COUNT(DISTINCT i.id) as invoice_count')
+            ->groupBy('o.order_type')
+            ->get()
+            ->keyBy('order_type');
+
+        $types = ['DINE_IN', 'TAKEAWAY', 'ONLINE'];
+        return ['by_order_type' => array_map(fn (string $type) => [
+            'code' => $type,
+            'amount' => round((float) ($rows->get($type)->amount ?? 0), 2),
+            'count' => (int) ($rows->get($type)->invoice_count ?? 0),
+        ], $types)];
     }
 
     private function paymentBreakdown(Period $period): array
@@ -684,15 +711,15 @@ class StatisticsService
                 $q->select(DB::raw(1))
                   ->from('orders as o')
                   ->whereColumn('o.customer_id', 'u.id')
-                  ->whereBetween('o.placed_at', $current->utcRange())
-                  ->where('o.status', '!=', 'CANCELLED');
+                  ->whereBetween('o.completed_at', $current->utcRange())
+                  ->where('o.status', 'COMPLETED');
             })
             ->whereExists(function ($q) use ($current) {
                 $q->select(DB::raw(1))
                   ->from('orders as o')
                   ->whereColumn('o.customer_id', 'u.id')
-                  ->where('o.placed_at', '<', $current->from)
-                  ->where('o.status', '!=', 'CANCELLED');
+                  ->where('o.completed_at', '<', $current->from)
+                  ->where('o.status', 'COMPLETED');
             })
             ->count();
 
@@ -797,18 +824,18 @@ class StatisticsService
         // Cú pháp khác nhau → kiểm tra driver.
 
         if ($driver === 'mysql') {
-            $hourExpr = "DATE_FORMAT(CONVERT_TZ(o.placed_at, '+00:00', '+07:00'), '%H')";
-            $dowExpr  = "DAYOFWEEK(CONVERT_TZ(o.placed_at, '+00:00', '+07:00'))";
+            $hourExpr = "DATE_FORMAT(CONVERT_TZ(o.completed_at, '+00:00', '+07:00'), '%H')";
+            $dowExpr  = "DAYOFWEEK(CONVERT_TZ(o.completed_at, '+00:00', '+07:00'))";
         } else {
             // SQLite: giờ VN = strftime('%H', placed_at, '+7 hours')
-            $hourExpr = "CAST(strftime('%H', o.placed_at, '+7 hours') AS INTEGER)";
-            $dowExpr  = "CAST(strftime('%w', o.placed_at, '+7 hours') AS INTEGER) + 1";
+            $hourExpr = "CAST(strftime('%H', o.completed_at, '+7 hours') AS INTEGER)";
+            $dowExpr  = "CAST(strftime('%w', o.completed_at, '+7 hours') AS INTEGER) + 1";
         }
 
         $hourRows = DB::table('orders as o')
             ->selectRaw("$hourExpr as hour, COUNT(*) as order_count, SUM(o.total_amount) as revenue")
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->groupBy('hour')
             ->orderBy('hour')
             ->get();
@@ -828,8 +855,8 @@ class StatisticsService
 
         $weekRows = DB::table('orders as o')
             ->selectRaw("$dowExpr as dow, COUNT(*) as order_count, SUM(o.total_amount) as revenue")
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->groupBy('dow')
             ->orderBy('dow')
             ->get();
@@ -981,8 +1008,8 @@ class StatisticsService
         // Số lần bán trong period.
         $soldRows = DB::table('order_items as oi')
             ->join('orders as o', 'o.id', '=', 'oi.order_id')
-            ->whereBetween('o.placed_at', $current->utcRange())
-            ->where('o.status', '!=', 'CANCELLED')
+            ->whereBetween('o.completed_at', $current->utcRange())
+            ->where('o.status', 'COMPLETED')
             ->where('oi.status', '!=', 'CANCELLED')
             ->selectRaw('oi.menu_item_id, SUM(oi.quantity) as sold, SUM(oi.subtotal) as revenue')
             ->groupBy('oi.menu_item_id')

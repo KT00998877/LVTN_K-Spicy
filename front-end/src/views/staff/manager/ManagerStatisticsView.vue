@@ -93,6 +93,31 @@
             </article>
         </section>
 
+        <section class="stats-grid">
+            <article class="stats-section" aria-labelledby="customer-title">
+                <div class="stats-section__head">
+                    <h2 id="customer-title" class="stats-section__title">Khách hàng thân thiết</h2>
+                    <span class="stats-section__meta">Top khách theo chi tiêu trong kỳ</span>
+                </div>
+                <div class="stats-section__body">
+                    <WidgetState :loading="statsStore.loading.customers" :error="statsStore.errors.customers ?? null" :empty="!statsStore.customers || statsStore.customers.top_customers.length === 0" empty-message="Chưa có khách hàng mua hàng trong kỳ." @retry="statsStore.retry('customers')">
+                        <table v-if="statsStore.customers?.top_customers.length" class="stats-rank-table" aria-label="Bảng khách hàng thân thiết">
+                            <thead><tr><th>#</th><th>Khách hàng</th><th class="ar">Số đơn</th><th class="ar">Chi tiêu</th></tr></thead>
+                            <tbody><tr v-for="(customer, index) in statsStore.customers.top_customers" :key="customer.id"><td class="stats-rank-table__num">{{ index + 1 }}</td><td><strong>{{ customer.name }}</strong></td><td class="ar">{{ formatInt(customer.order_count) }}</td><td class="ar">{{ formatVND(customer.total_spent) }}</td></tr></tbody>
+                        </table>
+                    </WidgetState>
+                </div>
+            </article>
+            <article class="stats-section" aria-labelledby="reservation-title">
+                <div class="stats-section__head"><h2 id="reservation-title" class="stats-section__title">Tình hình đặt bàn</h2><span class="stats-section__meta">{{ formatInt(statsStore.reservations?.total_reservations ?? 0) }} lượt trong kỳ</span></div>
+                <div class="stats-section__body">
+                    <WidgetState :loading="statsStore.loading.reservations" :error="statsStore.errors.reservations ?? null" :empty="!statsStore.reservations || statsStore.reservations.total_reservations === 0" empty-message="Chưa có lượt đặt bàn trong kỳ." @retry="statsStore.retry('reservations')">
+                        <dl v-if="statsStore.reservations" class="stats-reservation-list"><div><dt>Chờ xác nhận</dt><dd>{{ formatInt(statsStore.reservations.pending) }}</dd></div><div><dt>Đã xác nhận</dt><dd>{{ formatInt(statsStore.reservations.confirmed) }}</dd></div><div><dt>Đã đến</dt><dd>{{ formatInt(statsStore.reservations.arrived) }}</dd></div><div><dt>Hoàn tất</dt><dd>{{ formatInt(statsStore.reservations.completed) }}</dd></div><div><dt>Hủy / không đến</dt><dd>{{ formatInt(statsStore.reservations.cancelled + statsStore.reservations.no_show) }}</dd></div></dl>
+                    </WidgetState>
+                </div>
+            </article>
+        </section>
+
         <!-- ============================================================
              2. REVENUE TREND
              ============================================================ -->
@@ -144,12 +169,13 @@
                         empty-message="Chưa có đơn nào trong kỳ."
                         @retry="statsStore.retry('orderStatus')"
                     >
-                        <StatsDoughnutChart
+                        <StatsBarChart
                             v-if="orderStatus && orderStatus.breakdown.length"
                             :labels="orderStatus.breakdown.map((b) => statusLabel(b.status))"
                             :data="orderStatus.breakdown.map((b) => b.count)"
-                            :ariaLabel="'Biểu đồ tròn trạng thái đơn'"
-                            :height="260"
+                            label="Số đơn theo trạng thái"
+                            :ariaLabel="'Biểu đồ thanh ngang trạng thái đơn'"
+                            :height="Math.max(180, orderStatus.breakdown.length * 38)"
                         />
                     </WidgetState>
                 </div>
@@ -216,6 +242,24 @@
                     </tbody>
                 </table>
             </article>
+            <article class="stats-section" aria-labelledby="lowprod-title">
+                <div class="stats-section__head"><h2 id="lowprod-title" class="stats-section__title">Món bán chậm / chưa bán</h2><span class="stats-section__meta">{{ statsStore.lowProducts?.no_sales_count ?? 0 }} món chưa phát sinh bán</span></div>
+                <div class="stats-section__body">
+                    <WidgetState :loading="statsStore.loading.lowProducts" :error="statsStore.errors.lowProducts ?? null" :empty="!statsStore.lowProducts || statsStore.lowProducts.items.length === 0" empty-message="Không có món bán chậm trong kỳ." @retry="statsStore.retry('lowProducts')">
+                        <table v-if="statsStore.lowProducts?.items.length" class="stats-rank-table" aria-label="Bảng món bán chậm"><thead><tr><th>Món</th><th>Danh mục</th><th class="ar">SL bán</th><th class="ar">Doanh thu</th></tr></thead><tbody><tr v-for="item in statsStore.lowProducts.items.slice(0, 8)" :key="`low-${item.id}`"><td><strong>{{ item.name }}</strong></td><td>{{ item.category || '—' }}</td><td class="ar">{{ formatInt(item.sold_quantity) }}</td><td class="ar">{{ formatVND(item.revenue) }}</td></tr></tbody></table>
+                    </WidgetState>
+                </div>
+            </article>
+        </section>
+
+        <section class="stats-section" aria-labelledby="foodcost-title">
+            <div class="stats-section__head"><h2 id="foodcost-title" class="stats-section__title">Giá vốn nguyên liệu theo món</h2><span class="stats-section__meta">Ước tính theo công thức hiện tại</span></div>
+            <p class="stats-footnote">{{ statsStore.foodCost?.note }}</p>
+            <div class="stats-section__body">
+                <WidgetState :loading="statsStore.loading.foodCost" :error="statsStore.errors.foodCost ?? null" :empty="!statsStore.foodCost || statsStore.foodCost.items.length === 0" empty-message="Chưa có dữ liệu giá vốn món." @retry="statsStore.retry('foodCost')">
+                    <table v-if="statsStore.foodCost?.items.length" class="stats-rank-table" aria-label="Bảng tỷ lệ giá vốn món"><thead><tr><th>Món</th><th class="ar">Giá bán</th><th class="ar">Giá vốn</th><th class="ar">Food cost</th><th class="ar">Lãi gộp ước tính</th></tr></thead><tbody><tr v-for="item in statsStore.foodCost.items.filter(x => x.sold_quantity > 0).slice(0, 12)" :key="`fc-${item.id}`"><td><strong>{{ item.name }}</strong></td><td class="ar">{{ formatVND(item.selling_price) }}</td><td class="ar">{{ formatVND(item.ingredient_cost) }}</td><td class="ar">{{ item.food_cost_pct.toFixed(1) }}%</td><td class="ar">{{ formatVND(item.gross_profit) }}</td></tr></tbody></table>
+                </WidgetState>
+            </div>
         </section>
 
         <!-- ============================================================
@@ -278,6 +322,17 @@
                     </li>
                 </ul>
             </article>
+        </section>
+
+        <section class="stats-section" aria-labelledby="revenue-channel-title">
+            <div class="stats-section__head"><h2 id="revenue-channel-title" class="stats-section__title">Doanh thu theo kênh</h2><span class="stats-section__meta">Phân bổ theo hình thức phục vụ</span></div>
+            <div class="stats-section__body">
+                <WidgetState :loading="statsStore.loading.payments" :error="statsStore.errors.payments ?? null" :empty="!payments || payments.total_revenue === 0" empty-message="Chưa có giao dịch thành công trong kỳ." @retry="statsStore.retry('payments')">
+                    <WidgetState :loading="statsStore.loading.orderTypeRevenue" :error="statsStore.errors.orderTypeRevenue ?? null" :empty="statsStore.orderTypeRevenue.every(x => x.amount === 0)" empty-message="Chưa có doanh thu theo hình thức phục vụ." @retry="statsStore.retry('orderTypeRevenue')">
+                        <StatsBarChart :labels="orderTypeLabels" :data="orderTypeValues" label="Doanh thu theo kênh" :ariaLabel="'Biểu đồ thanh ngang doanh thu theo kênh phục vụ'" :formatValue="formatVND" :height="180" />
+                    </WidgetState>
+                </WidgetState>
+            </div>
         </section>
 
         <!-- ============================================================
@@ -452,6 +507,9 @@ const paymentColors = computed(() => {
     const list = payments.value?.methods ?? []
     return list.map((m) => PAYMENT_COLORS[m.code] ?? '#d71920')
 })
+const ORDER_TYPE_LABELS: Record<string, string> = { DINE_IN: 'Tại bàn', TAKEAWAY: 'Mang đi', ONLINE: 'Online' }
+const orderTypeLabels = computed(() => statsStore.orderTypeRevenue.map(x => ORDER_TYPE_LABELS[x.code] ?? x.code))
+const orderTypeValues = computed(() => statsStore.orderTypeRevenue.map(x => x.amount))
 function paymentColor(code: string): string {
     return PAYMENT_COLORS[code] ?? '#d71920'
 }
@@ -699,6 +757,11 @@ useRealtimeRefresh(
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
 }
+
+.stats-reservation-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.stats-reservation-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: var(--mgr-gray-50, #f9fafb); border-radius: 8px; }
+.stats-reservation-list dt { color: var(--mgr-gray-700, #374151); }
+.stats-reservation-list dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* ============== ORDER STATUS LIST ============== */
 .stats-status-list {
