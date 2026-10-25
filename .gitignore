@@ -186,6 +186,9 @@ Homestead.yaml
 /front-end/.playwright/
 /front-end/__screenshots__/
 /front-end/src/**/*.timestamp-*-*.mjs
+# Script probe tạm thời dùng để debug realtime/host cục bộ — không track
+/front-end/_probe*.mjs
+/front-end/tests/_probe*.mjs
 
 # ===========================================================================
 # mobile/  (Flutter)
@@ -277,3 +280,6 @@ coverage-final.json
 node_modules/
 /restart-chatbot.cmd
 /B2205886_TruongVanAnhKiet_LVTN.doc
+
+/rp.md
+/th.md
