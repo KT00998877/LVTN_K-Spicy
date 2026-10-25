@@ -4,7 +4,24 @@ import { beginRead } from '@/utils/realtime'
  * Dữ liệu được lấy từ backend Laravel qua api/staff.ts.
  */
 import { defineStore } from 'pinia'
-import { staffKitchen, type KitchenItem } from '@/api/staff'
+import { staffKitchen, type KitchenItem, type KitchenShortage } from '@/api/staff'
+
+/** Lỗi 409 từ backend: bếp bắt đầu nấu nhưng thiếu nguyên liệu. */
+export class ShortageError extends Error {
+    constructor(public readonly shortages: KitchenShortage[]) {
+        super('Thiếu nguyên liệu để bắt đầu nấu.')
+        this.name = 'ShortageError'
+    }
+}
+
+/** Lấy danh sách nguyên liệu thiếu từ lỗi Axios của backend. */
+export function shortagesFromError(err: unknown): KitchenShortage[] {
+    const anyErr = err as { response?: { status?: number; data?: { shortages?: KitchenShortage[] } } }
+    if (anyErr?.response?.status === 409 && Array.isArray(anyErr.response.data?.shortages)) {
+        return anyErr.response.data.shortages
+    }
+    return []
+}
 
 export const useKitchenStore = defineStore('staffKitchen', {
     state: () => ({
@@ -44,23 +61,31 @@ export const useKitchenStore = defineStore('staffKitchen', {
             }
         },
 
+        /**
+         * Cập nhật trạng thái món.
+         *
+         * Khi bếp bắt đầu nấu mà thiếu nguyên liệu, backend trả 409 kèm danh sách
+         * thiếu → hàm này ném ShortageError để UI mở dialog cho bếp quyết định.
+         * Gọi lại với allowShortage=true sau khi bếp chọn "Tiếp tục nấu".
+         */
         async updateItemStatus(
             orderId: number,
             itemId: number,
             status: 'PENDING' | 'PREPARING' | 'READY' | 'SERVED' | 'CANCELLED',
-            reason?: string
+            reason?: string,
+            allowShortage = false
         ): Promise<void> {
             if (this.updatingIds.includes(itemId)) return
             this.updatingIds.push(itemId)
             this.revision++
             try {
-                const order = await staffKitchen.updateItemStatus(orderId, itemId, status, reason)
+                const result = await staffKitchen.updateItemStatus(orderId, itemId, status, reason, allowShortage)
                 this.revision++
                 const entry = [...this.pendingItems, ...this.preparingItems, ...this.readyItems].find(e => e.item.id === itemId)
                 this.pendingItems = this.pendingItems.filter(e => e.item.id !== itemId)
                 this.preparingItems = this.preparingItems.filter(e => e.item.id !== itemId)
                 this.readyItems = this.readyItems.filter(e => e.item.id !== itemId)
-                const updated = order.items.find(i => i.id === itemId)
+                const updated = result.order.items.find(i => i.id === itemId)
                 if (entry && updated) {
                     Object.assign(entry.item, updated)
                     if (status === 'PENDING') this.pendingItems.push(entry)
@@ -68,6 +93,10 @@ export const useKitchenStore = defineStore('staffKitchen', {
                     if (status === 'READY') this.readyItems.push(entry)
                 }
             } catch (err) {
+                const shortages = shortagesFromError(err)
+                if (shortages.length > 0) {
+                    throw new ShortageError(shortages)
+                }
                 this.error = err instanceof Error ? err.message : 'Lỗi cập nhật món'
                 throw err
             } finally {

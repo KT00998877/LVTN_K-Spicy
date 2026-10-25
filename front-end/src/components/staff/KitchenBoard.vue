@@ -15,12 +15,14 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
 
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useKitchenStore } from '@/stores/staffKitchen'
+import { useKitchenStore, ShortageError } from '@/stores/staffKitchen'
 import { useToast } from '@/composables/useStaffUtils'
+import { useAppDialog } from '@/composables/useAppDialog'
 import type { OrderItemStatus } from '@/types/staff'
 import { RouterLink, useRouter } from 'vue-router'
-import type { KitchenItem } from '@/api/staff'
+import type { KitchenItem, KitchenShortage } from '@/api/staff'
 import { staffKitchen } from '@/api/staff'
+import ShortageDialog from '@/components/staff/ShortageDialog.vue'
 
 const props = defineProps<{
     status: OrderItemStatus
@@ -30,6 +32,7 @@ const props = defineProps<{
 const kitchenStore = useKitchenStore()
 const { pendingItems, preparingItems, readyItems, loading, error, updatingIds } = storeToRefs(kitchenStore)
 const toast = useToast()
+const appDialog = useAppDialog()
 const router = useRouter()
 const route = useNotificationOrderTarget(() => {
     const groups = new Map<number, { id: number; status: string }>()
@@ -45,6 +48,12 @@ const clock = ref(Date.now())
 
 const notifyingOrders = ref<Set<number>>(new Set())
 let clockTimer: ReturnType<typeof setInterval> | undefined
+
+// ====== Cảnh báo thiếu nguyên liệu (bếp tự quyết) ======
+const shortageOpen = ref(false)
+const shortageBusy = ref(false)
+const shortageList = ref<KitchenShortage[]>([])
+const shortageTarget = ref<{ orderId: number; itemId: number; dishName: string; orderCode: string } | null>(null)
 
 onMounted(() => {
     clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
@@ -153,12 +162,58 @@ function spicyLabel(level: number): string {
     return level === 0 ? 'Không cay' : `Cấp ${level}`
 }
 
-async function onStart(entry: { order: { id: number }; item: { id: number } }): Promise<void> {
+async function onStart(entry: { order: { id: number; code: string }; item: { id: number; menu_item_name: string } }): Promise<void> {
     try {
         await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'PREPARING')
         toast.success('Bắt đầu chế biến')
     } catch (err) {
+        // Thiếu nguyên liệu → mở dialog để bếp quyết định nấu tiếp hay hủy món.
+        if (err instanceof ShortageError) {
+            shortageTarget.value = {
+                orderId: entry.order.id,
+                itemId: entry.item.id,
+                dishName: entry.item.menu_item_name,
+                orderCode: entry.order.code,
+            }
+            shortageList.value = err.shortages
+            shortageOpen.value = true
+            return
+        }
         toast.error(err instanceof Error ? err.message : 'Lỗi')
+    }
+}
+
+/** Bếp chọn "Tiếp tục nấu": trừ tới 0, tạo yêu cầu nhập kho, vẫn nấu món này. */
+async function onShortageContinue(): Promise<void> {
+    const target = shortageTarget.value
+    if (!target) return
+    shortageBusy.value = true
+    try {
+        await kitchenStore.updateItemStatus(target.orderId, target.itemId, 'PREPARING', undefined, true)
+        shortageOpen.value = false
+        toast.success('Đã tiếp tục nấu. Đã gửi yêu cầu nhập kho cho quản lý.')
+        shortageTarget.value = null
+    } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Không bắt đầu được món')
+    } finally {
+        shortageBusy.value = false
+    }
+}
+
+/** Bếp chọn "Hủy món": hủy món với lý do hết nguyên liệu, quản lý sẽ ẩn món. */
+async function onShortageCancel(): Promise<void> {
+    const target = shortageTarget.value
+    if (!target) return
+    shortageBusy.value = true
+    try {
+        await kitchenStore.updateItemStatus(target.orderId, target.itemId, 'CANCELLED', 'Hết nguyên liệu')
+        shortageOpen.value = false
+        toast.warning('Đã hủy món. Quản lý đã được thông báo ẩn món khỏi thực đơn.')
+        shortageTarget.value = null
+    } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Không hủy được món')
+    } finally {
+        shortageBusy.value = false
     }
 }
 
@@ -172,8 +227,8 @@ async function onReady(entry: { order: { id: number }; item: { id: number } }): 
 }
 
 async function onCancel(entry: { order: { id: number }; item: { id: number; menu_item_name: string } }): Promise<void> {
-    if (!confirm(`Hủy món "${entry.item.menu_item_name}"?`)) return
-    const reason = prompt('Lý do hủy:', 'Hết nguyên liệu')?.trim()
+    if (!await appDialog.confirm({ title: 'Hủy món này?', message: `Món “${entry.item.menu_item_name}” sẽ bị hủy khỏi đơn.`, confirmLabel: 'Hủy món', tone: 'danger' })) return
+    const reason = (await appDialog.prompt({ title: 'Lý do hủy món', message: 'Ghi lại lý do để nhân viên phục vụ nắm được tình hình.', label: 'Lý do', initialValue: 'Hết nguyên liệu', confirmLabel: 'Gửi lý do' }))?.trim()
     if (!reason) return
     try {
         await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'CANCELLED', reason)
@@ -292,6 +347,11 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                     <p v-if="entry.item.note" class="item-note">
                                         📝 {{ entry.item.note }}
                                     </p>
+                                    <!-- Thiếu nguyên liệu: bếp thấy trước khi bấm "Bắt đầu nấu" -->
+                                    <p v-if="entry.item.shortages?.length" class="shortage-hint">
+                                        ⚠ Thiếu
+                                        {{ entry.item.shortages.map(s => `${s.ingredient} (${s.shortage}${s.unit})`).join(', ') }}
+                                    </p>
                                 </div>
 
                                 <!-- Actions -->
@@ -350,6 +410,17 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                 </div>
             </section>
         </div>
+
+        <!-- Cảnh báo thiếu nguyên liệu: bếp quyết nấu tiếp hay hủy món -->
+        <ShortageDialog
+            :open="shortageOpen"
+            :dish-name="shortageTarget?.dishName ?? ''"
+            :order-code="shortageTarget?.orderCode ?? ''"
+            :shortages="shortageList"
+            :busy="shortageBusy"
+            @continue="onShortageContinue"
+            @cancel="onShortageCancel"
+        />
     </div>
 </template>
 
@@ -782,6 +853,18 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     border-radius: 0 6px 6px 0;
     font-size: 14px;
     color: #fcd34d;
+}
+
+/* Cảnh báo thiếu nguyên liệu — phải nổi bật nhưng không tranh chấp với nút hành động */
+.shortage-hint {
+    margin: 6px 0 0;
+    padding: 8px 12px;
+    background: rgba(228, 38, 61, 0.12);
+    border-left: 3px solid var(--chili-red, #e4263d);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fda4af;
 }
 
 /* Item Actions */

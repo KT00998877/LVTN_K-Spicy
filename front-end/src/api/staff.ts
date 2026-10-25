@@ -105,6 +105,33 @@ export const staffAuth = {
     },
 }
 
+export interface TwoFactorStatus {
+    enabled: boolean
+    setup_pending: boolean
+}
+
+export interface TwoFactorSetup extends TwoFactorStatus {
+    secret: string
+    provisioning_uri: string
+}
+
+export const managerSecurity = {
+    async status(): Promise<TwoFactorStatus> {
+        const { data } = await apiClient.get<{ success: boolean; data: TwoFactorStatus }>('/staff/auth/two-factor')
+        return data.data
+    },
+    async setup(): Promise<TwoFactorSetup> {
+        const { data } = await apiClient.post<{ success: boolean; data: TwoFactorSetup }>('/staff/auth/two-factor/setup')
+        return { ...data.data, enabled: false, setup_pending: true }
+    },
+    async confirm(code: string): Promise<void> {
+        await apiClient.post('/staff/auth/two-factor/confirm', { code })
+    },
+    async disable(password: string, code: string): Promise<void> {
+        await apiClient.delete('/staff/auth/two-factor', { data: { password, code } })
+    },
+}
+
 /* ============================================================
  *  Tables + Sessions
  * ========================================================== */
@@ -411,6 +438,16 @@ export const staffReservations = {
  *  Kitchen (bếp)
  * ========================================================== */
 
+/** Nguyên liệu thiếu khi bếp bắt đầu nấu — bếp tự quyết định nấu tiếp hay hủy món. */
+export interface KitchenShortage {
+    ingredient_id: number
+    ingredient: string
+    unit: string
+    required: number
+    available: number
+    shortage: number
+}
+
 export interface KitchenItem {
     order: {
         order_type: 'DINE_IN' | 'TAKEAWAY' | 'ONLINE'
@@ -436,6 +473,8 @@ export interface KitchenItem {
         status: 'PENDING' | 'PREPARING' | 'READY' | 'SERVED' | 'CANCELLED'
         started_at: string | null
         ready_at: string | null
+        /** Nguyên liệu đang thiếu (nếu có) — bếp thấy ngay trên danh sách. */
+        shortages: KitchenShortage[]
         toppings: Array<{
             id: number
             name: string | null
@@ -456,18 +495,33 @@ export const staffKitchen = {
         return res.data.data
     },
 
-    /** PATCH /api/staff/kitchen/items/{oid}/{iid}/status */
+    /**
+     * PATCH /api/staff/kitchen/items/{oid}/{iid}/status
+     *
+     * Khi chuyển sang PREPARING mà thiếu nguyên liệu, backend trả 409 kèm
+     * `shortages` — bếp phải chọn "Tiếp tục nấu" (allowShortage=true) hoặc "Hủy món".
+     */
     async updateItemStatus(
         orderId: number,
         itemId: number,
         status: 'PENDING' | 'PREPARING' | 'READY' | 'SERVED' | 'CANCELLED',
-        reason?: string
-    ): Promise<Order> {
-        const res = await apiClient.patch<{ success: boolean; data: Order }>(
+        reason?: string,
+        allowShortage = false
+    ): Promise<{ order: Order; shortages: KitchenShortage[]; requestCode: string | null }> {
+        const res = await apiClient.patch<{
+            success: boolean
+            data: Order
+            shortages: KitchenShortage[]
+            request_code: string | null
+        }>(
             `/staff/kitchen/items/${orderId}/${itemId}/status`,
-            { status, reason }
+            { status, reason, allow_shortage: allowShortage }
         )
-        return res.data.data
+        return {
+            order: res.data.data,
+            shortages: res.data.shortages ?? [],
+            requestCode: res.data.request_code ?? null,
+        }
     },
 
     /** POST /api/staff/kitchen/orders/{orderId}/notify-shipper
@@ -574,7 +628,7 @@ export interface DashboardStats {
     ready_items: number
     total_staff: number
     revenue_growth_pct: number | null
-    orders_growth_pct: number
+    orders_growth_pct: number | null
 }
 
 export interface RevenueReport {
@@ -764,6 +818,35 @@ export interface DeliveryOrder {
     events: DeliveryEvent[]
 }
 
+/**
+ * Đơn ONLINE đang chờ shipper nhận (Phase 2).
+ * `distance_km` = khoảng cách từ vị trí hiện tại của shipper tới điểm giao.
+ */
+export interface NearbyJob {
+    id: number
+    code: string
+    recipient_name: string | null
+    delivery_address: string | null
+    delivery_latitude: number
+    delivery_longitude: number
+    total_amount: number
+    payment_method: PaymentMethod
+    distance_km: number | null
+    is_mine: boolean
+}
+
+/**
+ * Shipper đang rảnh, kèm khoảng cách từ nhà hàng (Phase 2).
+ */
+export interface NearestShipper {
+    id: number
+    name: string
+    distance_km: number
+    latitude: number
+    longitude: number
+    last_seen_at: string | null
+}
+
 export const onlineOrders = {
     /** GET /api/staff/online-orders */
     async list(status?: string, orderType?: string): Promise<DeliveryOrder[]> {
@@ -778,6 +861,17 @@ export const onlineOrders = {
     async listShippers(): Promise<DeliveryShipper[]> {
         const res = await apiClient.get<{ success: boolean; data: DeliveryShipper[] }>(
             '/staff/online-orders/shippers',
+        )
+        return res.data.data
+    },
+
+    /**
+     * GET /api/staff/deliveries/nearest (Phase 2) — shipper đang rảnh, xếp theo
+     * khoảng cách từ nhà hàng. Manager dùng để duyệt đơn nhanh hơn.
+     */
+    async nearestShippers(): Promise<NearestShipper[]> {
+        const res = await apiClient.get<{ success: boolean; data: NearestShipper[] }>(
+            '/staff/deliveries/nearest',
         )
         return res.data.data
     },
@@ -866,6 +960,38 @@ export const deliveries = {
             console.error('[route API] failed:', id, e)
             throw e
         }
+    },
+
+    /**
+     * POST /api/staff/deliveries/location — gửi vị trí hiện tại (Phase 2).
+     * App gọi theo chu kỳ (60s) hoặc khi shipper di chuyển > 200m.
+     */
+    async updateLocation(payload: {
+        latitude: number
+        longitude: number
+        accuracy?: number | null
+        is_available?: boolean
+    }): Promise<void> {
+        await apiClient.post('/staff/deliveries/location', payload)
+    },
+
+    /**
+     * POST /api/staff/deliveries/{id}/accept — shipper xác nhận nhận đơn (Phase 2).
+     * Chỉ 1 shipper nhận được; shipper khác sẽ nhận lỗi 409.
+     */
+    async accept(id: number): Promise<void> {
+        await apiClient.post(`/staff/deliveries/${id}/accept`)
+    },
+
+    /**
+     * GET /api/staff/deliveries/nearby-jobs — các đơn ONLINE đang chờ shipper nhận,
+     * sắp theo khoảng cách từ vị trí hiện tại (Phase 2).
+     */
+    async nearbyJobs(): Promise<NearbyJob[]> {
+        const res = await apiClient.get<{ success: boolean; data: NearbyJob[] }>(
+            '/staff/deliveries/nearby-jobs',
+        )
+        return res.data.data
     },
 }
 

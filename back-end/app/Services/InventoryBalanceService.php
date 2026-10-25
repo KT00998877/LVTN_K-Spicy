@@ -53,8 +53,9 @@ class InventoryBalanceService
         $since = $lastSheet?->closed_at;
         $actual = (float) $ingredient->quantity_in_stock;
 
-        // Lượng dùng dự kiến (đã nấu). ExpectedUsageService::between cần $since.
-        $used = $this->expected->between($since, $now, false);
+        // Lượng đã nấu nhưng CHƯA được trừ kho (món nấu trước Phase F).
+        // Từ Phase F, món đã bắt đầu nấu thì tồn đã bị trừ thật → không trừ lần 2.
+        $used = $this->expected->undeductedBetween($since, $now, false);
         $row = $used['by_ingredient'][$ingredientId] ?? ['quantity' => 0.0, 'uncomparable_items' => 0];
         $expectedUsage = (float) $row['quantity'];
 
@@ -107,7 +108,9 @@ class InventoryBalanceService
         $ingredients = Ingredient::query()->orderBy('name')->get();
         if ($ingredients->isEmpty()) return [];
 
-        $used = $this->expected->between($since, $now, false);
+        // Từ Phase F, món đã bắt đầu nấu thì tồn đã bị trừ thật → chỉ trừ thêm
+        // lượng của các món CHƯA được trừ (nấu trước Phase F).
+        $used = $this->expected->undeductedBetween($since, $now, false);
         $reservedMap = $this->availability->pendingUsage();
         $missingSnapshot = $used['missing_recipe_items'] > 0 || $used['legacy_items'] > 0;
 
@@ -123,9 +126,6 @@ class InventoryBalanceService
             $estimated = $actual - $expectedUsage - $reserved;
             if (!$since) {
                 $status = 'insufficient_data';
-                $estimated = null;
-            } elseif ($missingSnapshot) {
-                $status = 'missing_snapshot';
                 $estimated = null;
             } elseif ($row['uncomparable_items'] > 0 || $reservedMap === null) {
                 $status = 'uncomparable';

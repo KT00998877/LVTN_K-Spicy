@@ -23,6 +23,8 @@ class OrderItem extends Model
         'started_at',
         'recipe_snapshot',
         'recipe_captured_at',
+        'inventory_deducted_at',
+        'inventory_deduction_key',
         'ready_at',
         'served_at',
         'cancelled_by',

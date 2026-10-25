@@ -84,8 +84,8 @@ class MenuAvailabilityService
         if (DB::transactionLevel() > 0) $ingredientQuery->lockForUpdate();
         $ingredients = $ingredientQuery->get(['id', 'quantity_in_stock']);
         if ($ingredients->contains(fn ($ingredient) => !in_array((int) $ingredient->id, $counted, true))) return false;
-        $used = app(ExpectedUsageService::class)->between($last->closed_at, now(), DB::transactionLevel() > 0);
-        if ($used['missing_recipe_items'] || $used['legacy_items']
+        $used = app(ExpectedUsageService::class)->undeductedBetween($last->closed_at, now(), DB::transactionLevel() > 0);
+        if ($used['missing_recipe_items'] > 0 || $used['legacy_items'] > 0
             || collect($used['by_ingredient'])->contains(fn ($row) => $row['uncomparable_items'] > 0)) return false;
         foreach ($ingredients as $ingredient) {
             $this->balance[(int) $ingredient->id] = (float) $ingredient->quantity_in_stock

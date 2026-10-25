@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ShortageDetectedException;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -307,10 +308,15 @@ class StaffOrderService
 
     /**
      * Cập nhật status 1 order_item (theo state machine).
+     *
+     * @param  bool  $allowShortage  true = bếp đã xem cảnh báo thiếu nguyên liệu và chọn
+     *                              "tiếp tục nấu". Chỉ áp dụng khi chuyển sang PREPARING.
+     *
+     * @return array{order:array, shortages:array, request_code:?string}
      */
-    public function updateItemStatus(int $orderId, int $itemId, string $status, ?string $reason = null, ?User $byUser = null): array
+    public function updateItemStatus(int $orderId, int $itemId, string $status, ?string $reason = null, ?User $byUser = null, bool $allowShortage = false): array
     {
-        return DB::transaction(function () use ($orderId, $itemId, $status, $reason, $byUser) {
+        return DB::transaction(function () use ($orderId, $itemId, $status, $reason, $byUser, $allowShortage) {
             /** @var Order|null $order */
             $order = Order::with('items')->lockForUpdate()->find($orderId);
             if (!$order) {
@@ -361,6 +367,56 @@ class StaffOrderService
             }
             $item->save();
 
+            $shortages = [];
+            $requestCode = null;
+
+            if ($status === 'PREPARING') {
+                // Bếp bắt đầu nấu → trừ kho theo công thức đã chụp.
+                // Nếu thiếu nguyên liệu và bếp chưa đồng ý nấu tiếp → trả cảnh báo,
+                // KHÔNG đổi trạng thái món (bếp sẽ chọn tiếp tục hoặc hủy).
+                abort_if($byUser === null, 403, 'Cần đăng nhập để bắt đầu nấu.');
+                $consumption = app(InventoryConsumptionService::class)->deductForItem(
+                    $item,
+                    $byUser,
+                    $allowShortage,
+                );
+                if (!$consumption['deducted']) {
+                    // Rollback toàn bộ transaction để trạng thái món không đổi.
+                    throw new ShortageDetectedException($consumption['shortages']);
+                }
+                $shortages = $consumption['shortages'];
+                $requestCode = $consumption['request_code'];
+            }
+
+            if ($status === 'CANCELLED' && $reason && str_contains($reason, 'Hết nguyên liệu')) {
+                // Bếp hủy vì hết nguyên liệu (chưa từng bắt đầu nấu) → xác định
+                // nguyên liệu đang thiếu để biết món có nên bị ẩn khỏi thực đơn không.
+                // Món đã bắt đầu nấu thì $shortages đã có sẵn từ nhánh PREPARING.
+                if ($shortages === []) {
+                    $shortages = app(InventoryConsumptionService::class)->checkShortage($item)['shortages'];
+                }
+            }
+
+            if ($status === 'CANCELLED' && $item->inventory_deducted_at !== null && $byUser) {
+                // Món đã bắt đầu nấu (đã trừ kho) mà bị hủy → hoàn lại đúng phần đã trừ.
+                app(InventoryConsumptionService::class)->restoreForItem(
+                    $item,
+                    $byUser,
+                    $reason ?? 'Bếp hủy món',
+                );
+            }
+
+            if ($status === 'CANCELLED' && $reason && str_contains($reason, 'Hết nguyên liệu')) {
+                // Bếp hủy vì hết nguyên liệu → ẩn món khỏi thực đơn cho khách.
+                // Chỉ ẩn khi nguyên liệu ĐANG THIẾU là trọng yếu (mì, thịt, phô mai...);
+                // thiếu gia vị phụ thì bếp vẫn nấu được, không ẩn món.
+                app(InventoryConsumptionService::class)->hideMenuItemForShortage(
+                    (int) $item->menu_item_id,
+                    $reason,
+                    array_map(fn ($s) => (int) $s['ingredient_id'], $shortages),
+                );
+            }
+
             // Cập nhật status tổng của order
             $allItems = OrderItem::where('order_id', $order->id)->get();
             $statuses = $allItems->where('status', '!=', 'CANCELLED')->pluck('status')->all();
@@ -387,7 +443,12 @@ class StaffOrderService
             $order->save();
 
             if ($status === 'CANCELLED') $this->recalcOrderTotals($order);
-            return $this->formatOrderDetail($order->fresh()->load(['items.toppings.topping']));
+
+            return [
+                'order'       => $this->formatOrderDetail($order->fresh()->load(['items.toppings.topping'])),
+                'shortages'   => $shortages,
+                'request_code' => $requestCode,
+            ];
         });
     }
 

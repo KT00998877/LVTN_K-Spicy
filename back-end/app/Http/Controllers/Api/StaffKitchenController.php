@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\InventoryConsumptionService;
 use App\Services\StaffOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,6 +55,7 @@ class StaffKitchenController extends Controller
 
         $invoiceCodes = DB::table('invoices')->whereIn('order_id', $items->pluck('order_id')->unique())
             ->orderBy('id')->pluck('code', 'order_id');
+        $shortageMap = app(InventoryConsumptionService::class)->shortagesForItems($items->all());
         $result = $items->map(fn (OrderItem $i) => [
             'order' => [
                 'id'            => (int) $i->order->id,
@@ -79,6 +81,7 @@ class StaffKitchenController extends Controller
                 'started_at'    => $i->started_at?->toIso8601String(),
                 'ready_at'      => $i->ready_at?->toIso8601String(),
                 'service_reminded_at' => $i->service_reminded_at?->toIso8601String(),
+                'shortages'     => $shortageMap[(int) $i->id] ?? [],
                 'toppings'      => $i->toppings->map(fn ($t) => [
                     'id'         => (int) $t->id,
                     'name'       => $t->topping?->name,
@@ -98,6 +101,12 @@ class StaffKitchenController extends Controller
     /**
      * PATCH /api/staff/kitchen/items/{orderId}/{itemId}/status
      * Cập nhật trạng thái 1 món (bếp xác nhận bắt đầu / xong).
+     *
+     * Khi chuyển sang PREPARING mà thiếu nguyên liệu:
+     *  - Chưa gửi allow_shortage → trả 409 kèm danh sách nguyên liệu thiếu.
+     *    Món KHÔNG đổi trạng thái, bếp quyết định "Tiếp tục nấu" hoặc "Hủy món".
+     *  - Gửi allow_shortage=true → bếp đã xem cảnh báo và chọn tiếp tục nấu.
+     *    Hệ thống trừ tới 0, tạo yêu cầu nhập kho và báo quản lý.
      */
     public function updateStatus(Request $request, int $orderId, int $itemId): JsonResponse
     {
@@ -105,19 +114,23 @@ class StaffKitchenController extends Controller
         $data = $request->validate([
             'status' => ['required', 'string', $canManage ? 'in:PENDING,PREPARING,READY,SERVED,CANCELLED' : 'in:PENDING,PREPARING,READY,CANCELLED'],
             'reason' => ['required_if:status,CANCELLED', 'nullable', 'string', 'max:500'],
+            'allow_shortage' => ['sometimes', 'boolean'],
         ]);
 
-        $order = $this->service->updateItemStatus(
+        $result = $this->service->updateItemStatus(
             $orderId,
             $itemId,
             $data['status'],
             $data['reason'] ?? null,
-            $request->user()
+            $request->user(),
+            (bool) ($data['allow_shortage'] ?? false)
         );
 
         return response()->json([
-            'success' => true,
-            'data'    => $order,
+            'success'      => true,
+            'data'         => $result['order'],
+            'shortages'    => $result['shortages'],
+            'request_code' => $result['request_code'],
         ]);
     }
 

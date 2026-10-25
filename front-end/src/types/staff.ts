@@ -191,7 +191,7 @@ export interface DashboardStats {
     ready_items: number
     total_customers_today: number
     revenue_growth_pct: number          // so với hôm qua
-    orders_growth_pct: number
+    orders_growth_pct: number | null
 }
 
 export interface ChartDataPoint {

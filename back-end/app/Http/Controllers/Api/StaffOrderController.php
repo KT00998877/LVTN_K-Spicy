@@ -194,19 +194,23 @@ class StaffOrderController extends Controller
         $data = $request->validate([
             'status' => ['required', 'string', $canManage ? 'in:PENDING,PREPARING,READY,SERVED,CANCELLED' : 'in:SERVED,CANCELLED'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'allow_shortage' => ['sometimes', 'boolean'],
         ]);
         /** @var User $user */
         $user = $request->user();
-        $order = $this->service->updateItemStatus(
+        $result = $this->service->updateItemStatus(
             $oid,
             $iid,
             $data['status'],
             $data['reason'] ?? null,
-            $user
+            $user,
+            (bool) ($data['allow_shortage'] ?? false)
         );
         return response()->json([
-            'success' => true,
-            'data'    => $order,
+            'success'      => true,
+            'data'         => $result['order'],
+            'shortages'    => $result['shortages'],
+            'request_code' => $result['request_code'],
         ]);
     }
 

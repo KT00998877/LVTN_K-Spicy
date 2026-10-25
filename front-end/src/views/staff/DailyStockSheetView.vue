@@ -53,15 +53,16 @@
         <small class="manager-variance__hint">Bếp cần ghi lý do vào cột "Giải trình" trước khi chốt sổ — số chênh không tự kết luận thất thoát.</small>
       </section>
       <p v-if="!sheet.baseline" class="sheet-hint">Tồn dự kiến = tồn đầu + nhập − xuất/hủy + điều chỉnh − lượng dùng theo món đã bắt đầu nấu. Đây là số đối chiếu, không thay thế tồn bếp đếm.</p>
+      <p class="sheet-hint">“Tiêu hao bán” là lượng hệ thống tự trừ khi bếp bắt đầu nấu. “Xuất/hủy” là lượng bếp xuất thủ công (hủy món, hư hỏng…). Hai cột tách riêng để không đếm trùng.</p>
       <p v-if="sheet.status !== 'CLOSED'" class="sheet-hint">Giữ chỗ là lượng cần cho đơn đang chờ nấu. Tồn khả dụng ước tính = tồn dự kiến − giữ chỗ; ô để trống khi chưa đủ dữ liệu.</p>
 
       <form v-if="rows.length" @submit.prevent="save">
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Nguyên liệu</th><th scope="col">Tồn đầu</th><th scope="col">Nhập</th><th scope="col">Xuất/hủy</th><th scope="col">Điều chỉnh</th><th scope="col">Chứng từ</th><th scope="col">Tồn dự kiến</th><th scope="col">Giữ chỗ đơn chờ</th><th scope="col">Tồn khả dụng ước tính</th><th scope="col">Tồn bếp đếm</th><th scope="col">Đã dùng</th><th scope="col">Dùng dự kiến</th><th scope="col">Chênh lệch</th><th scope="col">Giải trình</th></tr></thead>
+            <thead><tr><th scope="col">Nguyên liệu</th><th scope="col">Tồn đầu</th><th scope="col">Nhập</th><th scope="col">Tiêu hao bán</th><th scope="col">Xuất/hủy</th><th scope="col">Điều chỉnh</th><th scope="col">Chứng từ</th><th scope="col">Tồn dự kiến</th><th scope="col">Giữ chỗ đơn chờ</th><th scope="col">Tồn khả dụng ước tính</th><th scope="col">Tồn bếp đếm</th><th scope="col">Đã dùng</th><th scope="col">Dùng dự kiến</th><th scope="col">Chênh lệch</th><th scope="col">Giải trình</th></tr></thead>
             <tbody v-for="group in groupedRows" :key="group.name">
               <tr class="category-row">
-                <th colspan="14">
+                <th colspan="15">
                   <button type="button" class="group-toggle" :aria-expanded="!collapsedGroups.has(group.name)" :aria-controls="`group-${group.name}`" @click="toggleGroup(group.name)">
                     <span class="chev" :class="{ open: !collapsedGroups.has(group.name) }" aria-hidden="true">▸</span>
                     {{ group.name }} · {{ group.counted }}/{{ group.rows.length }} đã đếm
@@ -73,6 +74,7 @@
                 <th scope="row"><strong>{{ row.name }}</strong><small>{{ row.code }} · {{ row.unit }}</small></th>
                 <td>{{ qty(row.opening_qty) }}</td>
                 <td>{{ qty(row.incoming_qty) }}</td>
+                <td>{{ qty(row.consumption_qty) }}</td>
                 <td>{{ qty(row.outgoing_qty) }}</td>
                 <td>{{ qty(row.correction_qty) }}</td>
                 <td><details v-if="row.sources.length"><summary>{{ row.sources.length }} giao dịch</summary><ul><li v-for="source in row.sources" :key="source.transaction_id">{{ sourceLabel(source) }} · {{ qty(source.quantity) }} {{ row.unit }}</li></ul></details><span v-else>—</span></td>
@@ -114,6 +116,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api/client'
 import { useStaffStore } from '@/stores/staff'
+import { useAppDialog } from '@/composables/useAppDialog'
+const appDialog = useAppDialog()
 
 interface StockItem {
   ingredient_id: number
@@ -124,6 +128,7 @@ interface StockItem {
   opening_qty: number | null
   incoming_qty: number
   outgoing_qty: number
+  consumption_qty: number
   correction_qty: number
   counted_qty: number | null
   used_qty: number | null
@@ -213,8 +218,7 @@ function used(row: EditableItem): number | null {
   if (sheet.value?.status === 'CLOSED') return row.used_qty
   if (sheet.value?.baseline || row.opening_qty === null || row.counted_input.trim() === '') return null
   return Math.round((row.opening_qty + row.incoming_qty - row.outgoing_qty + row.correction_qty - Number(row.counted_input)) * 100) / 100
-}
-function variance(row: EditableItem): number | null {
+}function variance(row: EditableItem): number | null {
   const actual = used(row)
   return row.comparison_complete && actual !== null && row.expected_qty !== null
     ? Math.round((actual - row.expected_qty) * 1000) / 1000 : null
@@ -259,7 +263,7 @@ async function save() {
 
 async function closeSheet() {
   if (!canClose.value || saving.value) return
-  if (!window.confirm('Chốt sổ kho hôm nay? Sau khi chốt, số đếm sẽ bị khóa.')) return
+  if (!await appDialog.confirm({ title: 'Chốt sổ kho hôm nay?', message: 'Sau khi chốt, số đếm sẽ bị khóa và không thể chỉnh sửa.', confirmLabel: 'Chốt sổ kho', tone: 'warning' })) return
   saving.value = true
   error.value = ''
   success.value = ''

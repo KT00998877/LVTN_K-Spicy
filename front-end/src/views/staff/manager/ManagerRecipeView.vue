@@ -80,7 +80,7 @@
                             <p class="mgr-recipe__sub">
                                 {{ activeMenuItem.category }} ·
                                 {{ formatVND(activeMenuItem.price) }} ·
-                                {{ recipe?.lines?.length || 0 }} nguyên liệu
+                                {{ rows.length }} nguyên liệu
                             </p>
                         </div>
                         <button class="mgr-btn mgr-btn--primary" :disabled="store.saving || !hasChanges" @click="saveRecipe">
@@ -112,22 +112,22 @@
                         </div>
                     </header>
 
-                    <div v-if="recipe?.summary" class="mgr-costcard">
+                    <div v-if="preview" class="mgr-costcard">
                         <div class="mgr-costcard__cell">
                             <span class="mgr-costcard__label">Giá bán</span>
-                            <strong>{{ formatVND(recipe.summary.selling_price) }}</strong>
+                            <strong>{{ formatVND(preview.selling_price) }}</strong>
                         </div>
                         <div class="mgr-costcard__cell">
                             <span class="mgr-costcard__label">Chi phí NVL</span>
-                            <strong>{{ formatVND(recipe.summary.ingredient_cost) }}</strong>
+                            <strong>{{ formatVND(preview.ingredient_cost) }}</strong>
                         </div>
                         <div class="mgr-costcard__cell">
                             <span class="mgr-costcard__label">Lợi nhuận gộp</span>
-                            <strong :class="profitClass">{{ formatVND(recipe.summary.gross_profit) }}</strong>
+                            <strong :class="profitClass">{{ formatVND(preview.gross_profit) }}</strong>
                         </div>
                         <div class="mgr-costcard__cell">
                             <span class="mgr-costcard__label">Food Cost %</span>
-                            <strong :class="foodCostClass">{{ recipe.summary.food_cost_pct.toFixed(1) }}%</strong>
+                            <strong :class="foodCostClass">{{ preview.food_cost_pct.toFixed(1) }}%</strong>
                         </div>
                     </div>
 
@@ -156,66 +156,60 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(line, idx) in recipe.lines" :key="line.ingredient_id"
-                                :class="{ 'mgr-row--warn': line.ingredient_in_stock !== undefined && line.effective_quantity !== undefined && line.ingredient_in_stock < line.effective_quantity }">
+                            <tr v-for="row in rows" :key="row.work.ingredient_id"
+                                :class="{ 'mgr-row--warn': row.shortage }">
                                 <td>
                                     <div class="mgr-line__ingredient">
                                         <div class="mgr-line__name-row">
-                                            <strong>{{ line.ingredient_name }}</strong>
-                                            <span v-if="workingLines[idx]?.availability_required" class="mgr-pill mgr-pill--critical" title="Nguyên liệu trọng yếu — thiếu sẽ khiến món tự động báo hết khi bật tự báo hết">Trọng yếu</span>
+                                            <strong>{{ row.meta.ingredient_name }}</strong>
+                                            <span v-if="row.work.availability_required" class="mgr-pill mgr-pill--critical" title="Nguyên liệu trọng yếu — thiếu sẽ khiến món tự động báo hết khi bật tự báo hết">Trọng yếu</span>
                                         </div>
-                                        <small class="mgr-mute">{{ line.ingredient_code }}</small>
-                                        <small v-if="line.ingredient_active === false" class="mgr-warn-inline">Đã ẩn</small>
+                                        <small class="mgr-mute">{{ row.meta.ingredient_code }}</small>
+                                        <small v-if="row.meta.ingredient_active === false" class="mgr-warn-inline">Đã ẩn</small>
                                     </div>
                                 </td>
                                 <td>
-                                    <select v-if="workingLines[idx]" v-model="workingLines[idx]!.unit_override" class="mgr-inline-input">
-                                        <option :value="null">— {{ line.ingredient_unit }} —</option>
+                                    <select v-model="row.work.unit_override" class="mgr-inline-input">
+                                        <option :value="null">— {{ row.meta.ingredient_unit }} —</option>
                                         <option v-for="u in unitOptions" :key="u" :value="u">{{ u }}</option>
                                     </select>
                                 </td>
                                 <td class="mgr-num">
                                     <input
-                                        v-if="workingLines[idx]"
-                                        v-model.number="workingLines[idx]!.quantity_required"
+                                        v-model.number="row.work.quantity_required"
                                         type="number" min="0.001" step="0.001"
                                         class="mgr-inline-input mgr-inline-input--num"
                                     />
                                 </td>
                                 <td class="mgr-num">
                                     <input
-                                        v-if="workingLines[idx]"
-                                        v-model.number="workingLines[idx]!.waste_factor"
+                                        v-model.number="row.work.waste_factor"
                                         type="number" min="1" max="9.999" step="0.01"
                                         class="mgr-inline-input mgr-inline-input--num"
                                     />
                                 </td>
                                 <td class="mgr-num mgr-mute">
-                                    <template v-if="workingLines[idx]">
-                                        {{ formatNumber(workingLines[idx]!.quantity_required * workingLines[idx]!.waste_factor) }}
-                                        {{ line.ingredient_unit }}
-                                    </template>
+                                    {{ formatNumber(row.work.quantity_required * row.work.waste_factor) }}
+                                    {{ row.work.unit_override || row.meta.ingredient_unit }}
                                 </td>
                                 <td>
-                                    <label v-if="workingLines[idx]" class="mgr-critical-toggle">
-                                        <input v-model="workingLines[idx]!.availability_required" type="checkbox" :aria-label="`Đánh dấu ${line.ingredient_name} là nguyên liệu trọng yếu`" />
-                                        <span aria-hidden="true">{{ workingLines[idx]!.availability_required ? 'Có' : 'Không' }}</span>
+                                    <label class="mgr-critical-toggle">
+                                        <input v-model="row.work.availability_required" type="checkbox" :aria-label="`Đánh dấu ${row.meta.ingredient_name} là nguyên liệu trọng yếu`" />
+                                        <span aria-hidden="true">{{ row.work.availability_required ? 'Có' : 'Không' }}</span>
                                     </label>
                                 </td>
                                 <td class="mgr-num mgr-money">
-                                    <template v-if="workingLines[idx]">
-                                        {{ formatVND(lineCost(workingLines[idx]!)) }}
-                                    </template>
+                                    {{ formatVND(lineCost(row.work)) }}
                                 </td>
                                 <td>
                                     <button type="button" class="mgr-linkbtn mgr-linkbtn--danger"
-                                            :disabled="store.saving" @click="removeLine(idx)">Xoá</button>
+                                            :disabled="store.saving" @click="removeLine(row.work.ingredient_id)">Xoá</button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
 
-                    <div v-if="recipe && !recipe.lines.length" class="mgr-emptycard mgr-emptycard--inset">
+                    <div v-if="recipe && !rows.length" class="mgr-emptycard mgr-emptycard--inset">
                         <p class="mgr-emptycard__title">Chưa có nguyên liệu nào</p>
                         <p class="mgr-emptycard__hint">Bấm <strong>Thêm nguyên liệu</strong> để bắt đầu xây dựng công thức.</p>
                     </div>
@@ -348,16 +342,16 @@ const hasChanges = computed(() => {
 })
 
 const profitClass = computed(() => {
-    if (!recipe.value) return ''
-    if (recipe.value.summary.gross_profit <= 0) return 'mgr-num--danger'
-    if (recipe.value.summary.food_cost_pct >= 40) return 'mgr-num--warn'
+    if (!preview.value) return ''
+    if (preview.value.gross_profit <= 0) return 'mgr-num--danger'
+    if (preview.value.food_cost_pct >= 40) return 'mgr-num--warn'
     return ''
 })
 
 const foodCostClass = computed(() => {
-    if (!recipe.value) return ''
-    if (recipe.value.summary.food_cost_pct >= 45) return 'mgr-num--danger'
-    if (recipe.value.summary.food_cost_pct >= 35) return 'mgr-num--warn'
+    if (!preview.value) return ''
+    if (preview.value.food_cost_pct >= 45) return 'mgr-num--danger'
+    if (preview.value.food_cost_pct >= 35) return 'mgr-num--warn'
     return 'mgr-num--ok'
 })
 
@@ -436,6 +430,7 @@ async function selectMenu(menuItemId: number) {
             availability_required: !!l.availability_required,
         }))
         savedLines.value = workingLines.value.map((line) => ({ ...line }))
+        syncUnitPrices(data.lines)
         // Tải lý do khả dụng hiệu lực để cảnh báo manager nếu món đang auto-ẩn.
         // Lỗi fetch không chặn flow — chỉ ẩn banner, manager vẫn dùng được công thức.
         if (recipe.value.menu_item.is_active) void loadAvailability()
@@ -462,14 +457,59 @@ async function loadAvailability() {
     }
 }
 
-function lineCost(line: WorkingLine): number {
-    if (!recipe.value) return 0
-    const original = recipe.value.lines.find((l) => l.ingredient_id === line.ingredient_id)
-    return original?.line_cost ?? 0
+/** Giá nhập của từng nguyên liệu để tính thành tiền ngay khi đang sửa.
+ *  Lấy từ server qua `line_cost / quantity_required`, nên khớp đúng công thức
+ *  của RecipeService::summarize (chỉ nhân quantity_required, không nhân waste_factor). */
+const unitPrices = ref<Map<number, number>>(new Map())
+/** Nguồn sự thật duy nhất cho bảng: mỗi dòng ghép metadata từ server với giá trị đang sửa.
+ *  `shortage` tính lại từ lượng đang sửa × hao hụt nên phản ánh ngay khi manager tăng định lượng. */
+const rows = computed(() => workingLines.value.map((work) => {
+    const meta = recipe.value?.lines.find((l) => l.ingredient_id === work.ingredient_id)
+    const expected = (Number(work.quantity_required) || 0) * (Number(work.waste_factor) || 0)
+    const stock = meta?.ingredient_in_stock
+    return {
+        work,
+        // Metadata luôn tồn tại sau khi nạp/lưu; fallback rỗng chỉ để template không cần guard.
+        meta: meta ?? ({} as RecipeLine),
+        shortage: stock !== undefined && expected > stock,
+    }
+}))
+
+const unitPriceOf = (ingredientId: number): number => unitPrices.value.get(ingredientId) ?? 0
+
+/** Suy ra đơn giá từ line_cost / quantity_required để preview khớp công thức backend.
+ *  line_cost = quantity_required × import_price → import_price = line_cost / quantity_required. */
+function syncUnitPrices(lines: RecipeLine[]): void {
+    const next = new Map<number, number>()
+    for (const l of lines) {
+        const qty = Number(l.quantity_required)
+        const cost = Number(l.line_cost)
+        if (qty > 0 && cost >= 0) next.set(l.ingredient_id, cost / qty)
+    }
+    unitPrices.value = next
 }
 
-function removeLine(idx: number) {
-    workingLines.value.splice(idx, 1)
+function lineCost(line: WorkingLine): number {
+    return (Number(line.quantity_required) || 0) * unitPriceOf(line.ingredient_id)
+}
+
+/** Tóm tắt tính lại từ dòng đang sửa — khi không sửa gì thì bằng đúng giá trị server trả về. */
+const preview = computed(() => {
+    const base = recipe.value?.summary
+    if (!base) return null
+    const cost = workingLines.value.reduce((sum, l) => sum + lineCost(l), 0)
+    const price = Number(base.selling_price)
+    const rounded = Math.round(cost * 100) / 100
+    return {
+        selling_price: price,
+        ingredient_cost: rounded,
+        gross_profit: Math.round(Math.max(0, price - rounded) * 100) / 100,
+        food_cost_pct: price > 0 ? Math.round((rounded / price) * 1000) / 10 : 0,
+    }
+})
+
+function removeLine(ingredientId: number) {
+    workingLines.value = workingLines.value.filter((l) => l.ingredient_id !== ingredientId)
 }
 
 async function openAddLine() {
@@ -499,31 +539,35 @@ function onPickerBackdrop(e: MouseEvent) {
 function confirmAddLine() {
     const ing = pickerResults.value.find((x) => x.id === picker.selectedId)
     if (!ing) return
+    const defaultQty = ['gói', 'chai', 'lon', 'hộp', 'quả', 'cái', 'cục', 'cây', 'phần'].includes(ing.unit) ? 1 : 0.1
     workingLines.value.push({
         ingredient_id: ing.id,
-        quantity_required: ing.unit === 'gói' || ing.unit === 'chai' || ing.unit === 'lon' || ing.unit === 'hộp' || ing.unit === 'quả' || ing.unit === 'cái' || ing.unit === 'cục' || ing.unit === 'cây' || ing.unit === 'phần' ? 1 : 0.1,
+        quantity_required: defaultQty,
         waste_factor: 1.000,
         unit_override: null,
         availability_required: false,
     })
-    // Tính lại cost preview nhanh: thêm dòng với line_cost = 0 vì chưa lưu
+    // Dòng mới chưa có trong recipe.lines → tự thêm metadata để bảng render được ngay
+    // và ghi đơn giá để preview thành tiền tính đúng ngay khi đang sửa.
     if (recipe.value) {
         recipe.value.lines.push({
+            id: undefined,
             ingredient_id: ing.id,
             ingredient_code: ing.code,
             ingredient_name: ing.name,
             ingredient_unit: ing.unit,
             ingredient_active: ing.is_active,
             ingredient_in_stock: ing.quantity_in_stock,
-            quantity_required: workingLines.value[workingLines.value.length - 1]!.quantity_required,
-            waste_factor: 1.0,
+            quantity_required: defaultQty,
+            waste_factor: 1,
             unit_override: null,
             availability_required: false,
-            effective_quantity: workingLines.value[workingLines.value.length - 1]!.quantity_required,
+            effective_quantity: defaultQty,
             display_unit: ing.unit,
-            line_cost: 0,
-        } as RecipeLine)
+            line_cost: defaultQty * Number(ing.import_price),
+        })
     }
+    unitPrices.value = new Map(unitPrices.value).set(ing.id, Number(ing.import_price))
     closePicker()
 }
 
@@ -550,6 +594,7 @@ async function saveRecipe() {
             availability_required: !!l.availability_required,
         }))
         savedLines.value = workingLines.value.map((line) => ({ ...line }))
+        syncUnitPrices(data.lines)
     } catch (err: unknown) {
         const e = err as { response?: { data?: { errors?: Record<string, string[]>; message?: string } } }
         if (e?.response?.data?.errors) {
@@ -579,10 +624,13 @@ async function toggleAuto() {
     } finally { autoSaving.value = false }
 }
 
+/** Lọc cục bộ trên kết quả vừa tải từ server. KHÔNG dùng store.list —
+ *  store.list chỉ được fill khi manager đã mở trang Nguyên liệu trước đó. */
 watch(() => picker.q, () => {
-    if (!picker.q) return
     const kw = picker.q.trim().toLowerCase()
-    pickerResults.value = store.list.filter((x) => x.name.toLowerCase().includes(kw) || x.code.toLowerCase().includes(kw))
+    if (!kw) return
+    pickerResults.value = pickerResults.value.filter((x) =>
+        x.name.toLowerCase().includes(kw) || x.code.toLowerCase().includes(kw))
 })
 
 onMounted(() => loadMenus())
