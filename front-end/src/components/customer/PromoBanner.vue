@@ -82,6 +82,7 @@ async function claim(promo: FeaturedPromotion): Promise<void> {
                 ? { backgroundImage: `url(${active.banner_image_url})` }
                 : undefined"
         >
+            <img v-if="!active.banner_image_url" class="promo-logo" src="/logo/logo.png" alt="Logo K-SPICY" />
             <span v-if="active.discount_label" class="promo-discount">{{ active.discount_label }}</span>
         </div>
 
@@ -158,6 +159,17 @@ async function claim(promo: FeaturedPromotion): Promise<void> {
     position: absolute;
     inset: 0;
     background: linear-gradient(100deg, rgba(0, 0, 0, 0.25), transparent 70%);
+}
+.promo-logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    width: min(42%, 132px);
+    max-height: 72%;
+    object-fit: contain;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.18));
 }
 
 .promo-discount {
@@ -283,6 +295,7 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 @media (max-width: 560px) {
     .promo-banner { grid-template-columns: 1fr; }
     .promo-visual { min-height: 110px; }
+    .promo-logo { width: 76px; max-height: 76px; }
     .promo-title { font-size: 18px; }
     .promo-body { padding: 16px; }
 }

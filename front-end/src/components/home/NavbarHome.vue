@@ -164,8 +164,8 @@ if (isAuthenticated.value) {
 // --- Chuông ưu đãi (Phase 1) ---
 // Chỉ mở khi khách đã đăng nhập; đóng lại khi đăng xuất.
 watch(
-    () => ({ authenticated: isAuthenticated.value, userId: authStore.user?.id }),
-    ({ authenticated, userId }) => {
+    [isAuthenticated, () => authStore.user?.id],
+    ([authenticated, userId]) => {
         if (authenticated && userId) promoStore.start(userId)
         else promoStore.stop()
     },

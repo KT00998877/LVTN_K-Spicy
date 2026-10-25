@@ -30,7 +30,6 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
 
 function togglePanel() {
     open.value = !open.value
-    if (open.value) void store.fetchPage()
 }
 
 async function copyCode(code: string, id: string) {
@@ -93,6 +92,7 @@ async function openNotification(item: PromoNotification) {
 
             <ul v-else>
                 <li v-for="item in store.items" :key="item.id" :class="{ unread: !item.read_at }">
+                    <span v-if="!item.read_at" class="unread-indicator">Mới</span>
                     <strong v-if="item.data.event === 'PROMO_CAMPAIGN'" class="notification-kind">Ưu đãi từ quán</strong>
                     <strong v-else-if="item.data.event === 'FLASH_SALE'" class="notification-kind">Flash Sale</strong>
                     <strong v-else-if="item.data.event === 'COMBO_PROMOTION'" class="notification-kind">Combo món và nước</strong>
@@ -108,10 +108,12 @@ async function openNotification(item: PromoNotification) {
                             {{ copyState[item.id] === 'copied' ? 'Đã sao chép' : copyState[item.id] === 'failed' ? 'Thử lại' : 'Sao chép' }}
                         </button>
                     </div>
-                    <button class="use-button" type="button" @click="openNotification(item)">
-                        {{ item.data.cta_text || 'Xem chi tiết' }}
-                    </button>
-                    <time :datetime="item.created_at">{{ new Date(item.created_at).toLocaleString('vi-VN') }}</time>
+                    <div class="notification-footer">
+                        <time :datetime="item.created_at">{{ new Date(item.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) }}</time>
+                        <button class="use-button" type="button" @click="openNotification(item)">
+                            {{ item.data.cta_text || 'Xem chi tiết' }} <span aria-hidden="true">→</span>
+                        </button>
+                    </div>
                 </li>
             </ul>
 
@@ -176,10 +178,12 @@ async function openNotification(item: PromoNotification) {
     right: 0;
     z-index: 60;
     width: min(360px, calc(100vw - 32px));
-    max-height: min(480px, calc(100dvh - 120px));
-    overflow-y: auto;
+    max-height: min(560px, calc(100dvh - 96px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     box-sizing: border-box;
-    padding: 16px;
+    padding: 18px;
     border-radius: 16px;
     background: var(--color-surface, #fff);
     color: #2d211f;
@@ -212,19 +216,21 @@ header strong { font-size: 16px; }
 .error { margin: 8px 0 0; color: #991b1b; font-size: 13px; }
 .empty { margin: 20px 0; color: #6b6b6b; font-size: 14px; text-align: center; }
 
-ul { list-style: none; margin: 12px 0 0; padding: 0; }
+ul { list-style: none; margin: 12px -8px 0 0; padding: 0 8px 2px 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 li {
-    padding: 12px;
+    position: relative;
+    padding: 14px;
     border-radius: 12px;
-    background: var(--cream, #f8f6f3);
+    background: #faf7f5;
     color: #2d211f;
 }
 li + li { margin-top: 8px; }
-li.unread { background: #fff0e0; }
-.notification-kind { display: block; margin-bottom: 6px; color: #991b1b; font-size: 12px; }
+li.unread { background: #fff1e7; }
+.unread-indicator { position: absolute; top: 13px; right: 14px; color: #991b1b; font-size: 11px; font-weight: 700; }
+.notification-kind { display: block; margin-bottom: 7px; padding-right: 38px; color: #991b1b; font-size: 12px; }
 
-.promo-message { margin: 0 0 10px; color: #2d211f; font-size: 14px; line-height: 1.45; }
+.promo-message { margin: 0 0 10px; color: #2d211f; font-size: 14px; line-height: 1.5; }
 
 .promo-code-row { display: flex; align-items: stretch; gap: 8px; }
 
@@ -258,11 +264,10 @@ li.unread { background: #fff0e0; }
 .copy-button:hover { filter: brightness(0.94); }
 
 .use-button {
-    width: 100%;
-    min-height: 40px;
-    margin-top: 10px;
-    border: 1.5px solid var(--chili-red, #e4263d);
-    border-radius: 8px;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 7px;
     background: transparent;
     color: var(--chili-red, #e4263d);
     font-size: 14px;
@@ -271,13 +276,16 @@ li.unread { background: #fff0e0; }
 }
 .use-button:hover { background: rgba(232, 58, 20, 0.07); }
 
-time { display: block; margin-top: 8px; color: #7a7a7a; font-size: 12px; }
+.notification-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; border-top: 1px solid #eadbd3; padding-top: 8px; }
+.notification-footer time { color: #705957; font-size: 12px; white-space: nowrap; }
 
 .read-all {
     width: 100%;
     min-height: 40px;
-    margin-top: 12px;
+    flex: none;
+    margin-top: 8px;
     border: 0;
+    border-top: 1px solid #eee4df;
     border-radius: 8px;
     background: transparent;
     color: #595959;

@@ -11,7 +11,7 @@ import apiClient from '@/api/client'
  * (`auth_token`) và kênh `customer.{id}` thay vì `staff.{id}`.
  *
  * Kênh broadcast được mở khi khách đăng nhập; nếu không có cấu hình Reverb
- * thì store vẫn hoạt động qua HTTP polling (chậm hơn nhưng không chết).
+ * thì danh sách được tải khi khách đăng nhập, không tự tải lại định kỳ.
  */
 export interface PromoNotification {
     id: string
@@ -47,7 +47,6 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
     const latest = ref<PromoNotification | null>(null)
 
     let echo: Echo<'reverb'> | null = null
-    let retry: ReturnType<typeof setInterval> | undefined
     let generation = 0
     let revision = 0
     let audio: AudioContext | undefined
@@ -127,8 +126,6 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         revision++
         echo?.disconnect()
         echo = null
-        if (retry) clearInterval(retry)
-        retry = undefined
         connected.value = false
         loading.value = false
         items.value = []
@@ -149,12 +146,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         void fetchPage()
 
         const key = import.meta.env.VITE_REVERB_APP_KEY
-        if (!key) {
-            retry = setInterval(() => {
-                if (currentGeneration === generation && navigator.onLine) void fetchPage()
-            }, 15000)
-            return
-        }
+        if (!key) return
 
         const secure = (import.meta.env.VITE_REVERB_SCHEME ?? window.location.protocol.replace(':', '')) === 'https'
         const port = Number(import.meta.env.VITE_REVERB_PORT ?? (secure ? 443 : 8080))
@@ -187,7 +179,6 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
             .subscribed(() => {
                 if (currentGeneration !== generation) return
                 connected.value = true
-                void fetchPage()
             })
             .listen('.customer.promo.created', (item: PromoNotification) => {
                 if (currentGeneration !== generation || seen.has(item.id)) return
@@ -217,12 +208,6 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
                 } else void fetchPage()
             })
 
-        // Fallback polling nếu realtime không kết nối được.
-        retry = setInterval(() => {
-            if (currentGeneration === generation && navigator.onLine && (!connected.value || error.value)) {
-                void fetchPage()
-            }
-        }, 15000)
     }
 
     return {
