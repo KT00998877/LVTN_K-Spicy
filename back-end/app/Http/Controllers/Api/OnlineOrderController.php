@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\{Order, User};
 use App\Services\{OnlineOrderService, StaffOrderService, RoutingService};
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OnlineOrderController extends Controller
 {

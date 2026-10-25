@@ -30,6 +30,7 @@ export const useOrderStore = defineStore('orders', {
         loadingDetail: false,
         loadingPayment: false,
         loadingConfirm: false,
+        loadingCancel: false,
         updatingStatus: false,
 
         error: null as string | null,
@@ -192,6 +193,27 @@ export const useOrderStore = defineStore('orders', {
                 return { ok: false, pointsAwarded: 0, totalPoints: 0 }
             } finally {
                 this.loadingConfirm = false
+            }
+        },
+
+        async cancelOrder(id: number | string, reason: string): Promise<boolean> {
+            const auth = useAuthStore()
+            if (!auth.isAuthenticated || this.loadingCancel) return false
+
+            this.loadingCancel = true
+            this.error = null
+            try {
+                this.current = await ordersApi.cancelMyOrder(id, reason)
+                this.items = this.items.map((item) => item.id === Number(id)
+                    ? { ...item, status: 'CANCELLED' }
+                    : item)
+                return true
+            } catch (err) {
+                this.error = (err as OrderError)?.response?.data?.message
+                    ?? 'Không thể hủy đơn. Vui lòng thử lại.'
+                return false
+            } finally {
+                this.loadingCancel = false
             }
         },
 

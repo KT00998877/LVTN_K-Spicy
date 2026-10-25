@@ -15,7 +15,9 @@ const ENDPOINTS = {
     myDetail: (id: number | string) => `/orders/me/${id}`,
     simulatePayment: (id: number | string) => `/orders/me/${id}/simulate-payment`,
     confirmReceipt:  (id: number | string) => `/orders/me/${id}/confirm-receipt`,
+    cancel:          (id: number | string) => `/orders/me/${id}/cancel`,
     myRoute:        (id: number | string) => `/orders/me/${id}/route`,
+    myShipperLocation: (id: number | string) => `/orders/me/${id}/shipper-location`,
 } as const
 
 /**
@@ -75,6 +77,15 @@ export async function confirmOrderReceipt(id: number | string): Promise<ConfirmR
     }
 }
 
+/** POST /api/orders/me/{id}/cancel — khách hủy đơn đang chờ xác nhận. */
+export async function cancelMyOrder(id: number | string, reason: string): Promise<OrderDetail> {
+    const { data } = await apiClient.post<{ success: boolean; data: OrderDetail }>(
+        ENDPOINTS.cancel(id),
+        { reason },
+    )
+    return data.data
+}
+
 /** Helper lấy danh sách phẳng (unwrap meta) */
 export function unwrapOrderList(payload: OrderListResponse): {
     items: OrderSummary[]
@@ -89,6 +100,34 @@ export function unwrapOrderList(payload: OrderListResponse): {
 export async function getOrderRoute(id: number | string): Promise<DeliveryRoute> {
     const { data } = await apiClient.get<{ success: boolean; data: DeliveryRoute }>(
         ENDPOINTS.myRoute(id),
+    )
+    return data.data
+}
+
+/**
+ * Vị trí hiện tại của shipper (Phase 2).
+ * `null` khi shipper chưa chia sẻ vị trí.
+ */
+export interface ShipperLocationInfo {
+    shipper_id: number
+    shipper_name: string | null
+    latitude: number
+    longitude: number
+    accuracy: number | null
+    is_fresh: boolean
+    last_seen_at: string | null
+    remaining_distance_km: number | null
+    status: string
+}
+
+/**
+ * GET /api/orders/me/{id}/shipper-location — khách theo dõi shipper đang ở đâu.
+ */
+export async function getShipperLocation(
+    id: number | string,
+): Promise<ShipperLocationInfo | null> {
+    const { data } = await apiClient.get<{ success: boolean; data: ShipperLocationInfo | null }>(
+        ENDPOINTS.myShipperLocation(id),
     )
     return data.data
 }

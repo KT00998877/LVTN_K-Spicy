@@ -21,24 +21,32 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
  * Không dùng icon — chỉ text + badge màu.
  */
 
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDeliveriesStore } from '@/stores/onlineOrders'
 import { useStaffStore } from '@/stores/staff'
+import { useShipperLocationStore } from '@/stores/shipperLocation'
 import { formatVND, formatTime, formatDateTime, useToast } from '@/composables/useStaffUtils'
-import { onlineOrders as deliveriesApi, deliveries as deliveriesDeliveryApi, type DeliveryRoute, type DeliveryOrder } from '@/api/staff'
+import { onlineOrders as deliveriesApi, deliveries as deliveriesDeliveryApi, type DeliveryRoute, type DeliveryOrder, type NearbyJob } from '@/api/staff'
 // Sử dụng `deliveriesDeliveryApi.route()` vì endpoint nằm trong nhóm deliveries.
 // `onlineOrders` là nhóm cho manager/cashier; `deliveries` là nhóm cho shipper.
 import ShipperRouteMap from '@/components/ShipperRouteMap.vue'
 
 const deliveriesStore = useDeliveriesStore()
 const staffStore = useStaffStore()
+const locationStore = useShipperLocationStore()
 const { session } = storeToRefs(staffStore)
+const { hasFix, watching, lastError: locationError, permissionDenied, lastSentAt } = storeToRefs(locationStore)
 
 const toast = useToast()
-const tab = ref<'assigned' | 'active' | 'awaiting' | 'recent'>('active')
+const tab = ref<'nearby' | 'assigned' | 'active' | 'awaiting' | 'recent'>('active')
 const issueOrder = ref<{ id: number; code: string } | null>(null)
 const issueReason = ref('')
+
+/** Đơn ONLINE đang chờ shipper nhận (Phase 2) — xếp theo khoảng cách. */
+const nearbyJobs = ref<NearbyJob[]>([])
+const nearbyLoading = ref(false)
+const acceptingId = ref<number | null>(null)
 
 /** Modal chỉ đường — mở sau khi bấm "Đã lấy món từ bếp". */
 const routeOrder = ref<DeliveryOrder | null>(null)
@@ -210,7 +218,63 @@ function paymentMethodLabel(m: string | undefined): string {
 onMounted(() => {
     void refresh()
 
+    // Phase 2 — Theo dõi vị trí định kỳ để hệ thống gán đơn gần nhất.
+    locationStore.watchPosition()
+    void loadNearbyJobs()
 })
+
+onUnmounted(() => {
+    locationStore.stopWatching()
+})
+
+/**
+ * Dừng theo dõi GPS khi tab ẩn để tiết kiệm pin; bật lại khi quay vào.
+ */
+function onVisibilityChange() {
+    if (document.hidden) {
+        locationStore.stopWatching()
+    } else {
+        locationStore.watchPosition()
+        void loadNearbyJobs()
+    }
+}
+
+document.addEventListener('visibilitychange', onVisibilityChange)
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+})
+
+/** Tải danh sách đơn đang chờ shipper nhận, xếp theo khoảng cách. */
+async function loadNearbyJobs() {
+    nearbyLoading.value = true
+    try {
+        nearbyJobs.value = await deliveriesDeliveryApi.nearbyJobs()
+    } catch {
+        nearbyJobs.value = []
+    } finally {
+        nearbyLoading.value = false
+    }
+}
+
+/** Shipper bấm "Nhận đơn" — chỉ 1 shipper nhận được đơn đó. */
+async function handleAccept(job: NearbyJob) {
+    if (acceptingId.value !== null) return
+    acceptingId.value = job.id
+    try {
+        await deliveriesDeliveryApi.accept(job.id)
+        toast.success(`Đã nhận đơn ${job.code}.`)
+        await loadNearbyJobs()
+        await refresh()
+    } catch (e) {
+        const err = e as { response?: { status?: number; data?: { message?: string } } }
+        toast.error(err.response?.data?.message ?? 'Đơn này đã có shipper khác nhận.')
+        await loadNearbyJobs()
+    } finally {
+        acceptingId.value = null
+    }
+}
+
 useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && busyId.value === null)
 </script>
 
@@ -243,7 +307,28 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
             </div>
         </div>
 
+        <!-- Phase 2 — Trạng thái chia sẻ vị trí -->
+        <div class="location-bar">
+            <div class="location-status">
+                <span class="dot" :class="{ on: hasFix }" aria-hidden="true" />
+                <span v-if="permissionDenied" class="location-text location-text--warn">
+                    Trình duyệt đang chặn vị trí. Bật quyền để nhận đơn gần nhất.
+                </span>
+                <span v-else-if="locationError" class="location-text location-text--warn">{{ locationError }}</span>
+                <span v-else-if="hasFix" class="location-text">
+                    Đang chia sẻ vị trí{{ lastSentAt ? ` — cập nhật ${formatTime(lastSentAt)}` : '' }}
+                </span>
+                <span v-else class="location-text">Đang lấy vị trí…</span>
+            </div>
+            <button class="btn-ghost" type="button" :disabled="locationStore.sending" @click="locationStore.requestOnce()">
+                {{ locationStore.sending ? 'Đang gửi…' : 'Cập nhật vị trí' }}
+            </button>
+        </div>
+
         <nav class="tabs" aria-label="Lọc trạng thái đơn">
+            <button :class="{ active: tab === 'nearby' }" @click="tab = 'nearby'; void loadNearbyJobs()">
+                Đơn gần nhất ({{ nearbyJobs.length }})
+            </button>
             <button :class="{ active: tab === 'assigned' }" @click="tab = 'assigned'">
                 Được phân công ({{ assigned.length }})
             </button>
@@ -260,6 +345,36 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 
         <p v-if="error" class="alert error" role="alert">{{ error }}</p>
         <p v-if="loading && !list.length" class="empty">Đang tải đơn giao hàng…</p>
+
+        <!-- Phase 2 — Danh sách đơn đang chờ shipper nhận, xếp theo khoảng cách -->
+        <div v-if="tab === 'nearby'">
+            <p v-if="nearbyLoading" class="empty">Đang tải đơn gần bạn…</p>
+            <div v-else-if="!nearbyJobs.length" class="empty">
+                <p>Hiện chưa có đơn nào đang chờ nhận. Đơn mới sẽ hiện ở đây theo khoảng cách gần bạn nhất.</p>
+            </div>
+            <ul v-else class="nearby-list">
+                <li v-for="job in nearbyJobs" :key="job.id" class="nearby-item">
+                    <div class="nearby-info">
+                        <strong>{{ job.code }}</strong>
+                        <span>{{ job.recipient_name }} — {{ job.delivery_address }}</span>
+                        <span class="nearby-meta">
+                            {{ formatVND(job.total_amount) }} · {{ job.payment_method === 'COD' ? 'Thu COD' : 'Đã thanh toán' }}
+                            <template v-if="job.distance_km !== null">
+                                · cách bạn {{ job.distance_km.toFixed(2) }} km
+                            </template>
+                        </span>
+                    </div>
+                    <button
+                        class="btn-primary"
+                        type="button"
+                        :disabled="acceptingId !== null"
+                        @click="handleAccept(job)"
+                    >
+                        {{ acceptingId === job.id ? 'Đang nhận…' : job.is_mine ? 'Nhận đơn này' : 'Nhận đơn' }}
+                    </button>
+                </li>
+            </ul>
+        </div>
 
         <div v-else-if="tab === 'assigned' && !assigned.length" class="empty"><p>Chưa có đơn đang chờ chế biến hoặc lấy hàng.</p></div>
         <div v-else-if="tab === 'active' && !active.length" class="empty">
@@ -552,9 +667,48 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 .card-green { border-top: 4px solid #10b981; }
 .card-blue { border-top: 4px solid #3b82f6; }
 
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--color-gray-200, #eee); }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--color-gray-200, #eee); flex-wrap: wrap; }
 .tabs button { padding: 12px 20px; border: none; background: none; cursor: pointer; font-weight: 600; color: var(--color-gray-600, #555); border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .tabs button.active { color: var(--color-chili-red, #d71920); border-bottom-color: var(--color-chili-red, #d71920); }
+
+/* Phase 2 — Thanh trạng thái chia sẻ vị trí */
+.location-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-gray-200, #eee);
+    border-radius: 10px;
+    background: white;
+}
+.location-status { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.location-status .dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--color-gray-400, #bbb); }
+.location-status .dot.on { background: #10b981; }
+.location-text { font-size: 13px; color: var(--color-gray-600, #555); }
+.location-text--warn { color: #b45309; }
+
+/* Phase 2 — Danh sách đơn gần nhất */
+.nearby-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.nearby-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--color-gray-200, #eee);
+    border-left: 4px solid var(--color-chili-red, #d71920);
+    border-radius: 12px;
+    background: white;
+}
+.nearby-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nearby-info strong { font-size: 15px; }
+.nearby-info span { font-size: 13px; color: var(--color-gray-600, #555); overflow-wrap: anywhere; }
+.nearby-meta { font-size: 12px; color: var(--color-gray-500, #777); }
+.nearby-item .btn-primary { flex: 0 0 auto; min-width: 96px; padding: 10px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid var(--color-chili-red, #d71920); background: var(--color-chili-red, #d71920); color: white; }
+.nearby-item .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 
 .alert { padding: 12px 16px; border-radius: 8px; }
 .alert.error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }

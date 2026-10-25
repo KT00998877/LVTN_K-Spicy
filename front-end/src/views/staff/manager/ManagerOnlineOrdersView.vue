@@ -21,7 +21,8 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOnlineOrdersStore } from '@/stores/onlineOrders'
-import type { DeliveryOrder } from '@/api/staff'
+import { onlineOrders } from '@/api/staff'
+import type { DeliveryOrder, NearestShipper } from '@/api/staff'
 import { formatVND, formatDateTime, formatTime, useToast } from '@/composables/useStaffUtils'
 
 const store = useOnlineOrdersStore()
@@ -43,7 +44,15 @@ const route = useNotificationOrderTarget(() => orders.value, order => {
 
 
 const confirmTarget = ref<DeliveryOrder | null>(null)
+/** null = để backend tự gán shipper gần nhất (Phase 2). */
 const confirmShipperId = ref<number | null>(null)
+/** Shipper đang rảnh + khoảng cách từ nhà hàng (Phase 2). */
+const nearestShippers = ref<NearestShipper[]>([])
+
+/** Khoảng cách của shipper từ nhà hàng (null nếu chưa có dữ liệu vị trí). */
+function nearestDistance(shipperId: number): number | null {
+    return nearestShippers.value.find(s => s.id === shipperId)?.distance_km ?? null
+}
 
 const rejectTarget = ref<DeliveryOrder | null>(null)
 const rejectReason = ref('')
@@ -90,6 +99,7 @@ async function handleConfirm(o: DeliveryOrder) {
     if (o.order_type === 'ONLINE') {
         confirmTarget.value = o
         confirmShipperId.value = null
+        await loadNearestShippers()
         return
     }
     const ok = await store.confirm(o.id)
@@ -97,11 +107,26 @@ async function handleConfirm(o: DeliveryOrder) {
     else if (error.value) toast.error(error.value)
 }
 
+/** Tải shipper đang rảnh + khoảng cách từ nhà hàng (Phase 2). */
+async function loadNearestShippers() {
+    try {
+        nearestShippers.value = await onlineOrders.nearestShippers()
+    } catch {
+        nearestShippers.value = []
+    }
+}
+
 async function submitConfirm() {
-    if (!confirmTarget.value || !confirmShipperId.value || busyId.value !== null) return
-    const ok = await store.confirm(confirmTarget.value.id, confirmShipperId.value)
+    if (!confirmTarget.value || busyId.value !== null) return
+    // confirmShipperId === null → backend tự gán shipper gần nhất.
+    const shipperId = confirmShipperId.value ?? undefined
+    const ok = await store.confirm(confirmTarget.value.id, shipperId)
     if (ok) {
-        toast.success(`Đã duyệt và phân công shipper cho đơn ${ok.code}.`)
+        toast.success(
+            shipperId
+                ? `Đã duyệt và phân công shipper cho đơn ${ok.code}.`
+                : `Đã duyệt đơn ${ok.code} — hệ thống tự gán shipper gần nhất.`,
+        )
         confirmTarget.value = null
     } else if (error.value) toast.error(error.value)
 }
@@ -335,17 +360,34 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                 <form class="modal" @submit.prevent="submitConfirm">
                     <h3>Duyệt đơn {{ confirmTarget.code }}</h3>
                     <fieldset class="shipper-list" :disabled="busyId !== null">
-                        <legend>Chọn shipper nhận đơn (bắt buộc)</legend>
+                        <legend>Chọn shipper nhận đơn</legend>
+
+                        <!-- Phase 2 — Tự động gán shipper gần nhất (theo vị trí GPS) -->
+                        <label class="shipper-option shipper-option--auto">
+                            <input type="radio" name="confirm-shipper" :value="null" v-model="confirmShipperId" />
+                            <span>
+                                <strong>Tự động gán shipper gần nhất</strong>
+                                <small>Hệ thống chọn shipper đang rảnh gần nhà hàng nhất theo vị trí GPS.</small>
+                            </span>
+                        </label>
+
                         <label v-for="s in shippers" :key="s.id" class="shipper-option">
-                            <input type="radio" name="confirm-shipper" :value="s.id" v-model="confirmShipperId" required />
-                            <span>{{ s.name }}</span>
+                            <input type="radio" name="confirm-shipper" :value="s.id" v-model="confirmShipperId" />
+                            <span>
+                                {{ s.name }}
+                                <small v-if="nearestDistance(s.id) !== null" class="shipper-distance">
+                                    cách quán {{ nearestDistance(s.id)!.toFixed(2) }} km
+                                </small>
+                            </span>
                         </label>
                         <p v-if="!shippers.length" class="empty small">Chưa có shipper đang hoạt động để phân công.</p>
                     </fieldset>
                     <p class="modal-sub">Đơn sẽ chuyển vào bếp sau khi duyệt. Bàn giao hàng thực hiện khi chế biến xong.</p>
                     <footer class="modal-actions">
                         <button type="button" class="btn-ghost" :disabled="busyId !== null" @click="confirmTarget = null">Hủy</button>
-                        <button type="submit" class="btn-primary" :disabled="!confirmShipperId || busyId !== null">{{ busyId !== null ? 'Đang duyệt…' : 'Duyệt và phân công' }}</button>
+                        <button type="submit" class="btn-primary" :disabled="busyId !== null">
+                            {{ busyId !== null ? 'Đang duyệt…' : confirmShipperId === null ? 'Duyệt & tự gán shipper' : 'Duyệt và phân công' }}
+                        </button>
                     </footer>
                 </form>
             </div>
@@ -448,6 +490,11 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
 .shipper-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; margin: 8px 0 12px; }
 .shipper-option { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border: 1px solid var(--color-gray-200, #eee); border-radius: 8px; cursor: pointer; }
 .shipper-option input { margin: 0; }
+.shipper-option > span { display: flex; flex-direction: column; gap: 2px; }
+.shipper-option--auto { border-color: var(--color-chili-red, #d71920); background: #fff5f5; }
+.shipper-option--auto strong { color: var(--color-chili-red, #d71920); font-size: 14px; }
+.shipper-option small { font-size: 12px; color: var(--color-gray-500, #777); }
+.shipper-distance { color: var(--color-gray-500, #777); }
 
 @media (max-width: 640px) {
     .online-orders { padding: 16px; }

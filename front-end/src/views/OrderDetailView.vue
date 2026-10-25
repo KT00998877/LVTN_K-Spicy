@@ -13,14 +13,14 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
  * Không dùng icon — chỉ text + badge màu.
  */
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useOrderStore } from '@/stores/orders'
 import type { OrderItemStatus, OrderStatus } from '@/types/orders'
 import { createVNPay } from '@/api/payments'
 import { useAuthStore } from '@/stores/auth'
-import { getOrderRoute } from '@/api/orders'
+import { getOrderRoute, getShipperLocation, type ShipperLocationInfo } from '@/api/orders'
 import type { DeliveryRoute } from '@/api/staff'
 import ShipperRouteMap from '@/components/ShipperRouteMap.vue'
 
@@ -28,14 +28,18 @@ import NavbarHome from '@/components/home/NavbarHome.vue'
 import FooterHome from '@/components/home/FooterHome.vue'
 import ReviewSection from '@/components/review/ReviewSection.vue'
 import ReviewFormModal from '@/components/review/ReviewFormModal.vue'
+import DeliveryRatingSection from '@/components/review/DeliveryRatingSection.vue'
 import { fetchReviewEligibility } from '@/api/review'
 import type { ReviewEligibility } from '@/types/review'
+import type { DeliveryRating } from '@/types/deliveryRating'
+import { useAppDialog } from '@/composables/useAppDialog'
 
 const route = useRoute()
 const router = useRouter()
 const orderStore = useOrderStore()
 const authStore = useAuthStore()
-const { current, loadingDetail, loadingPayment, error } = storeToRefs(orderStore)
+const appDialog = useAppDialog()
+const { current, loadingDetail, loadingPayment, loadingCancel, error } = storeToRefs(orderStore)
 
 /* ---------------- Status maps ---------------- */
 
@@ -150,6 +154,32 @@ function backToList() {
     router.push({ name: 'account', query: { tab: 'orders' } })
 }
 
+const canCancelOrder = computed(() => isDeliveryOrder.value && current.value?.status === 'PENDING')
+const cancelError = ref('')
+
+async function cancelOrder(): Promise<void> {
+    if (!current.value || loadingCancel.value) return
+    cancelError.value = ''
+    const value = await appDialog.prompt({
+        title: 'Hủy đơn hàng?',
+        message: 'Đơn đang chờ nhà hàng xác nhận. Hãy cho nhà hàng biết lý do bạn muốn hủy.',
+        label: 'Lý do hủy',
+        placeholder: 'Ví dụ: Tôi đặt nhầm món',
+        confirmLabel: 'Hủy đơn',
+        tone: 'danger',
+    })
+    if (value === null) return
+
+    const reason = value.trim()
+    if (reason.length < 3) {
+        cancelError.value = 'Vui lòng nhập lý do hủy có ít nhất 3 ký tự.'
+        return
+    }
+
+    const ok = await orderStore.cancelOrder(current.value.id, reason)
+    if (!ok) cancelError.value = orderStore.error ?? 'Không thể hủy đơn. Vui lòng thử lại.'
+}
+
 /* ---------------- Payment modal ---------------- */
 
 const paymentModalOpen = ref(false)
@@ -203,6 +233,54 @@ const routeData = ref<DeliveryRoute | null>(null)
 const routeLoading = ref(false)
 const routeError = ref('')
 const routeModalOpen = ref(false)
+
+/* Phase 2 — Theo dõi vị trí shipper (poll mỗi 10s khi đang giao) */
+const shipperLocation = ref<ShipperLocationInfo | null>(null)
+let shipperPollTimer: number | null = null
+
+/** Đơn đang trên đường → nên poll vị trí shipper. */
+const shouldTrackShipper = computed(() => {
+    const s = current.value?.status
+    return current.value?.order_type === 'ONLINE' && (s === 'DELIVERING' || s === 'DELIVERED')
+})
+
+async function pollShipperLocation() {
+    if (!orderId.value) return
+    try {
+        shipperLocation.value = await getShipperLocation(orderId.value)
+    } catch {
+        // Im lặng — lần poll sau sẽ thử lại.
+    }
+}
+
+function stopShipperPolling() {
+    if (shipperPollTimer !== null) {
+        window.clearInterval(shipperPollTimer)
+        shipperPollTimer = null
+    }
+}
+
+function startShipperPolling() {
+    stopShipperPolling()
+    void pollShipperLocation()
+    shipperPollTimer = window.setInterval(() => void pollShipperLocation(), 10_000)
+}
+
+// Bật/tắt polling theo trạng thái đơn.
+watch(shouldTrackShipper, (on) => {
+    if (on) startShipperPolling()
+    else stopShipperPolling()
+}, { immediate: true })
+
+onUnmounted(() => stopShipperPolling())
+
+/** Khoảng cách còn lại tới khách (km) — hiển thị dạng gọn. */
+const remainingDistanceText = computed(() => {
+    const km = shipperLocation.value?.remaining_distance_km
+    if (km === null || km === undefined) return null
+    if (km < 1) return `${Math.round(km * 1000)} m`
+    return `${km.toFixed(1)} km`
+})
 
 async function openRouteModal() {
     if (!current.value || !isOnlineOrder.value) return
@@ -374,7 +452,16 @@ async function onReviewSubmitted() {
     // Refresh order detail để cập nhật COMPLETED + trạng thái.
     if (orderId.value) await orderStore.fetchDetail(orderId.value, true)
 }
-useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!orderId.value && !orderStore.loadingDetail && !orderStore.loadingPayment && !orderStore.loadingConfirm)
+
+/* Phase 4 — Khách gửi đánh giá dịch vụ giao hàng. */
+function onDeliveryRated(result: DeliveryRating) {
+    if (!current.value) return
+    current.value.delivery_rating = result.rating
+    current.value.delivery_comment = result.comment
+    current.value.delivery_rated_at = result.rated_at
+    current.value.delivery_photos = result.photos
+}
+useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!orderId.value && !orderStore.loadingDetail && !orderStore.loadingPayment && !orderStore.loadingConfirm && !orderStore.loadingCancel)
 </script>
 
 <template>
@@ -434,6 +521,17 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                     </button>
                 </div>
 
+                <section v-if="canCancelOrder" class="cancel-order-card" aria-labelledby="cancel-order-title">
+                    <div>
+                        <strong id="cancel-order-title">Bạn cần thay đổi đơn?</strong>
+                        <p>Đơn chỉ có thể hủy trước khi nhà hàng xác nhận.</p>
+                        <p v-if="cancelError" class="cancel-order-error" role="alert">{{ cancelError }}</p>
+                    </div>
+                    <button type="button" class="au-btn au-btn-danger" :disabled="loadingCancel" @click="cancelOrder">
+                        {{ loadingCancel ? 'Đang hủy đơn…' : 'Hủy đơn' }}
+                    </button>
+                </section>
+
                 <!-- ====== Timeline (cho đơn chưa hủy) ====== -->
                 <section v-if="current.status !== 'CANCELLED'" class="detail-card">
                     <h2 class="card-title">Tiến trình đơn hàng</h2>
@@ -462,6 +560,28 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                         </button>
                     </div>
                     <p class="muted small">Bấm "Xem đường đi" để xem khoảng cách và hướng dẫn đường đi bằng ô tô từ quán đến nhà bạn.</p>
+
+                    <!-- Phase 2 — Vị trí live của shipper -->
+                    <div v-if="shipperLocation" class="shipper-live">
+                        <div class="shipper-live-row">
+                            <span class="shipper-live-label">Shipper</span>
+                            <strong>{{ shipperLocation.shipper_name || 'Đang cập nhật' }}</strong>
+                        </div>
+                        <div v-if="remainingDistanceText" class="shipper-live-row">
+                            <span class="shipper-live-label">Còn cách bạn</span>
+                            <strong>{{ remainingDistanceText }}</strong>
+                        </div>
+                        <div v-if="shipperLocation.last_seen_at" class="shipper-live-row">
+                            <span class="shipper-live-label">Cập nhật lúc</span>
+                            <strong>{{ formatDate(shipperLocation.last_seen_at) }}</strong>
+                        </div>
+                        <p v-if="!shipperLocation.is_fresh" class="muted small shipper-live-stale">
+                            Vị trí có thể chưa cập nhật mới nhất.
+                        </p>
+                    </div>
+                    <p v-else-if="shouldTrackShipper" class="muted small shipper-live-stale">
+                        Shipper chưa chia sẻ vị trí. Vị trí sẽ hiện khi shipper bật định vị.
+                    </p>
                 </section>
 
                 <!-- ====== Receipt confirmation CTA (chỉ DELIVERED) ====== -->
@@ -641,6 +761,19 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                             </div>
                         </article>
                     </div>
+                </section>
+
+                <!-- ====== Phase 4: Đánh giá dịch vụ giao hàng (chỉ đơn ONLINE đã hoàn thành) ====== -->
+                <section v-if="current.status === 'COMPLETED' && current.order_type === 'ONLINE'" class="detail-card detail-card-flush">
+                    <DeliveryRatingSection
+                        :order-id="current.id"
+                        :rating="current.delivery_rating"
+                        :comment="current.delivery_comment"
+                        :rated-at="current.delivery_rated_at"
+                        :photos="current.delivery_photos"
+                        :shipper-name="current.shipper_name"
+                        @submitted="onDeliveryRated"
+                    />
                 </section>
 
                 <!-- ====== Review Section (chỉ đơn COMPLETED) ====== -->
@@ -830,7 +963,7 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                                 Mở Google Maps
                             </a>
                         </section>
-                        <ShipperRouteMap :route-data="routeData" />
+                        <ShipperRouteMap :route-data="routeData" :shipper-location="shipperLocation" />
                         <section v-if="routeData.route.steps.length" class="route-steps">
                             <h4>Chỉ dẫn đường đi (ô tô)</h4>
                             <ol>
@@ -931,6 +1064,13 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
     padding: 24px;
     margin-bottom: 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+/* Bọc ngoài có padding riêng → phần trong không cần padding thêm. */
+.detail-card-flush {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .card-title {
@@ -1148,7 +1288,24 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
 .au-btn { padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid var(--color-gray-200, #eee); background: white; }
 .au-btn-primary { background: var(--color-chili-red, #d71920); color: white; border-color: var(--color-chili-red, #d71920); }
 .au-btn-ghost { background: white; color: var(--hp-dark); }
+.au-btn-danger { background: white; color: #b91c1c; border-color: #b91c1c; }
+.au-btn-danger:hover:not(:disabled) { background: #b91c1c; color: white; }
+.au-btn:focus-visible { outline: 2px solid var(--color-chili-red, #d71920); outline-offset: 3px; }
 .au-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.cancel-order-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 16px;
+    padding: 18px 22px;
+    background: #fff7f7;
+    border-radius: 8px;
+}
+.cancel-order-card strong { color: var(--hp-dark); }
+.cancel-order-card p { margin: 4px 0 0; color: var(--hp-muted); font-size: 14px; }
+.cancel-order-card .cancel-order-error { color: #991b1b; }
 
 .detail-actions { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
 
@@ -1204,6 +1361,22 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
 }
 .tracking-btn:hover { background: #c2410c; }
 
+/* Phase 2 — Vị trí live của shipper */
+.shipper-live {
+    margin-top: 4px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(253, 186, 116, 0.85);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.shipper-live-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.shipper-live-label { color: #9a3412; }
+.shipper-live-row strong { color: var(--hp-charcoal, #2a2a2a); text-align: right; }
+.shipper-live-stale { margin: 2px 0 0; }
+
 .state-inline { padding: 24px; text-align: center; color: var(--hp-muted, #555); font-size: 14px; }
 .modal.route-modal { max-width: 640px; max-height: 90vh; overflow-y: auto; }
 
@@ -1233,6 +1406,7 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
     .timeline-step { min-width: 70px; }
     .step-label { font-size: 11px; }
     .info-grid { grid-template-columns: 1fr; }
+    .cancel-order-card { align-items: stretch; flex-direction: column; }
 }
 
 /* ===== Per-item review button ===== */

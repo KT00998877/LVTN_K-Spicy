@@ -38,6 +38,9 @@ class Order extends Model
         'inventory_reversed_at',
         'inventory_reversed_user_id',
         'inventory_reversal_reason',
+        'delivery_rating',
+        'delivery_comment',
+        'delivery_rated_at',
     ];
 
     protected function casts(): array
@@ -59,6 +62,8 @@ class Order extends Model
             'inventory_processed_at' => 'datetime',
             'inventory_reversed_at'  => 'datetime',
             'points_awarded' => 'integer',
+            'delivery_rating' => 'integer',
+            'delivery_rated_at' => 'datetime',
         ];
     }
 
@@ -81,5 +86,11 @@ class Order extends Model
     public function tableSession(): BelongsTo
     {
         return $this->belongsTo(TableSession::class);
+    }
+
+    /** Ảnh khách chụp kèm đánh giá dịch vụ giao. */
+    public function deliveryPhotos(): HasMany
+    {
+        return $this->hasMany(OrderDeliveryPhoto::class)->orderBy('sort_order');
     }
 }

@@ -31,6 +31,8 @@ export interface OrderSummary {
     item_count: number
     placed_at: string | null
     completed_at: string | null
+    cancelled_at?: string | null
+    cancellation_reason?: string | null
     /** Trạng thái thanh toán rút gọn (UNPAID / PAID / ...). Có thể null nếu không phải ONLINE. */
     payment_status?: InvoiceStatus | null
     /** Thông tin người nhận (chỉ có với đơn ONLINE). */
@@ -123,6 +125,11 @@ export interface OrderDetail {
     shipper_id?: number | null
     shipper_name?: string | null
     delivery_issue?: string | null
+    /** Phase 4 — đánh giá dịch vụ giao hàng của khách. */
+    delivery_rating?: number | null
+    delivery_comment?: string | null
+    delivery_rated_at?: string | null
+    delivery_photos?: { id: number; url: string }[]
     payment?: OrderPaymentInfo | null
     events?: OrderEvent[]
 }

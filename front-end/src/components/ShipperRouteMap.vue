@@ -14,12 +14,26 @@ import 'leaflet/dist/leaflet.css'
 import { decodePolyline } from '@/utils/geocoding'
 import type { DeliveryRoute } from '@/api/staff'
 
-const props = defineProps<{ routeData: DeliveryRoute | null }>()
+/**
+ * Vị trí live của shipper (Phase 2) — dùng để vẽ marker động.
+ */
+export interface ShipperMarker {
+    latitude: number
+    longitude: number
+    shipper_name?: string | null
+}
+
+const props = defineProps<{
+    routeData: DeliveryRoute | null
+    /** Phase 2 — vị trí live của shipper (null nếu chưa có). */
+    shipperLocation?: ShipperMarker | null
+}>()
 
 const container = ref<HTMLElement>()
 let map: L.Map | undefined
 let restaurantMarker: L.Marker | undefined
 let customerMarker: L.Marker | undefined
+let shipperMarker: L.Marker | undefined
 let routeLine: L.Polyline | undefined
 let alive = true
 
@@ -33,10 +47,33 @@ const customerIcon = L.divIcon({
     html: '<span aria-hidden="true">📍</span>',
     iconSize: [30, 36], iconAnchor: [15, 36],
 })
+const shipperIcon = L.divIcon({
+    className: 'route-pin shipper',
+    html: '<span aria-hidden="true">🛵</span>',
+    iconSize: [32, 38], iconAnchor: [16, 38],
+})
 
 function clear() {
     restaurantMarker?.remove(); customerMarker?.remove(); routeLine?.remove()
     restaurantMarker = customerMarker = routeLine = undefined
+}
+
+/** Vẽ/cập nhật marker shipper — cập nhật tọa độ nếu đã có. */
+function drawShipper() {
+    if (!map) return
+    const loc = props.shipperLocation
+    if (!loc) {
+        shipperMarker?.remove()
+        shipperMarker = undefined
+        return
+    }
+    const position: L.LatLngExpression = [loc.latitude, loc.longitude]
+    if (shipperMarker) {
+        shipperMarker.setLatLng(position)
+    } else {
+        shipperMarker = L.marker(position, { icon: shipperIcon, title: loc.shipper_name ?? 'Shipper' }).addTo(map)
+            .bindTooltip(`Shipper · ${loc.shipper_name ?? ''}`, { permanent: false, direction: 'top' })
+    }
 }
 
 function draw(data: DeliveryRoute) {
@@ -72,6 +109,8 @@ function draw(data: DeliveryRoute) {
         [c.latitude, c.longitude],
     ])
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+
+    drawShipper()
 }
 
 onMounted(() => {
@@ -82,9 +121,12 @@ onMounted(() => {
         maxZoom: 19,
     }).addTo(map)
     if (props.routeData) draw(props.routeData)
+    else drawShipper()
 })
 watch(() => props.routeData, value => { if (value) draw(value) })
-onBeforeUnmount(() => { alive = false; clear(); map?.remove() })
+// Phase 2 — vị trí shipper thay đổi → cập nhật marker (không vẽ lại cả map).
+watch(() => props.shipperLocation, () => drawShipper(), { deep: true })
+onBeforeUnmount(() => { alive = false; clear(); shipperMarker?.remove(); map?.remove() })
 </script>
 
 <template>
@@ -93,6 +135,7 @@ onBeforeUnmount(() => { alive = false; clear(); map?.remove() })
         <div v-if="routeData" class="legend">
             <span><span class="dot restaurant">🍜</span> Quán</span>
             <span><span class="dot customer">📍</span> Khách</span>
+            <span v-if="shipperLocation"><span class="dot shipper">🛵</span> Shipper</span>
             <span class="line"></span> Đường đi ô tô
         </div>
     </div>
@@ -112,4 +155,5 @@ onBeforeUnmount(() => { alive = false; clear(); map?.remove() })
 }
 :deep(.route-pin) { font-size: 22px; background: none; border: 0; }
 :deep(.route-pin.restaurant) { filter: drop-shadow(0 1px 2px rgba(0,0,0,.2)); }
+:deep(.route-pin.shipper) { filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
 </style>

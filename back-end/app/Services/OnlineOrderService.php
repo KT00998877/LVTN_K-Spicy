@@ -74,6 +74,15 @@ class OnlineOrderService
             'shipper_name'    => $order->shipper_id ? User::whereKey($order->shipper_id)->value('name') : null,
             'delivery_issue'  => $order->delivery_issue,
             'points_awarded'  => (int) ($order->points_awarded ?? 0),
+            'delivery_rating' => $order->delivery_rating !== null ? (int) $order->delivery_rating : null,
+            'delivery_comment' => $order->delivery_comment,
+            'delivery_rated_at' => $order->delivery_rated_at?->toIso8601String(),
+            'delivery_photos' => $order->relationLoaded('deliveryPhotos')
+                ? $order->deliveryPhotos->map(fn ($p) => [
+                    'id'  => (int) $p->id,
+                    'url' => $p->url,
+                ])->values()->all()
+                : [],
             'payment' => $invoice ? [
                 'invoice_id'   => $invoice->id,
                 'invoice_code' => $invoice->code,
@@ -205,10 +214,22 @@ class OnlineOrderService
                 return;
             }
             if ($order->order_type === 'ONLINE') {
-                abort_unless($actor && $shipperId, 422, 'Vui lòng chọn shipper trước khi duyệt đơn.');
-                abort_unless(User::whereKey($shipperId)->where('is_active', true)
+                // Cho phép duyệt đơn mà không chọn shipper thủ công → hệ thống tự
+                // gán shipper gần nhà hàng nhất (Phase 2). Nếu không có shipper
+                // nào rảnh thì bắt buộc phải chọn tay.
+                $resolvedShipperId = $shipperId;
+
+                if ($resolvedShipperId === null) {
+                    $resolvedShipperId = app(ShipperDispatchService::class)->autoAssign($order);
+                    abort_unless($resolvedShipperId !== null, 422,
+                        'Chưa có shipper đang rảnh để tự phân công. Vui lòng chọn shipper thủ công.');
+                }
+
+                abort_unless(User::whereKey($resolvedShipperId)->where('is_active', true)
                     ->whereHas('roles', fn ($q) => $q->where('code', 'SHIPPER'))->exists(),
                     422, 'Shipper không hoạt động hoặc không hợp lệ.');
+
+                $shipperId = $resolvedShipperId;
             }
             abort_unless($order->status === 'PENDING', 409, 'Đơn không ở trạng thái chờ xác nhận.');
 
