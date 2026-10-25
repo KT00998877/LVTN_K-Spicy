@@ -60,6 +60,8 @@ export interface MenuItemCard {
     sold_out_at?: string | null
     /** Chỉ có ở best_sellers */
     sold_count?: number
+    /** Gợi ý combo nước uống do quản lý cấu hình (Phase 3). */
+    suggestions?: import('./menuSuggestion').MenuSuggestion[]
 }
 
 export type TableStatusKey =

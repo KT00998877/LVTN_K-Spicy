@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\Channel;
 use App\Http\Controllers\Controller;
-use App\Services\{CartContext, CartLine, DeliveryPricingService, Money, PromotionService};
+use App\Services\{CartContext, CartLine, DeliveryPricingService, MenuSuggestionService, Money, PromotionService};
 use Illuminate\Http\Request;
 
 class CheckoutQuoteController extends Controller
@@ -68,12 +68,25 @@ class CheckoutQuoteController extends Controller
         }
         $promotionDiscountVnd = (int) ($promotionResult['total_discount'] ?? 0);
 
+        // Tiết kiệm combo (Phase 3) — gợi ý món + đồ uống do quản lý cấu hình.
+        $quantities = [];
+        foreach ($cart?->items ?? [] as $item) {
+            $id = (int) $item->menu_item_id;
+            $quantities[$id] = ($quantities[$id] ?? 0) + (int) $item->quantity;
+        }
+        $combo = app(MenuSuggestionService::class)->comboDiscountForCart($quantities);
+
         $payload = $pricing->quote($data['order_type'], $data['delivery_latitude'] ?? null,
             $data['delivery_longitude'] ?? null, $subtotal, (int) ($data['points_redeemed'] ?? 0),
-            (int) $request->user()->loyalty_points, $voucherDiscountVnd, $promotionDiscountVnd);
+            (int) $request->user()->loyalty_points, $voucherDiscountVnd, $promotionDiscountVnd,
+            $combo['discount_vnd']);
         $payload['voucher'] = $voucherPreview;
         $payload['voucher_error'] = $voucherError;
         $payload['promotions'] = $promotionResult;
+        $payload['combo'] = [
+            'discount' => $combo['discount_vnd'],
+            'lines' => $combo['lines'],
+        ];
         return response()->json($payload);
     }
 }

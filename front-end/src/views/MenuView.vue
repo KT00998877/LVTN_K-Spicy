@@ -6,6 +6,9 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useMenuStore } from '@/stores/menu'
 import { useCartStore } from '@/stores/cart'
+import { useAuthStore } from '@/stores/auth'
+import { useFavoritesStore } from '@/stores/favorites'
+import { useToast } from '@/composables/useStaffUtils'
 import { parseFiltersFromQuery, serializeFiltersToQuery } from '@/api/menu'
 import type { MenuItemCard } from '@/types/home'
 
@@ -23,6 +26,9 @@ const route = useRoute()
 const router = useRouter()
 const menuStore = useMenuStore()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
+const favoritesStore = useFavoritesStore()
+const toast = useToast()
 
 const { items, loading, loadingMore, loadMoreError, hasMore, error, filters, totalCount, activeFilterCount, categories } = storeToRefs(menuStore)
 const { modalVisible, modalMenuItem, modalItem, loadingItem } = storeToRefs(cartStore)
@@ -44,7 +50,25 @@ onMounted(async () => {
     await menuStore.initFromQuery(queryFilters.value)
     // Fetch cart để biết badge count
     await cartStore.fetchCart()
+    if (authStore.isAuthenticated) await favoritesStore.load()
 })
+
+watch(() => authStore.isAuthenticated, async authenticated => {
+    if (authenticated) await favoritesStore.load(true)
+})
+
+async function handleToggleFavorite(item: MenuItemCard) {
+    if (!authStore.isAuthenticated) {
+        await router.push({ name: 'login', query: { redirect: route.fullPath } })
+        return
+    }
+    try {
+        const added = await favoritesStore.toggle(item)
+        toast.success(added ? 'Đã thêm vào món yêu thích' : 'Đã bỏ khỏi món yêu thích')
+    } catch {
+        toast.error(favoritesStore.error ?? 'Không thể cập nhật món yêu thích.')
+    }
+}
 
 /**
  * Sync filter ↔ URL (khi user đổi filter, URL tự update).
@@ -77,7 +101,18 @@ function handleAddToCart(item: MenuItemCard) {
         price_formatted: item.price_formatted,
         default_spicy: item.spicy_level,
         image_url: item.image_url,
+        suggestions: item.suggestions ?? [],
     })
+}
+
+/**
+ * Quick-add combo: món chính (theo tùy chỉnh trong modal) + món gợi ý đi kèm.
+ */
+async function handleModalAddCombo(payload: {
+    main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
+    suggested_item_id: number
+}) {
+    await cartStore.addCombo(payload.main, payload.suggested_item_id)
 }
 
 /**
@@ -202,8 +237,11 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
                         <MenuGrid
                             :items="items"
                             :loading="loading"
+                            :favorite-ids="favoritesStore.favoriteIds"
+                            :favorite-loading-ids="favoritesStore.pendingIds"
                             @reset="menuStore.resetFilters()"
                             @add-to-cart="handleAddToCart"
+                            @toggle-favorite="handleToggleFavorite"
                         />
 
                         <!-- Pagination / Quick Categories -->
@@ -238,6 +276,7 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
             :cart-item="modalItem"
             :loading="loadingItem"
             @submit="handleModalSubmit"
+            @add-combo="handleModalAddCombo"
         />
     </div>
 </template>

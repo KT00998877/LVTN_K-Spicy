@@ -55,6 +55,10 @@ export interface Cart {
     total_quantity: number   // tổng số lượng món
     subtotal: number
     subtotal_formatted: string
+    /** Tiết kiệm combo (Phase 3) — món chính + món gợi ý do quản lý cấu hình. */
+    combo_discount: number
+    combo_discount_formatted: string
+    combo_lines: import('./menuSuggestion').ComboSavingLine[]
 }
 
 /** ===== API Response ===== */

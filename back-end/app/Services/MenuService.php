@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +19,55 @@ use Illuminate\Support\Facades\DB;
  */
 class MenuService
 {
+    /**
+     * Danh sách món yêu thích còn hiển thị trên thực đơn của một khách hàng.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listFavorites(User $user): array
+    {
+        $availability = app(MenuAvailabilityService::class);
+
+        return DB::table('user_favorite_menu_items as f')
+            ->join('menu_items as m', 'm.id', '=', 'f.menu_item_id')
+            ->join('categories as c', 'c.id', '=', 'm.category_id')
+            ->where('f.user_id', $user->id)
+            ->where('m.is_active', true)
+            ->where('c.is_active', true)
+            ->orderByDesc('f.created_at')
+            ->get([
+                'm.id', 'm.name', 'm.slug', 'm.description', 'm.image_url',
+                'm.price', 'm.spicy_level', 'm.size', 'm.preparation_minutes',
+                'm.is_available', 'm.sold_out_reason', 'm.sold_out_at',
+                'm.auto_availability_enabled',
+                'c.name as category_name', 'c.slug as category_slug',
+            ])
+            ->map(function ($row) use ($availability) {
+                $status = $availability->status($row);
+
+                return [
+                    'id' => (int) $row->id,
+                    'name' => $row->name,
+                    'slug' => $row->slug,
+                    'description' => $row->description,
+                    'image_url' => $row->image_url ?: $this->placeholderImage($row->category_slug),
+                    'price' => (float) $row->price,
+                    'price_formatted' => number_format((float) $row->price, 0, ',', '.') . ' đ',
+                    'spicy_level' => (int) $row->spicy_level,
+                    'size' => $row->size,
+                    'preparation_minutes' => (int) $row->preparation_minutes,
+                    'is_available' => $status['is_available'],
+                    'availability_reason' => $status['reason'],
+                    'sold_out_reason' => $row->sold_out_reason,
+                    'sold_out_at' => $row->sold_out_at,
+                    'category_name' => $row->category_name,
+                    'category_slug' => $row->category_slug,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     /**
      * Lấy danh sách món ăn đã được lọc + sắp xếp, kèm metadata phân trang.
      *
@@ -147,6 +197,13 @@ class MenuService
             ->values()
             ->all();
 
+        // Gợi ý combo (Phase 3) — 1 query cho cả trang.
+        $suggestions = app(MenuSuggestionService::class)->forMenuItems(array_column($rows, 'id'));
+        $rows = array_map(function (array $row) use ($suggestions) {
+            $row['suggestions'] = $suggestions[$row['id']] ?? [];
+            return $row;
+        }, $rows);
+
         return [
             'items'      => $rows,
             'count'      => count($rows),
@@ -205,6 +262,7 @@ class MenuService
             'sold_out_at'         => $row->sold_out_at,
             'category_name'       => $row->category_name,
             'category_slug'       => $row->category_slug,
+            'suggestions' => app(MenuSuggestionService::class)->forMenuItem((int) $row->id),
         ];
     }
 

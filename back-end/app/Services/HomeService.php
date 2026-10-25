@@ -102,7 +102,7 @@ class HomeService
     }
 
     /**
-     * Món nổi bật - lấy 8 món đầu tiên đang available, ưu tiên mì cay.
+     * Món đặc sắc do quản lý bật, ưu tiên món còn bán và nhóm mì cay.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -113,6 +113,7 @@ class HomeService
         return DB::table('menu_items as m')
             ->join('categories as c', 'c.id', '=', 'm.category_id')
             ->where('m.is_active', true)
+            ->where('m.is_featured', true)
             ->where('c.is_active', true)
             ->orderByDesc('m.is_available')
             ->orderByRaw("CASE WHEN c.slug = 'mi-cay-han-quoc' THEN 0 ELSE 1 END")
@@ -156,8 +157,7 @@ class HomeService
     }
 
     /**
-     * Món bán chạy - hiện tại lấy theo thứ tự menu, sẽ thay bằng ORDER BY SUM(quantity)
-     * khi có bảng order_items chứa dữ liệu thật.
+     * Món bán chạy do quản lý bật, sắp xếp theo số lượng đã bán thực tế.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -168,6 +168,7 @@ class HomeService
             ->join('categories as c', 'c.id', '=', 'm.category_id')
             ->leftJoin('order_items as oi', 'oi.menu_item_id', '=', 'm.id')
             ->where('m.is_active', true)
+            ->where('m.is_best_seller', true)
             ->where('c.is_active', true)
             ->orderByDesc('m.is_available')
             ->groupBy('m.id', 'm.name', 'm.slug', 'm.description', 'm.image_url', 'm.is_available', 'm.auto_availability_enabled',

@@ -4,10 +4,11 @@ import api from '@/api/client'
 import { createVNPay } from '@/api/payments'
 import DeliveryLocationPicker from '@/components/DeliveryLocationPicker.vue'
 import type { CheckoutPayload } from '@/types/cart'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
 import { useCartStore } from '@/stores/cart'
+import { useAppDialog } from '@/composables/useAppDialog'
 import { useAuthStore } from '@/stores/auth'
 import type { CartItem } from '@/types/cart'
 import { imageUrl } from '@/utils/image'
@@ -20,6 +21,7 @@ import type { VoucherPreview } from '@/types/voucher'
 
 const router = useRouter()
 const cartStore = useCartStore()
+const appDialog = useAppDialog()
 const authStore = useAuthStore()
 
 const {
@@ -44,12 +46,18 @@ const deliveryAddress = ref('')
 const location = ref<{ latitude: number; longitude: number } | null>(null)
 const points = ref(0)
 const checkoutConfig = ref<{ restaurant_address: string; latitude: number; longitude: number } | null>(null)
-const quote = ref<{ shipping_fee: number; distance_km: number; discount: number; total: number; max_points: number; balance: number; voucher?: VoucherPreview | null; voucher_error?: string | null } | null>(null)
+const quote = ref<{ shipping_fee: number; distance_km: number; discount: number; total: number; max_points: number; balance: number; combo_discount?: number; voucher?: VoucherPreview | null; voucher_error?: string | null } | null>(null)
 const quoteLoading = ref(false)
 const quoteError = ref('')
 /** Voucher đã chọn (null nếu chưa áp dụng / đã bỏ). */
 const voucherCode = ref<string | null>(null)
 const voucherPreview = ref<VoucherPreview | null>(null)
+/** Mã voucher đến từ banner/chuông ưu đãi (?voucher=CODE) — tự áp dụng 1 lần. */
+const route = useRoute()
+const voucherFromLink = computed(() => {
+    const raw = route.query.voucher
+    return typeof raw === 'string' ? raw.trim().toUpperCase() : null
+})
 let quoteRevision = 0
 let quoteTimer: ReturnType<typeof setTimeout> | undefined
 const money = (value: number) => `${value.toLocaleString('vi-VN')}đ`
@@ -198,7 +206,7 @@ function handleEditItem(item: CartItem) {
 }
 
 async function handleRemoveItem(item: CartItem) {
-    if (!confirm(`Xóa "${item.menu_item.name}" khỏi giỏ hàng?`)) return
+    if (!await appDialog.confirm({ title: 'Xóa món khỏi giỏ?', message: `“${item.menu_item.name}” sẽ được bỏ khỏi giỏ hàng.`, confirmLabel: 'Xóa món', tone: 'danger' })) return
     await cartStore.removeItem(item.id)
 }
 
@@ -413,6 +421,26 @@ function continueShopping() {
                                 </button>
                             </div>
                         </article>
+
+                        <!-- Tiết kiệm combo (Phase 3) -->
+                        <div v-if="cart && cart.combo_discount > 0" class="combo-summary">
+                            <div class="combo-summary-head">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path d="M8 2h8l-1 6H9L8 2z"></path>
+                                    <path d="M12 8v13"></path>
+                                    <path d="M7 21h10"></path>
+                                </svg>
+                                <span>Tiết kiệm combo</span>
+                                <strong>−{{ cart.combo_discount_formatted }}</strong>
+                            </div>
+                            <ul class="combo-summary-list">
+                                <li v-for="line in cart.combo_lines" :key="line.suggestion_id">
+                                    {{ line.title }}
+                                    <span v-if="line.quantity > 1">×{{ line.quantity }}</span>
+                                    <span class="combo-saving">−{{ line.saving.toLocaleString('vi-VN') }}đ</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </section>
 
@@ -525,6 +553,7 @@ function continueShopping() {
                             <VoucherInput
                                 v-model="voucherCode"
                                 :subtotal="cart?.subtotal ?? 0"
+                                :initial-code="voucherFromLink"
                                 :disabled="submitting || !!cartStore.pendingCheckout"
                                 @applied="onVoucherApplied"
                                 @cleared="onVoucherCleared"
@@ -579,6 +608,10 @@ function continueShopping() {
                         <!-- Tổng -->
                         <div class="summary-total">
                             <div class="total-row"><span>Tiền món</span><span>{{ subtotalFormatted }}</span></div>
+                            <div v-if="quote && quote.combo_discount && quote.combo_discount > 0" class="total-row combo-row">
+                                <span>Tiết kiệm combo</span>
+                                <span class="discount-amount">−{{ money(quote.combo_discount) }}</span>
+                            </div>
                             <div v-if="quote && quote.discount > 0" class="total-row voucher-row">
                                 <span>
                                     <span v-if="voucherPreview">Voucher <strong>{{ voucherPreview.code }}</strong></span>
@@ -898,6 +931,62 @@ function continueShopping() {
     color: var(--color-white);
 }
 
+/* ===== Combo saving (Phase 3) ===== */
+.combo-summary {
+    margin-top: 16px;
+    padding: 16px 18px;
+    border: 1px dashed var(--color-golden-yellow, #f5b301);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(245, 179, 1, 0.08), rgba(229, 57, 53, 0.06));
+}
+
+.combo-summary-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-charcoal-black);
+}
+
+.combo-summary-head svg {
+    color: var(--color-golden-yellow, #f5b301);
+    flex-shrink: 0;
+}
+
+.combo-summary-head strong {
+    margin-left: auto;
+    color: var(--color-chili-red);
+    font-weight: 800;
+}
+
+.combo-summary-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.combo-summary-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-gray-600);
+}
+
+.combo-summary-list li span {
+    color: var(--color-gray-400);
+}
+
+.combo-summary-list .combo-saving {
+    margin-left: auto;
+    color: var(--color-chili-red);
+    font-weight: 700;
+}
+
 @media (max-width: 768px) {
     .cart-item {
         grid-template-columns: 80px 1fr auto;
@@ -1155,6 +1244,9 @@ function continueShopping() {
 }
 
 .total-row.voucher-row {
+    color: #15803d;
+}
+.total-row.combo-row {
     color: #15803d;
 }
 .total-row.voucher-row strong {

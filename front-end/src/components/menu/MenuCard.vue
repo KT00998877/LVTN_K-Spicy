@@ -6,10 +6,13 @@ import RatingBadge from '@/components/review/RatingBadge.vue'
 
 const props = defineProps<{
     item: MenuItemCard
+    isFavorite?: boolean
+    favoriteLoading?: boolean
 }>()
 
 const emit = defineEmits<{
     (e: 'addToCart', item: MenuItemCard): void
+    (e: 'toggleFavorite', item: MenuItemCard): void
 }>()
 
 // Spicy info
@@ -63,6 +66,11 @@ function handleAdd(e?: Event) {
     if (props.item.is_available === false) return
     emit('addToCart', props.item)
 }
+
+function handleFavorite(e: Event) {
+    e.stopPropagation()
+    emit('toggleFavorite', props.item)
+}
 </script>
 
 <template>
@@ -78,6 +86,20 @@ function handleAdd(e?: Event) {
     >
         <!-- Image -->
         <div class="card-image-wrap">
+            <button
+                type="button"
+                class="favorite-btn"
+                :class="{ 'favorite-btn--active': isFavorite }"
+                :aria-label="isFavorite ? `Bỏ ${item.name} khỏi món yêu thích` : `Thêm ${item.name} vào món yêu thích`"
+                :aria-pressed="!!isFavorite"
+                :aria-busy="favoriteLoading"
+                :disabled="favoriteLoading"
+                @click="handleFavorite"
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" :fill="isFavorite ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+                </svg>
+            </button>
             <span
                 v-if="soldOutState"
                 class="sold-out-badge"
@@ -182,12 +204,36 @@ function handleAdd(e?: Event) {
 .food-card--sold-out { cursor: default; }
 .food-card--sold-out:hover { transform: none; border-color: var(--color-gray-200); box-shadow: none; }
 
+.favorite-btn {
+    position: absolute;
+    z-index: 2;
+    top: 12px;
+    right: 12px;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-charcoal-black);
+    background: var(--color-white);
+    border: 0;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.favorite-btn:hover { color: var(--color-chili-red); transform: scale(1.05); }
+.favorite-btn:active { transform: scale(0.95); }
+.favorite-btn:focus-visible { outline: 3px solid var(--color-chili-red); outline-offset: 2px; }
+.favorite-btn--active { color: var(--color-chili-red); }
+.favorite-btn:disabled { cursor: wait; opacity: 0.7; }
+
 /* Sold-out badge — 3 tông theo lý do */
 .sold-out-badge {
     position: absolute;
     z-index: 1;
     top: 12px;
-    right: 12px;
+    right: 64px;
     padding: 6px 10px;
     border-radius: var(--radius-full);
     color: white;

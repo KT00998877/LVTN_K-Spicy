@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryPricingService
 {
-    public function quote(string $type, ?float $lat, ?float $lng, int $subtotal, int $points, int $balance, int $voucherDiscount = 0, int $promotionDiscount = 0): array
+    public function quote(string $type, ?float $lat, ?float $lng, int $subtotal, int $points, int $balance, int $voucherDiscount = 0, int $promotionDiscount = 0, int $comboDiscount = 0): array
     {
         $config = config('checkout');
         $distance = 0;
@@ -25,15 +25,17 @@ class DeliveryPricingService
             abort_if($distance > $config['max_km'], 422, 'Địa chỉ nằm ngoài phạm vi giao hàng 15 km.');
             $fee = $config['base_fee'] + (int) ceil(max(0, $distance - $config['base_km'])) * $config['per_km'];
         }
-        // Tính giảm giá điểm dựa trên (subtotal - voucher_discount - promotion_discount) để tránh giảm trên phần đã giảm.
-        $afterDiscounts = max(0, $subtotal - max(0, $voucherDiscount) * 100 - max(0, $promotionDiscount) * 100);
+        // Tính giảm giá điểm dựa trên (subtotal - voucher_discount - promotion_discount - combo_discount)
+        // để tránh giảm trên phần đã giảm.
+        $afterDiscounts = max(0, $subtotal - max(0, $voucherDiscount) * 100 - max(0, $promotionDiscount) * 100 - max(0, $comboDiscount) * 100);
         $maxPoints = min($balance, (int) floor($afterDiscounts * $config['max_discount_percent'] / 100 / ($config['point_value'] * 100)));
         abort_unless($points >= 0 && $points <= $maxPoints, 422, "Chỉ được sử dụng tối đa {$maxPoints} điểm cho đơn này.");
         $pointsDiscount = $points * $config['point_value'];
-        $totalDiscount = max(0, $voucherDiscount) + max(0, $promotionDiscount) + $pointsDiscount;
+        $totalDiscount = max(0, $voucherDiscount) + max(0, $promotionDiscount) + max(0, $comboDiscount) + $pointsDiscount;
         return ['distance_km' => $distance, 'shipping_fee' => $fee, 'discount' => $totalDiscount,
             'voucher_discount' => max(0, $voucherDiscount),
             'promotion_discount' => max(0, $promotionDiscount),
+            'combo_discount' => max(0, $comboDiscount),
             'points_discount' => $pointsDiscount,
             'total' => (float) Money::decimal($subtotal + $fee * 100 - $totalDiscount * 100),
             'max_points' => $maxPoints, 'balance' => $balance,

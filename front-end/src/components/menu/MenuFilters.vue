@@ -210,7 +210,7 @@ function getCategoryIcon(slug: string): string {
     background: var(--color-white);
     border-bottom: 1px solid var(--color-gray-200);
     position: sticky;
-    top: 64px;
+    top: var(--navbar-height-mobile);
     z-index: var(--z-sticky);
 }
 

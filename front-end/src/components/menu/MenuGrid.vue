@@ -5,11 +5,14 @@ import MenuCard from './MenuCard.vue'
 defineProps<{
     items: MenuItemCard[]
     loading: boolean
+    favoriteIds?: number[]
+    favoriteLoadingIds?: number[]
 }>()
 
 const emit = defineEmits<{
     reset: []
     addToCart: [item: MenuItemCard]
+    toggleFavorite: [item: MenuItemCard]
 }>()
 
 function handleReset() {
@@ -62,7 +65,10 @@ function handleReset() {
                 v-for="item in items"
                 :key="item.id"
                 :item="item"
+                :is-favorite="favoriteIds?.includes(item.id)"
+                :favorite-loading="favoriteLoadingIds?.includes(item.id)"
                 @add-to-cart="emit('addToCart', item)"
+                @toggle-favorite="emit('toggleFavorite', item)"
             />
         </div>
     </div>

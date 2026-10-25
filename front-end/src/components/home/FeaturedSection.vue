@@ -11,9 +11,7 @@
  *  - User-controlled transitions: arrows + index + drag swipe
  *  - Reuse cartStore.openAddModal (existing FoodDetailModal flow)
  *
- * Selection:
- *  - Priority: bestSellers (if has data) → featured → available
- *  - Cap at 4 items
+ * Selection: món được quản lý bật cờ “đặc sắc”, ưu tiên món còn bán, tối đa 4 món.
  *
  * Reuses: useHomeStore, useCartStore, UiContainer, UiEyebrow tone="gold",
  *         UiButton variant="brand"/outline, UiBadge, UiReveal.
@@ -35,13 +33,7 @@ const cartStore = useCartStore()
 // =========================================================
 // PRODUCT SELECTION (Phase 4 §26 + Correction: sold-out strategy)
 //
-// Selection order:
-//   1. Best Sellers available
-//   2. Featured available
-//   3. Best Sellers unavailable (fill remainder if curated set short)
-//   4. Featured unavailable (fill remainder)
-//   5. Dedup by id
-//   6. Cap at 4
+// Selection order: featured available → featured unavailable → cap at 4.
 //
 // Result: product stage may render sold-out items when the available
 // pool is short. UI handles this via .stage-soldout overlay + disabled CTA.
@@ -51,32 +43,11 @@ function isAvailable(item: MenuItemCard): boolean {
 }
 
 const stageProducts = computed<MenuItemCard[]>(() => {
-    const bestSellers = store.bestSellers ?? []
     const featured = store.featured ?? []
-    const merged: MenuItemCard[] = []
-    const seen = new Set<number>()
-    const CAP = 4
-
-    function pushIf(item: MenuItemCard) {
-        if (!item) return
-        if (seen.has(item.id)) return
-        seen.add(item.id)
-        merged.push(item)
-    }
-
-    // 1. Best Sellers available
-    bestSellers.forEach((p) => { if (isAvailable(p)) pushIf(p) })
-    // 2. Featured available
-    featured.forEach((p) => { if (isAvailable(p)) pushIf(p) })
-    // 3. Best Sellers unavailable (fill remainder if needed)
-    if (merged.length < CAP) {
-        bestSellers.forEach((p) => { if (!isAvailable(p)) pushIf(p) })
-    }
-    // 4. Featured unavailable (fill remainder if needed)
-    if (merged.length < CAP) {
-        featured.forEach((p) => { if (!isAvailable(p)) pushIf(p) })
-    }
-    return merged.slice(0, CAP)
+    return [
+        ...featured.filter(isAvailable),
+        ...featured.filter(item => !isAvailable(item)),
+    ].slice(0, 4)
 })
 
 const isStageEmpty = computed(() => stageProducts.value.length === 0)
@@ -430,9 +401,9 @@ onBeforeUnmount(() => {
                 <UiButton
                     variant="white"
                     as="router-link"
-                    to="/thuc-don"
+                    to="/mon-dac-sac"
                 >
-                    Xem toàn bộ thực đơn
+                    Khám phá món đặc sắc
                     <svg width="16" height="16" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor"
                         stroke-width="2.4"

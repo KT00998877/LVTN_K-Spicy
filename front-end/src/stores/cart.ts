@@ -2,6 +2,7 @@ import { beginRead } from '@/utils/realtime'
 import { defineStore } from 'pinia'
 import * as cartApi from '@/api/cart'
 import type { Cart, CartItem, CartAddPayload, CheckoutPayload } from '@/types/cart'
+import type { MenuSuggestion } from '@/types/menuSuggestion'
 import { useAuthStore } from './auth'
 import { useOrderStore } from './orders'
 
@@ -9,7 +10,16 @@ interface CartError extends Error {
     response?: { status?: number; data?: { message?: string } }
 }
 
-type MenuSelection = { id: number; name: string; price: number; price_formatted: string; default_spicy: number; image_url: string }
+type MenuSelection = {
+    id: number
+    name: string
+    price: number
+    price_formatted: string
+    default_spicy: number
+    image_url: string
+    /** Gợi ý combo nước uống (Phase 3). */
+    suggestions?: MenuSuggestion[]
+}
 type CheckoutInput = Omit<CheckoutPayload, 'idempotency_key' | 'cart_version'>
 
 function sessionGuard() {
@@ -138,6 +148,38 @@ export const useCartStore = defineStore('cart', {
         },
         addItem(payload: CartAddPayload): Promise<boolean> {
             return this.mutate(() => cartApi.addToCart(payload))
+        },
+        /**
+         * Thêm nhanh combo: món chính (theo tùy chỉnh hiện tại) + món gợi ý (Phase 3).
+         * Cả 2 dùng chung 1 lần mutate → modal đóng 1 lần, giỏ refresh 1 lần.
+         */
+        async addCombo(mainPayload: CartAddPayload, sideItemId: number): Promise<boolean> {
+            // Dùng holder object để giữ lỗi của lần thêm thứ 2 (TS không narrow biến gán trong closure).
+            const holder: { error: CartError | null } = { error: null }
+
+            const ok = await this.mutate(async () => {
+                await cartApi.addToCart(mainPayload)
+                try {
+                    await cartApi.addToCart({
+                        menu_item_id: sideItemId,
+                        quantity: 1,
+                        spicy_level: 0,
+                        note: '',
+                        topping_ids: [],
+                    })
+                } catch (err) {
+                    // Món đi kèm vừa hết hàng → giữ món chính đã thêm, báo lỗi nhẹ.
+                    holder.error = err as CartError
+                }
+            })
+
+            if (holder.error) {
+                await this.fetchCart(true)
+                this.error = holder.error.response?.data?.message ?? 'Không thêm được món đi kèm.'
+                return false
+            }
+
+            return ok
         },
         updateItem(id: number, payload: Partial<CartAddPayload>): Promise<boolean> {
             return this.mutate(() => cartApi.updateCartItem(id, payload))

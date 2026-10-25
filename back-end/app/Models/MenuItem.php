@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MenuItem extends Model
@@ -25,6 +26,8 @@ class MenuItem extends Model
         'recipe_managed_at',
         'auto_availability_enabled',
         'is_active',
+        'is_featured',
+        'is_best_seller',
         'preparation_minutes',
         'spicy_level',
         'size',
@@ -40,6 +43,8 @@ class MenuItem extends Model
             'recipe_managed_at' => 'datetime',
             'auto_availability_enabled' => 'boolean',
             'is_active'    => 'boolean',
+            'is_featured'  => 'boolean',
+            'is_best_seller' => 'boolean',
         ];
     }
 
@@ -52,5 +57,10 @@ class MenuItem extends Model
     public function recipes(): HasMany
     {
         return $this->hasMany(MenuItemIngredient::class, 'menu_item_id');
+    }
+
+    public function favoritedByUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_favorite_menu_items')->withTimestamps();
     }
 }

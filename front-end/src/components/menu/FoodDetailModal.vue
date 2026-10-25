@@ -16,6 +16,7 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { ref, computed, watch } from 'vue'
 import { fetchToppings } from '@/api/cart'
 import type { ToppingItem } from '@/types/cart'
+import type { MenuSuggestion } from '@/types/menuSuggestion'
 import { imageUrl } from '@/utils/image'
 
 const props = defineProps<{
@@ -28,6 +29,8 @@ const props = defineProps<{
         default_spicy: number
         image_url: string
         description?: string
+        /** Gợi ý combo nước uống do quản lý cấu hình (Phase 3). */
+        suggestions?: MenuSuggestion[]
     } | null
     cartItem?: {
         id: number
@@ -51,6 +54,11 @@ const emit = defineEmits<{
         spicy_level: number
         note: string
         topping_ids: number[]
+    }]
+    /** Thêm nhanh combo: món chính (theo tùy chỉnh) + món gợi ý. */
+    'add-combo': [payload: {
+        main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
+        suggested_item_id: number
     }]
 }>()
 
@@ -143,6 +151,13 @@ const toppingTotalFormatted = computed(() =>
 
 const canSubmit = computed(() => quantity.value > 0 && quantity.value <= 99)
 
+/** Gợi ý combo khả dụng (món gợi ý còn bán). */
+const availableSuggestions = computed(() =>
+    (props.menuItem?.suggestions ?? []).filter((s) => s.suggested_item?.is_available !== false),
+)
+
+const addingComboId = ref<number | null>(null)
+
 const selectedToppings = computed(() =>
     toppings.value.filter(t => selectedToppingIds.value.includes(t.id))
 )
@@ -214,10 +229,29 @@ function close() {
     emit('update:visible', false)
 }
 
+/** Thêm nhanh món chính (theo tùy chỉnh hiện tại) + món gợi ý đi kèm. */
+function handleAddCombo(suggestion: MenuSuggestion) {
+    const menuId = props.menuItem?.id ?? 0
+    if (!menuId) return
+    addingComboId.value = suggestion.id
+    emit('add-combo', {
+        main: {
+            menu_item_id: menuId,
+            quantity: quantity.value,
+            spicy_level: spicyLevel.value,
+            note: note.value.trim(),
+            topping_ids: [...selectedToppingIds.value],
+        },
+        suggested_item_id: suggestion.suggested_item.id,
+    })
+}
+
 watch(() => props.visible, (val) => {
     if (val) {
         resetForm()
         void loadToppings()
+    } else {
+        addingComboId.value = null
     }
 })
 useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () => props.visible && !props.loading && !loadingToppings.value)
@@ -430,6 +464,61 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
                                                 +{{ new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(topping.price) }}
                                             </span>
                                         </button>
+                                    </div>
+                                </section>
+
+                                <!-- ===== GỢI Ý COMBO NƯỚC UỐNG ===== -->
+                                <section v-if="availableSuggestions.length" class="customize-group">
+                                    <div class="group-label-row">
+                                        <h3 class="group-label">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="label-icon">
+                                                <path d="M8 2h8l-1 6H9L8 2z"></path>
+                                                <path d="M12 8v13"></path>
+                                                <path d="M7 21h10"></path>
+                                            </svg>
+                                            Gợi ý thêm
+                                        </h3>
+                                        <span class="topping-total">Mua theo combo tiết kiệm hơn</span>
+                                    </div>
+
+                                    <div class="suggestion-list">
+                                        <article
+                                            v-for="suggestion in availableSuggestions"
+                                            :key="suggestion.id"
+                                            class="suggestion-card"
+                                        >
+                                            <div class="suggestion-media">
+                                                <img
+                                                    :src="imageUrl(suggestion.suggested_item.image_url || '')"
+                                                    :alt="suggestion.suggested_item.name"
+                                                    loading="lazy"
+                                                />
+                                            </div>
+                                            <div class="suggestion-body">
+                                                <strong class="suggestion-name">{{ suggestion.suggested_item.name }}</strong>
+                                                <p v-if="suggestion.message" class="suggestion-msg">{{ suggestion.message }}</p>
+                                                <div class="suggestion-prices">
+                                                    <span class="suggestion-original">
+                                                        {{ suggestion.original_price_formatted }}
+                                                    </span>
+                                                    <span v-if="suggestion.combo_price !== null" class="suggestion-combo">
+                                                        Combo {{ suggestion.combo_price_formatted }}
+                                                    </span>
+                                                    <span v-if="suggestion.saving > 0" class="suggestion-saving">
+                                                        Tiết kiệm {{ suggestion.saving_formatted }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="suggestion-btn"
+                                                :disabled="loading || addingComboId !== null"
+                                                @click="handleAddCombo(suggestion)"
+                                            >
+                                                <span v-if="addingComboId === suggestion.id">Đang thêm…</span>
+                                                <span v-else>Thêm combo</span>
+                                            </button>
+                                        </article>
                                     </div>
                                 </section>
 
@@ -934,6 +1023,115 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
     font-weight: 600;
     color: var(--color-gray-500);
     white-space: nowrap;
+}
+
+/* ===== GỢI Ý COMBO ===== */
+.suggestion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.suggestion-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--dur-base) var(--ease-out);
+}
+
+.suggestion-card:hover {
+    border-color: var(--color-chili-red);
+}
+
+.suggestion-media {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-gray-100);
+}
+
+.suggestion-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.suggestion-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.suggestion-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-charcoal-black);
+}
+
+.suggestion-msg {
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-gray-500);
+    line-height: 1.4;
+}
+
+.suggestion-prices {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.suggestion-original {
+    color: var(--color-gray-400);
+    text-decoration: line-through;
+}
+
+.suggestion-combo {
+    font-weight: 700;
+    color: var(--color-chili-red);
+}
+
+.suggestion-saving {
+    font-weight: 700;
+    color: #15803d;
+}
+
+.suggestion-btn {
+    flex-shrink: 0;
+    height: 38px;
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--color-chili-red);
+    color: var(--color-white);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background var(--dur-base) var(--ease-out);
+}
+
+.suggestion-btn:hover:not(:disabled) {
+    background: var(--color-dark-red);
+}
+
+.suggestion-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.suggestion-btn:focus-visible {
+    outline: 2px solid var(--color-chili-red);
+    outline-offset: 2px;
 }
 
 /* ===== NOTES ===== */

@@ -35,6 +35,8 @@ class ManagerMenuController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'image_url' => ['nullable', 'string', 'max:255', 'regex:~^(https?://|/storage/)~i'],
             'is_available' => ['sometimes', 'boolean'], 'is_active' => ['sometimes', 'boolean'],
+            'is_featured' => ['sometimes', 'boolean'],
+            'is_best_seller' => ['sometimes', 'boolean'],
             'sold_out_reason' => ['nullable', 'string', 'max:255'],
             'preparation_minutes' => ['sometimes', 'integer', 'min:0', 'max:1440'],
             'spicy_level' => ['sometimes', 'integer', 'min:0', 'max:5'],

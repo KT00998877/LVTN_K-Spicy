@@ -93,6 +93,9 @@ class CartService
         $totalQuantity = array_sum(array_column($items, 'quantity'));
         $subtotal      = array_sum(array_column($items, 'subtotal'));
 
+        // Tiết kiệm combo (Phase 3) — quản lý cấu hình gợi ý món + đồ uống.
+        $combo = app(MenuSuggestionService::class)->comboDiscountForCart($this->cartQuantities($cart));
+
         return [
             'id'                => (int) $cart->id,
             'user_id'           => (int) $cart->user_id,
@@ -102,6 +105,9 @@ class CartService
             'total_quantity'    => $totalQuantity,
             'subtotal'          => $subtotal,
             'subtotal_formatted'=> $this->formatPrice($subtotal),
+            'combo_discount'   => $combo['discount_vnd'],
+            'combo_discount_formatted' => $this->formatPrice($combo['discount_vnd']),
+            'combo_lines'       => $combo['lines'],
         ];
     }
 
@@ -411,11 +417,15 @@ class CartService
             $promotionContext = $this->buildCartContext($cart, $orderType, $subtotal);
             $promotionDiscountVnd = app(PromotionService::class)->preview($promotionContext)->totalDiscountVnd;
 
+            // Tiết kiệm combo (Phase 3): món chính + món gợi ý do quản lý cấu hình.
+            $comboDiscountVnd = app(MenuSuggestionService::class)
+                ->comboDiscountForCart($this->cartQuantities($cart))['discount_vnd'];
+
             $pricing = app(DeliveryPricingService::class)->quote($orderType,
                 isset($delivery['delivery_latitude']) ? (float) $delivery['delivery_latitude'] : null,
                 isset($delivery['delivery_longitude']) ? (float) $delivery['delivery_longitude'] : null,
                 $subtotal, $points, (int) $customer->loyalty_points,
-                $voucherDiscountVnd, $promotionDiscountVnd);
+                $voucherDiscountVnd, $promotionDiscountVnd, $comboDiscountVnd);
             $order->fill([
                 'shipping_fee' => $pricing['shipping_fee'], 'discount_amount' => $pricing['discount'],
                 'total_amount' => $pricing['total'], 'points_redeemed' => $points,
@@ -454,6 +464,22 @@ class CartService
             app(StaffNotificationService::class)->orderCreated($order);
             return $order;
         });
+    }
+
+    /**
+     * Số lượng từng món trong giỏ: [menu_item_id => quantity].
+     * Dùng để tính tiết kiệm combo (Phase 3).
+     *
+     * @return array<int, int>
+     */
+    private function cartQuantities(Cart $cart): array
+    {
+        $quantities = [];
+        foreach ($cart->items as $ci) {
+            $quantities[(int) $ci->menu_item_id] = ($quantities[(int) $ci->menu_item_id] ?? 0) + (int) $ci->quantity;
+        }
+
+        return $quantities;
     }
 
     /**
