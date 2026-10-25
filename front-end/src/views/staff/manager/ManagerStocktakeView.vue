@@ -125,9 +125,13 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ingredientsApi } from '@/api/ingredients'
 import { useStockFlowStore } from '@/stores/managerStockFlow'
+import { useAppDialog } from '@/composables/useAppDialog'
+import { useToast } from '@/composables/useStaffUtils'
 import type { Stocktake, StocktakeItemPayload, StocktakePayload } from '@/api/stockFlow'
 
 const store = useStockFlowStore()
+const appDialog = useAppDialog()
+const toast = useToast()
 
 const dialog = ref<HTMLDialogElement | null>(null)
 const dialogMode = ref<'create' | 'view'>('create')
@@ -260,26 +264,26 @@ async function onSubmit() {
 }
 
 async function completeOne(row: Stocktake) {
-  if (!confirm(`Hoàn tất phiên kiểm kê ${row.code}? Phiếu chỉ lưu chênh lệch để đối chiếu, không đổi tồn kho.`)) return
+  if (!await appDialog.confirm({ title: `Hoàn tất kiểm kê ${row.code}?`, message: 'Phiếu chỉ lưu chênh lệch để đối chiếu, không thay đổi tồn kho.', confirmLabel: 'Hoàn tất kiểm kê', tone: 'warning' })) return
   busyId.value = row.id
   try {
     await store.completeStocktake(row.id)
     await refresh()
   } catch (e: any) {
-    alert(store.msg(e))
+    toast.error(store.msg(e))
   } finally {
     busyId.value = null
   }
 }
 
 async function cancelOne(row: Stocktake) {
-  if (!confirm(`Huỷ phiên kiểm kê ${row.code}?`)) return
+  if (!await appDialog.confirm({ title: `Hủy kiểm kê ${row.code}?`, message: 'Phiên kiểm kê chưa hoàn tất sẽ bị hủy.', confirmLabel: 'Hủy kiểm kê', tone: 'danger' })) return
   busyId.value = row.id
   try {
     await store.cancelStocktake(row.id)
     await refresh()
   } catch (e: any) {
-    alert(store.msg(e))
+    toast.error(store.msg(e))
   } finally {
     busyId.value = null
   }

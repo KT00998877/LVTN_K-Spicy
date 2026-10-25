@@ -11,7 +11,6 @@
                 <RouterView />
             </main>
         </div>
-        <StaffToast />
     </div>
 </template>
 
@@ -21,7 +20,6 @@ import { computed, watch, onUnmounted } from 'vue'
 import '@/assets/manager.css'
 import StaffSidebar from '@/components/staff/StaffSidebar.vue'
 import StaffHeader from '@/components/staff/StaffHeader.vue'
-import StaffToast from '@/components/staff/StaffToast.vue'
 import ServiceNotifications from '@/components/staff/ServiceNotifications.vue'
 import { useStaffStore } from '@/stores/staff'
 import { useStaffNotificationsStore } from '@/stores/staffNotifications'

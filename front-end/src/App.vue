@@ -2,6 +2,7 @@
 import { RouterView } from 'vue-router'
 import ChatBotWidget from '@/components/chat/ChatBotWidget.vue'
 import LiveChatWidget from '@/components/chat/LiveChatWidget.vue'
+import AppFeedback from '@/components/AppFeedback.vue'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -14,6 +15,7 @@ const showCustomerChat = computed(() => !route.path.startsWith('/staff'))
     <!-- Tư vấn trực tiếp chạy song song với trợ lý ảo. -->
     <LiveChatWidget v-if="showCustomerChat" />
     <ChatBotWidget v-if="showCustomerChat" />
+    <AppFeedback />
 </template>
 
 <style>

@@ -18,16 +18,18 @@ const toasts: Ref<Toast[]> = ref([])
 let toastSeq = 1
 
 export function useToast() {
-    function show(type: Toast['type'], message: string, duration = 3000): void {
+    function show(type: Toast['type'], message: string, duration?: number): void {
         const id = toastSeq++
-        toasts.value.push({ id, type, message, duration })
+        const lifetime = duration ?? (type === 'error' ? 5000 : type === 'warning' ? 4300 : 3500)
+        toasts.value.push({ id, type, message, duration: lifetime })
         setTimeout(() => {
             const idx = toasts.value.findIndex(t => t.id === id)
             if (idx >= 0) toasts.value.splice(idx, 1)
-        }, duration)
+        }, lifetime)
     }
     return {
         toasts,
+        dismiss: (id: number) => { const idx = toasts.value.findIndex(t => t.id === id); if (idx >= 0) toasts.value.splice(idx, 1) },
         success: (msg: string, dur?: number) => show('success', msg, dur),
         error:   (msg: string, dur?: number) => show('error', msg, dur),
         warning: (msg: string, dur?: number) => show('warning', msg, dur),

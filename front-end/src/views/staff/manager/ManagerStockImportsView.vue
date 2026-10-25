@@ -195,9 +195,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import api from '@/api/client'
 import { ingredientsApi, type Ingredient } from '@/api/ingredients'
 import { useStockFlowStore } from '@/stores/managerStockFlow'
+import { useAppDialog } from '@/composables/useAppDialog'
+import { useToast } from '@/composables/useStaffUtils'
 import type { StockImport, StockImportItemPayload, StockImportPayload } from '@/api/stockFlow'
 
 const store = useStockFlowStore()
+const appDialog = useAppDialog()
+const toast = useToast()
 
 const dialog = ref<HTMLDialogElement | null>(null)
 const receiveDialog = ref<HTMLDialogElement | null>(null)
@@ -444,13 +448,13 @@ async function confirmImport() {
 }
 
 async function cancelImport(row: StockImport) {
-  if (!confirm(`Huỷ phiếu nhập ${row.code}?`)) return
+  if (!await appDialog.confirm({ title: `Hủy phiếu nhập ${row.code}?`, message: 'Phiếu nhập này sẽ không được xác nhận vào kho.', confirmLabel: 'Hủy phiếu nhập', tone: 'danger' })) return
   busyId.value = row.id
   try {
     await store.cancelImport(row.id)
     await refresh()
   } catch (e: any) {
-    alert(store.msg(e))
+    toast.error(store.msg(e))
   } finally {
     busyId.value = null
   }

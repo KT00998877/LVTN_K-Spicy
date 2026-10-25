@@ -14,6 +14,8 @@ import ReviewFormModal from './ReviewFormModal.vue'
 import StarRating from './StarRating.vue'
 import { fetchReviewEligibility, deleteReview } from '@/api/review'
 import { useAuthStore } from '@/stores/auth'
+import { useAppDialog } from '@/composables/useAppDialog'
+import { useToast } from '@/composables/useStaffUtils'
 import type { Review, ReviewEligibility } from '@/types/review'
 
 const props = defineProps<{
@@ -28,6 +30,8 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const appDialog = useAppDialog()
+const toast = useToast()
 const eligibility = ref<ReviewEligibility | null>(null)
 const loadingEligibility = ref(false)
 const showModal = ref(false)
@@ -62,7 +66,7 @@ function openEdit() {
 
 async function handleDelete() {
     if (!eligibility.value?.existing_review) return
-    if (!confirm('Bạn có chắc muốn xóa đánh giá này?')) return
+    if (!await appDialog.confirm({ title: 'Xóa đánh giá?', message: 'Đánh giá này sẽ bị xóa khỏi nhà hàng.', confirmLabel: 'Xóa đánh giá', tone: 'danger' })) return
     try {
         await deleteReview(eligibility.value.existing_review.id)
         await loadEligibility()
@@ -71,7 +75,7 @@ async function handleDelete() {
         refreshLocal()
         emit('changed')
     } catch {
-        alert('Không thể xóa đánh giá. Vui lòng thử lại.')
+        toast.error('Không thể xóa đánh giá. Vui lòng thử lại.')
     }
 }
 

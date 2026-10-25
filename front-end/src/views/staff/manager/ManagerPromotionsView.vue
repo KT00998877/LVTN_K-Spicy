@@ -496,6 +496,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
+import { useAppDialog } from '@/composables/useAppDialog'
 import { useManagerPromotionsStore } from '@/stores/managerPromotions'
 import type { CampaignPayload, ManagerCampaign, ManagerCampaignDetail } from '@/types/campaign'
 import type { ManagerPromotion, PromotionPayload } from '@/types/promotion'
@@ -515,6 +516,7 @@ type Tab = 'voucher' | 'promotion' | 'campaign'
 const activeTab = ref<Tab>('voucher')
 
 const store = useManagerPromotionsStore()
+const appDialog = useAppDialog()
 
 /* ============================================================
  *  VOUCHER state (giữ nguyên logic Phase 3)
@@ -601,7 +603,7 @@ async function onToggleVoucher(v: ManagerVoucher): Promise<void> {
 }
 
 async function onDeleteVoucher(v: ManagerVoucher): Promise<void> {
-    if (!confirm(`Xoá mã ${v.code}? Mã đã có lượt dùng sẽ chỉ tạm ngưng thay vì xoá cứng.`)) return
+    if (!await appDialog.confirm({ title: 'Xóa mã ưu đãi?', message: `Mã ${v.code} đã có lượt dùng sẽ chỉ bị tạm ngưng.`, confirmLabel: 'Xóa mã', tone: 'danger' })) return
     try {
         const msg = await store.remove(v.id)
         voucherBanner.success = msg
@@ -777,7 +779,7 @@ async function onTogglePromotion(p: ManagerPromotion): Promise<void> {
 }
 
 async function onDeletePromotion(p: ManagerPromotion): Promise<void> {
-    if (!confirm(`Xoá chương trình "${p.name}"? Đã có lượt dùng sẽ chỉ tạm ngưng.`)) return
+    if (!await appDialog.confirm({ title: 'Xóa chương trình?', message: `“${p.name}” đã có lượt dùng sẽ chỉ bị tạm ngưng.`, confirmLabel: 'Xóa chương trình', tone: 'danger' })) return
     try {
         const msg = await store.removePromotion(p.id)
         promoBanner.success = msg
@@ -915,9 +917,7 @@ async function onToggleCampaign(c: ManagerCampaign): Promise<void> {
 
 async function onDeleteCampaign(c: ManagerCampaign): Promise<void> {
     if (
-        !confirm(
-            `Xoá chiến dịch "${c.name}"?\nChiến dịch có khuyến mãi đang chạy sẽ không xoá được — vui lòng tắt/chuyển trước.`,
-        )
+        !await appDialog.confirm({ title: 'Xóa chiến dịch?', message: `“${c.name}” có khuyến mãi đang chạy thì không thể xóa. Hãy tắt hoặc chuyển khuyến mãi trước.`, confirmLabel: 'Xóa chiến dịch', tone: 'danger' })
     )
         return
     try {

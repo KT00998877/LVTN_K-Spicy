@@ -97,6 +97,7 @@ import type { OrderItemStatus } from '@/types/staff'
 import { fetchMenuItems } from '@/api/menu'
 import type { MenuItemCard } from '@/types/home'
 import { formatVND, useToast } from '@/composables/useStaffUtils'
+import { useAppDialog } from '@/composables/useAppDialog'
 import { useTablesStore } from '@/stores/staffTables'
 import { imageUrl } from '@/utils/image'
 
@@ -104,6 +105,7 @@ const route = useRoute()
 const router = useRouter()
 const tablesStore = useTablesStore()
 const toast = useToast()
+const appDialog = useAppDialog()
 const order = ref<Order | null>(null)
 const loading = ref(true)
 const menuLoading = ref(false)
@@ -203,7 +205,7 @@ async function pay() {
         await router.replace({ name: 'waiter-tables' })
     }
 }
-function canLeave() { return !busy.value && (!draft.value.length || window.confirm('Các món chưa gửi sẽ mất. Bạn muốn rời trang?')) }
+async function canLeave() { return !busy.value && (!draft.value.length || await appDialog.confirm({ title: 'Rời màn hình gọi món?', message: 'Các món chưa gửi sẽ bị mất.', confirmLabel: 'Rời đi', tone: 'warning' })) }
 onBeforeRouteLeave(canLeave)
 onBeforeRouteUpdate(canLeave)
 function beforeUnload(e: BeforeUnloadEvent) { if (draft.value.length || busy.value) { e.preventDefault(); e.returnValue = '' } }

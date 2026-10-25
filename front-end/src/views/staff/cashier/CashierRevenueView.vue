@@ -39,6 +39,7 @@
 </template>
 <script setup lang="ts">
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
+import { useAppDialog } from '@/composables/useAppDialog'
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import apiClient from '@/api/client'
 import ShiftReportSheet from '@/components/staff/ShiftReportSheet.vue'
@@ -74,6 +75,7 @@ function vnTime(d: Date) {
     return parts.replace(' ', 'T')
 }
 const form = reactive({ date: vnTime(new Date()).slice(0, 10), opening_cash: 0, cash_in: 0, cash_out: 0, actual_cash: 0, note: '' })
+const appDialog = useAppDialog()
 const report = ref<ShiftReport | null>(null)
 const history = ref<Partial<ShiftReport>[]>([])
 const page = ref(1), lastPage = ref(1)
@@ -97,7 +99,7 @@ async function preview() {
 }
 async function closeShift() {
     if (changed.value || report.value?.id) return
-    if (!window.confirm('Chốt báo cáo ngày và lưu báo cáo? Báo cáo đã chốt sẽ không chỉnh sửa được.')) return
+    if (!await appDialog.confirm({ title: 'Chốt báo cáo ngày?', message: 'Báo cáo đã chốt sẽ được lưu và không thể chỉnh sửa.', confirmLabel: 'Chốt báo cáo', tone: 'warning' })) return
     await run(async () => {
         report.value = (await apiClient.post<{ data: ShiftReport }>('/staff/cashier-reports/close', { ...form })).data.data
         await loadHistory()

@@ -413,6 +413,8 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useAppDialog } from '@/composables/useAppDialog'
+import { useToast } from '@/composables/useStaffUtils'
 import { useMarketingStudioStore } from '@/stores/marketingStudio'
 import { useBlogManagerStore } from '@/stores/blogManager'
 import VersionEditModal from '@/components/manager/promotions/VersionEditModal.vue'
@@ -423,6 +425,8 @@ import { pushAssetVersionToBlog } from '@/api/marketing'
 
 const store = useMarketingStudioStore()
 const blogStore = useBlogManagerStore()
+const appDialog = useAppDialog()
+const toast = useToast()
 
 const statuses = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED'] as const
 type StatusValue = (typeof statuses)[number]
@@ -504,7 +508,7 @@ async function openEditBlog(b: ManagerBlog) {
         editingBlog.value = await blogStore.loadBlog(b.id)
         blogFormRef.value?.open()
     } catch {
-        alert('Không tải được chi tiết bài viết.')
+        toast.error('Không tải được chi tiết bài viết.')
     }
 }
 
@@ -517,49 +521,49 @@ async function onSaveBlog(payload: BlogPayload & { id?: number }) {
         }
         editingBlog.value = null
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Lưu bài viết thất bại.')
+        toast.error(e?.response?.data?.message || 'Lưu bài viết thất bại.')
     }
 }
 
 async function onPublishBlog(b: ManagerBlog) {
-    if (!confirm(`Xuất bản bài viết "${b.title}"?\nBài sẽ hiển thị công khai trên trang khách hàng.`)) return
+    if (!await appDialog.confirm({ title: 'Xuất bản bài viết?', message: `“${b.title}” sẽ hiển thị công khai trên trang khách hàng.`, confirmLabel: 'Xuất bản', tone: 'warning' })) return
     try {
         await blogStore.publish(b.id)
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Xuất bản thất bại.')
+        toast.error(e?.response?.data?.message || 'Xuất bản thất bại.')
     }
 }
 
 async function onArchiveBlog(b: ManagerBlog) {
-    if (!confirm(`Lưu trữ bài viết "${b.title}"?`)) return
+    if (!await appDialog.confirm({ title: 'Lưu trữ bài viết?', message: `“${b.title}” sẽ được chuyển vào mục đã lưu trữ.`, confirmLabel: 'Lưu trữ' })) return
     try {
         await blogStore.archive(b.id)
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Lưu trữ thất bại.')
+        toast.error(e?.response?.data?.message || 'Lưu trữ thất bại.')
     }
 }
 
 async function onDeleteBlog(b: ManagerBlog) {
-    if (!confirm(`Xoá vĩnh viễn bài viết "${b.title}"? Hành động này KHÔNG thể hoàn tác.`)) return
+    if (!await appDialog.confirm({ title: 'Xóa vĩnh viễn bài viết?', message: `“${b.title}” sẽ bị xóa và không thể khôi phục.`, confirmLabel: 'Xóa bài viết', tone: 'danger' })) return
     try {
         await blogStore.remove(b.id)
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Xoá thất bại.')
+        toast.error(e?.response?.data?.message || 'Xóa thất bại.')
     }
 }
 
 async function onPushVersionToBlog(v: MarketingVersion) {
     if (!store.current) return
-    if (!confirm(`Đẩy Version ${v.version_number} lên Blog nhà hàng?\nSẽ tạo 1 bản nháp (DRAFT) trong mục Blog.`)) return
+    if (!await appDialog.confirm({ title: 'Tạo bản nháp Blog?', message: `Version ${v.version_number} sẽ được tạo thành bài viết nháp trong mục Blog.`, confirmLabel: 'Tạo bản nháp' })) return
     try {
         const blog = await pushAssetVersionToBlog(store.current.id, { version_id: v.id })
-        alert(`Đã tạo bài viết trong Blog nhà hàng. Mở mục Blog ở tab trên để xem.`)
+        toast.success('Đã tạo bài viết nháp trong Blog nhà hàng.')
         // Switch sang blog section để user xem ngay.
         activeSection.value = 'blog'
         void blogStore.loadBlogs(1)
         void blog
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Đẩy lên Blog thất bại.')
+        toast.error(e?.response?.data?.message || 'Đẩy lên Blog thất bại.')
     }
 }
 
@@ -576,7 +580,7 @@ function onMenuItemChange() {
 
 async function onCreate() {
     if (!form.subject.trim()) {
-        alert('Nhập subject hoặc chọn món ăn để AI tự gợi ý.')
+        toast.warning('Nhập chủ đề hoặc chọn món ăn để AI tự gợi ý.')
         return
     }
     const payload: CreateAssetPayload = {
@@ -614,36 +618,37 @@ async function onSelectVersion(vid: number) {
 }
 
 async function onArchive(row: MarketingAsset) {
-    if (!confirm(`Lưu trữ asset "${row.subject}"?\nAsset sẽ được chuyển sang "Thùng rác" và có thể khôi phục lại.`)) return
+    if (!await appDialog.confirm({ title: 'Lưu trữ nội dung?', message: `“${row.subject}” sẽ được chuyển vào thùng rác và có thể khôi phục.`, confirmLabel: 'Lưu trữ' })) return
     await store.archive(row.id)
 }
 
 async function onRestore(row: MarketingAsset) {
-    if (!confirm(`Khôi phục asset "${row.subject}" về DRAFT?`)) return
+    if (!await appDialog.confirm({ title: 'Khôi phục nội dung?', message: `“${row.subject}” sẽ được đưa về bản nháp.`, confirmLabel: 'Khôi phục' })) return
     try {
         await store.restoreAsset(row.id)
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Không thể khôi phục asset.')
+        toast.error(e?.response?.data?.message || 'Không thể khôi phục nội dung.')
     }
 }
 
 async function onForceDelete(row: MarketingAsset) {
-    const ok = confirm(
-        `Xoá VĨNH VIỄN asset "${row.subject}"?\n\n` +
-        `Hành động này KHÔNG thể hoàn tác — toàn bộ version và file đính kèm sẽ bị xoá khỏi database.\n\n` +
-        `Bấm OK để tiếp tục.`,
-    )
+    const ok = await appDialog.confirm({
+        title: 'Xóa vĩnh viễn nội dung?',
+        message: `“${row.subject}” cùng toàn bộ phiên bản và tệp đính kèm sẽ bị xóa, không thể khôi phục.`,
+        confirmLabel: 'Tiếp tục xác nhận',
+        tone: 'danger',
+    })
     if (!ok) return
     // Lớp confirm 2: bắt buộc nhập đúng tên asset để xác nhận.
-    const typed = prompt(`Nhập chính xác tên asset để xác nhận xoá vĩnh viễn:\n\n"${row.subject}"`)
+    const typed = await appDialog.prompt({ title: 'Xác nhận tên nội dung', message: 'Nhập đúng tên nội dung để hoàn tất thao tác xóa vĩnh viễn.', label: 'Tên nội dung', placeholder: row.subject, confirmLabel: 'Xóa vĩnh viễn', tone: 'danger' })
     if (typed !== row.subject) {
-        alert('Đã huỷ — tên không khớp.')
+        toast.info('Đã hủy thao tác vì tên không khớp.')
         return
     }
     try {
         await store.forceDeleteAsset(row.id)
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Không thể xoá asset.')
+        toast.error(e?.response?.data?.message || 'Không thể xóa nội dung.')
     }
 }
 
@@ -668,7 +673,7 @@ async function onSaveVersion(payload: {
         await store.updateAssetVersion(store.current.id, editingVersion.value.id, payload)
         editingVersion.value = null
     } catch (e: any) {
-        alert(e?.response?.data?.message || 'Không thể lưu version.')
+        toast.error(e?.response?.data?.message || 'Không thể lưu phiên bản.')
     }
 }
 
