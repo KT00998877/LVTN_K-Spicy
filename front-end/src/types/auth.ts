@@ -55,7 +55,15 @@ export interface AuthResponse {
     token: string
     roles?: string[]
     primary_role?: import('./staff').StaffRole | null
+    requires_two_factor?: false
 }
+
+export interface TwoFactorChallengeResponse {
+    requires_two_factor: true
+    challenge_token: string
+}
+
+export type LoginResponse = AuthResponse | TwoFactorChallengeResponse
 
 /** Payload đăng ký */
 export interface RegisterPayload {

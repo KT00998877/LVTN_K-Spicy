@@ -78,6 +78,17 @@ class AuthController extends Controller
         $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
         $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
 
+        if ($result['requires_two_factor']) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Vui lòng nhập mã xác minh từ ứng dụng bảo mật.',
+                'data' => [
+                    'requires_two_factor' => true,
+                    'challenge_token' => $result['challenge_token'],
+                ],
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Đăng nhập thành công',
@@ -86,8 +97,80 @@ class AuthController extends Controller
                 'primary_role' => $staffRoles[0] ?? null,
                 'user'  => $this->formatUser($result['user']),
                 'token' => $result['token'],
+                'requires_two_factor' => false,
             ],
         ]);
+    }
+
+    public function verifyTwoFactor(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'challenge_token' => ['required', 'string', 'size:64'],
+            'code' => ['required', 'digits:6'],
+        ]);
+        $result = $this->authService->completeTwoFactorLogin(
+            $data['challenge_token'],
+            $data['code'],
+            $request,
+        );
+        $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
+        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đăng nhập thành công',
+            'data' => [
+                'roles' => $roles,
+                'primary_role' => $staffRoles[0] ?? null,
+                'user' => $this->formatUser($result['user']),
+                'token' => $result['token'],
+                'requires_two_factor' => false,
+            ],
+        ]);
+    }
+
+    public function twoFactorStatus(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'enabled' => $request->user()->two_factor_confirmed_at !== null,
+                'setup_pending' => $request->user()->two_factor_secret !== null
+                    && $request->user()->two_factor_confirmed_at === null,
+            ],
+        ]);
+    }
+
+    public function setupTwoFactor(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->authService->beginTwoFactorSetup($request->user()),
+        ]);
+    }
+
+    public function confirmTwoFactor(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'digits:6']]);
+        $this->authService->confirmTwoFactor($request->user(), $data['code'], $request);
+
+        return response()->json(['success' => true, 'message' => 'Đã bật xác thực hai lớp.']);
+    }
+
+    public function disableTwoFactor(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'password' => ['required', 'string'],
+            'code' => ['required', 'digits:6'],
+        ]);
+        $this->authService->disableTwoFactor(
+            $request->user(),
+            $data['password'],
+            $data['code'],
+            $request,
+        );
+
+        return response()->json(['success' => true, 'message' => 'Đã tắt xác thực hai lớp.']);
     }
 
     /**

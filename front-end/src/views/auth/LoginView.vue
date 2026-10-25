@@ -21,6 +21,7 @@ const form = reactive({
 })
 
 const showPassword = ref(false)
+const twoFactorCode = ref('')
 
 const sessionExpired = computed(() => route.query.expired === '1')
 const redirectTarget = computed(() => (route.query.redirect as string) || '/')
@@ -29,18 +30,27 @@ const identifierErr = computed(() => validationErrors.value.identifier?.[0] ?? v
 const passwordErr   = computed(() => validationErrors.value.password?.[0])
 
 async function onSubmit() {
-    const ok = await authStore.login({
+    const result = await authStore.login({
         identifier: form.identifier.trim(),
         password: form.password,
     })
-    if (ok) {
+    if (result === 'authenticated') {
+        redirectAfterLogin()
+    }
+}
+
+async function onVerifyTwoFactor() {
+    if (twoFactorCode.value.length !== 6) return
+    if (await authStore.verifyTwoFactor(twoFactorCode.value)) redirectAfterLogin()
+}
+
+function redirectAfterLogin() {
         const staff = useStaffStore()
         const roots: Record<StaffRole, string> = {
             WAITER: '/staff/waiter/tables', KITCHEN: '/staff/kitchen/queue',
             CASHIER: '/staff/cashier/invoices', SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard',
         }
         router.replace(staff.currentRole ? roots[staff.currentRole] : redirectTarget.value)
-    }
 }
 
 onMounted(() => {
@@ -69,8 +79,12 @@ onMounted(() => {
         </template>
 
         <div class="au-form-header">
-            <h2 class="au-form-title">Đăng nhập</h2>
-            <p class="au-form-sub">Nhập email/số điện thoại và mật khẩu của bạn</p>
+            <h2 class="au-form-title">{{ authStore.twoFactorChallenge ? 'Xác minh bảo mật' : 'Đăng nhập' }}</h2>
+            <p class="au-form-sub">
+                {{ authStore.twoFactorChallenge
+                    ? 'Nhập mã 6 số từ ứng dụng xác thực của bạn.'
+                    : 'Nhập email/số điện thoại và mật khẩu của bạn' }}
+            </p>
         </div>
 
         <div v-if="error && !identifierErr && !passwordErr" class="au-alert au-alert-error" style="margin-bottom: 18px;">
@@ -78,7 +92,7 @@ onMounted(() => {
             <span>{{ error }}</span>
         </div>
 
-        <form class="au-form" @submit.prevent="onSubmit" novalidate>
+        <form v-if="!authStore.twoFactorChallenge" class="au-form" @submit.prevent="onSubmit" novalidate>
             <div class="au-field">
                 <label for="identifier" class="au-label">Email hoặc số điện thoại</label>
                 <input
@@ -140,9 +154,36 @@ onMounted(() => {
             </button>
         </form>
 
-        <SocialLogin />
+        <form v-else class="au-form" @submit.prevent="onVerifyTwoFactor" novalidate>
+            <div class="au-field">
+                <label for="two-factor-code" class="au-label">Mã xác minh</label>
+                <input
+                    id="two-factor-code"
+                    v-model="twoFactorCode"
+                    class="au-input"
+                    :class="{ 'has-error': !!validationErrors.code?.[0] }"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="6"
+                    pattern="[0-9]{6}"
+                    autofocus
+                    required
+                />
+                <span v-if="validationErrors.code?.[0]" class="au-error-msg">{{ validationErrors.code[0] }}</span>
+            </div>
+            <button type="submit" class="au-btn au-btn-primary" :disabled="loading || twoFactorCode.length !== 6">
+                <span v-if="loading" class="au-spinner"></span>
+                {{ loading ? 'Đang xác minh...' : 'Xác minh' }}
+            </button>
+            <button type="button" class="au-btn" :disabled="loading" @click="authStore.cancelTwoFactor()">
+                Quay lại đăng nhập
+            </button>
+        </form>
 
-        <p class="au-form-footer">
+        <SocialLogin v-if="!authStore.twoFactorChallenge" />
+
+        <p v-if="!authStore.twoFactorChallenge" class="au-form-footer">
             Chưa có tài khoản?
             <router-link to="/dang-ky" class="au-link">Đăng ký ngay</router-link>
         </p>

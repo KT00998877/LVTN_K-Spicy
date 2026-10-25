@@ -6,11 +6,13 @@ use App\Models\AuthAuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use OTPHP\TOTP;
 
 /**
  * AuthService — xử lý nghiệp vụ auth với focus bảo mật:
@@ -32,6 +34,8 @@ class AuthService
 
     /** Tên token khi tạo (giúp quản lý dễ) */
     private const TOKEN_NAME = 'spa';
+
+    private const TWO_FACTOR_CHALLENGE_TTL_MINUTES = 5;
 
     /**
      * Đăng ký tài khoản mới.
@@ -88,7 +92,7 @@ class AuthService
     /**
      * Đăng nhập. Trả về generic error nếu thất bại để tránh user enumeration.
      *
-     * @return array{user: User, token: string}
+     * @return array{user: User, token: ?string, requires_two_factor: bool, challenge_token?: string}
      */
     public function login(string $identifier, string $password, Request $request): array
     {
@@ -129,6 +133,24 @@ class AuthService
         // Thành công → reset counter
         $this->resetFailedAttempts($user);
 
+        if ($this->requiresTwoFactor($user)) {
+            $challengeToken = Str::random(64);
+            Cache::put(
+                $this->twoFactorChallengeKey($challengeToken),
+                $user->id,
+                now()->addMinutes(self::TWO_FACTOR_CHALLENGE_TTL_MINUTES),
+            );
+
+            $this->log($user, 'login_two_factor_required', $identifier, $request, true);
+
+            return [
+                'user' => $user,
+                'token' => null,
+                'requires_two_factor' => true,
+                'challenge_token' => $challengeToken,
+            ];
+        }
+
         // Tạo token mới (đồng thời KHÔNG xóa token cũ — FE sẽ quản lý logout-all)
         $token = $user->createToken(self::TOKEN_NAME, ['*'], now()->addDays(7))->plainTextToken;
 
@@ -137,7 +159,119 @@ class AuthService
         return [
             'user'  => $user,
             'token' => $token,
+            'requires_two_factor' => false,
         ];
+    }
+
+    /** @return array{user: User, token: string} */
+    public function completeTwoFactorLogin(string $challengeToken, string $code, Request $request): array
+    {
+        $cacheKey = $this->twoFactorChallengeKey($challengeToken);
+        $userId = Cache::get($cacheKey);
+        $user = is_numeric($userId) ? User::find((int) $userId) : null;
+
+        if (!$user || !$user->is_active || !$this->requiresTwoFactor($user)) {
+            throw ValidationException::withMessages([
+                'code' => ['Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.'],
+            ]);
+        }
+
+        if (!$this->verifyTwoFactorCode($user, $code)) {
+            $this->log($user, 'login_two_factor_failed', $user->email, $request, false);
+            throw ValidationException::withMessages([
+                'code' => ['Mã xác minh không chính xác.'],
+            ]);
+        }
+
+        $replayKey = 'auth:2fa:used:' . $user->id . ':' . hash('sha256', $code);
+        if (!Cache::add($replayKey, true, now()->addSeconds(90))) {
+            throw ValidationException::withMessages([
+                'code' => ['Mã xác minh đã được sử dụng. Vui lòng chờ mã mới.'],
+            ]);
+        }
+
+        Cache::forget($cacheKey);
+        $token = $user->createToken(self::TOKEN_NAME, ['*'], now()->addDays(7))->plainTextToken;
+        $this->log($user, 'login_success', $user->email, $request, true, ['two_factor' => true]);
+
+        return ['user' => $user, 'token' => $token];
+    }
+
+    /** @return array{secret: string, provisioning_uri: string} */
+    public function beginTwoFactorSetup(User $user): array
+    {
+        if ($this->requiresTwoFactor($user)) {
+            throw ValidationException::withMessages([
+                'two_factor' => ['Hãy tắt xác thực hai lớp hiện tại trước khi thiết lập lại.'],
+            ]);
+        }
+
+        $totp = TOTP::generate();
+        $this->configureTotp($totp, $user);
+
+        $user->forceFill([
+            'two_factor_secret' => $totp->getSecret(),
+            'two_factor_confirmed_at' => null,
+        ])->save();
+
+        return [
+            'secret' => $totp->getSecret(),
+            'provisioning_uri' => $totp->getProvisioningUri(),
+        ];
+    }
+
+    public function confirmTwoFactor(User $user, string $code, Request $request): void
+    {
+        if (!$user->two_factor_secret || !$this->verifyTwoFactorCode($user, $code)) {
+            throw ValidationException::withMessages(['code' => ['Mã xác minh không chính xác.']]);
+        }
+
+        $user->forceFill(['two_factor_confirmed_at' => now()])->save();
+        $this->log($user, 'two_factor_enabled', $user->email, $request, true);
+    }
+
+    public function disableTwoFactor(User $user, string $password, string $code, Request $request): void
+    {
+        if (!Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages(['password' => ['Mật khẩu không chính xác.']]);
+        }
+        if (!$this->requiresTwoFactor($user) || !$this->verifyTwoFactorCode($user, $code)) {
+            throw ValidationException::withMessages(['code' => ['Mã xác minh không chính xác.']]);
+        }
+
+        $user->forceFill([
+            'two_factor_secret' => null,
+            'two_factor_confirmed_at' => null,
+        ])->save();
+        $this->log($user, 'two_factor_disabled', $user->email, $request, true);
+    }
+
+    private function requiresTwoFactor(User $user): bool
+    {
+        return $user->two_factor_confirmed_at !== null
+            && $user->two_factor_secret !== null
+            && $user->roles()->whereRaw('UPPER(code) = ?', ['MANAGER'])->exists();
+    }
+
+    private function verifyTwoFactorCode(User $user, string $code): bool
+    {
+        if (!$user->two_factor_secret) return false;
+
+        $totp = TOTP::createFromSecret($user->two_factor_secret);
+        $this->configureTotp($totp, $user);
+
+        return $totp->verify($code, null, 15);
+    }
+
+    private function configureTotp(TOTP $totp, User $user): void
+    {
+        $totp->setLabel($user->email);
+        $totp->setIssuer((string) config('app.name', 'K-SPICY'));
+    }
+
+    private function twoFactorChallengeKey(string $challengeToken): string
+    {
+        return 'auth:2fa:challenge:' . hash('sha256', $challengeToken);
     }
 
     /**

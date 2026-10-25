@@ -7,6 +7,7 @@ import type {
     RegisterPayload,
     ResetPasswordPayload,
     AuthUser,
+    LoginResponse,
 } from '@/types/auth'
 
 const ENDPOINTS = {
@@ -18,6 +19,7 @@ const ENDPOINTS = {
     changePassword:   '/auth/change-password',
     forgotPassword:   '/auth/forgot-password',
     resetPassword:    '/auth/reset-password',
+    twoFactorChallenge: '/auth/two-factor-challenge',
 } as const
 
 /** Chuẩn hóa response Laravel validation → object error dễ dùng */
@@ -38,11 +40,23 @@ export async function register(payload: RegisterPayload): Promise<AuthResponse> 
     }
 }
 
-export async function login(payload: LoginPayload): Promise<AuthResponse> {
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
     try {
-        const { data } = await apiClient.post<{ success: boolean; data: AuthResponse }>(
+        const { data } = await apiClient.post<{ success: boolean; data: LoginResponse }>(
             ENDPOINTS.login,
             payload,
+        )
+        return data.data
+    } catch (err) {
+        throw Object.assign(err as Error, { validationErrors: extractValidationError(err) })
+    }
+}
+
+export async function verifyTwoFactor(challengeToken: string, code: string): Promise<AuthResponse> {
+    try {
+        const { data } = await apiClient.post<{ success: boolean; data: AuthResponse }>(
+            ENDPOINTS.twoFactorChallenge,
+            { challenge_token: challengeToken, code },
         )
         return data.data
     } catch (err) {

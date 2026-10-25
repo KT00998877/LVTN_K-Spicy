@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Blog;
+use HTMLPurifier;
+use HTMLPurifier_Config;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,6 +18,28 @@ class BlogService
 {
     /** Tốc độ đọc trung bình (từ/phút) cho tiếng Việt. */
     private const WORDS_PER_MINUTE = 220;
+
+    private readonly HTMLPurifier $purifier;
+
+    public function __construct()
+    {
+        $config = HTMLPurifier_Config::createDefault();
+        $config->set('Core.Encoding', 'UTF-8');
+        $config->set('Cache.DefinitionImpl', null);
+        $config->set(
+            'HTML.Allowed',
+            'p,br,strong,b,em,i,u,h2,h3,h4,h5,h6,ul,ol,li,'
+            .'a[href|title|target|rel],img[src|alt|title|width|height],'
+            .'blockquote,pre,code,hr,span,div',
+        );
+        $config->set('Attr.AllowedFrameTargets', ['_blank']);
+        $config->set('URI.AllowedSchemes', [
+            'http' => true,
+            'https' => true,
+        ]);
+
+        $this->purifier = new HTMLPurifier($config);
+    }
 
     /**
      * Lưu ảnh upload lên disk 'public' và trả về URL truy cập.
@@ -50,24 +74,10 @@ class BlogService
         ];
     }
 
-    /**
-     * Sanitize HTML content (loại bỏ script/iframe nguy hiểm, giữ formatting an toàn).
-     *
-     * Dùng strip_tags với whitelist để tránh phụ thuộc thư viện ngoài.
-     * Nếu sau này cần whitelist phức tạp hơn (figure, picture, ...) → cài mews/purifier.
-     */
+    /** Sanitize rich text bằng allowlist tag, attribute và URI scheme. */
     public function sanitizeHtml(string $html): string
     {
-        // Whitelist tags: format content + ảnh + link.
-        $allowed = '<p><br><strong><b><em><i><u><h2><h3><h4><h5><h6><ul><ol><li><a><img><figure><figcaption><blockquote><pre><code><hr><span><div>';
-        $cleaned = strip_tags($html, $allowed);
-
-        // Loại bỏ inline event handlers (onclick, onerror, ...) phòng XSS.
-        $cleaned = preg_replace('#\s*on[a-z]+\s*=\s*("([^"]*)"|\'([^\']*)\')#i', '', $cleaned) ?? $cleaned;
-        // Loại bỏ javascript: scheme trong href/src.
-        $cleaned = preg_replace('#(href|src)\s*=\s*("javascript:[^"]*"|\'javascript:[^\']*\')#i', '$1="#"', $cleaned) ?? $cleaned;
-
-        return trim($cleaned);
+        return trim($this->purifier->purify($html));
     }
 
     /**
