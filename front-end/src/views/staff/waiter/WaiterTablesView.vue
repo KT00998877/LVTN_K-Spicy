@@ -4,7 +4,11 @@
         <!-- ===== Header bar ===== -->
         <div class="wt-header">
             <div class="wt-title-row">
-                <h1 class="wt-title">Sơ đồ bàn</h1>
+                <div class="wt-heading-copy">
+                    <span class="wt-eyebrow">K-SPICY · PHỤC VỤ</span>
+                    <h1 class="wt-title">Sơ đồ bàn</h1>
+                    <p class="wt-subtitle">Chọn bàn để bắt đầu phục vụ hoặc xem nhanh phiên hiện tại.</p>
+                </div>
                 <div class="wt-header-actions">
                     <span class="wt-clock">{{ currentTime }}</span>
                     <button
@@ -23,32 +27,32 @@
             </div>
 
             <!-- Stats row — primary scan target -->
-            <div class="wt-stats" role="status" aria-label="Tóm tắt trạng thái bàn">
-                <div class="stat-chip stat-available">
+            <div class="wt-stats" role="group" aria-label="Lọc bàn theo trạng thái">
+                <button class="stat-chip stat-available" :class="{ 'stat-chip-active': statusFilter === 'AVAILABLE' }" :aria-pressed="statusFilter === 'AVAILABLE'" aria-label="Lọc bàn trống" @click="toggleStatusFilter('AVAILABLE')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
                     <span class="stat-n">{{ stats.available }}</span>
                     <span class="stat-l">Trống</span>
-                </div>
-                <div class="stat-chip stat-occupied">
+                </button>
+                <button class="stat-chip stat-occupied" :class="{ 'stat-chip-active': statusFilter === 'OCCUPIED' }" :aria-pressed="statusFilter === 'OCCUPIED'" aria-label="Lọc bàn đang phục vụ" @click="toggleStatusFilter('OCCUPIED')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span class="stat-n">{{ stats.occupied }}</span>
                     <span class="stat-l">Phục vụ</span>
-                </div>
-                <div class="stat-chip stat-reserved">
+                </button>
+                <button class="stat-chip stat-reserved" :class="{ 'stat-chip-active': statusFilter === 'RESERVED' }" :aria-pressed="statusFilter === 'RESERVED'" aria-label="Lọc bàn đã đặt trước" @click="toggleStatusFilter('RESERVED')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <span class="stat-n">{{ stats.reserved }}</span>
                     <span class="stat-l">Đặt trước</span>
-                </div>
-                <div class="stat-chip stat-waiting">
+                </button>
+                <button class="stat-chip stat-waiting" :class="{ 'stat-chip-active': statusFilter === 'WAITING_PAYMENT' }" :aria-pressed="statusFilter === 'WAITING_PAYMENT'" aria-label="Lọc bàn chờ thanh toán" @click="toggleStatusFilter('WAITING_PAYMENT')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     <span class="stat-n">{{ stats.waiting_payment }}</span>
                     <span class="stat-l">Chờ thanh toán</span>
-                </div>
-                <div class="stat-chip stat-cleaning">
+                </button>
+                <button class="stat-chip stat-cleaning" :class="{ 'stat-chip-active': statusFilter === 'CLEANING' }" :aria-pressed="statusFilter === 'CLEANING'" aria-label="Lọc bàn đang dọn" @click="toggleStatusFilter('CLEANING')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                     <span class="stat-n">{{ stats.cleaning }}</span>
                     <span class="stat-l">Dọn bàn</span>
-                </div>
+                </button>
             </div>
         </div>
 
@@ -74,10 +78,20 @@
             <button class="link-btn" @click="refresh">Thử lại</button>
         </div>
 
+        <div v-if="tables.length" class="wt-tools">
+            <button class="wt-all-filter" type="button" :aria-pressed="statusFilter === null" @click="statusFilter = null">Tất cả trạng thái</button>
+            <label class="wt-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                <input v-model.trim="tableSearch" type="search" placeholder="Tìm mã bàn hoặc tên bàn" aria-label="Tìm mã bàn hoặc tên bàn" />
+                <button v-if="tableSearch" class="wt-search-clear" type="button" aria-label="Xóa nội dung tìm kiếm" @click="tableSearch = ''">×</button>
+            </label>
+            <div class="wt-results" aria-live="polite">{{ visibleTableCount }} / {{ tables.length }} bàn</div>
+        </div>
+
         <!-- ===== Floor sections ===== -->
-        <div v-if="tables.length" class="wt-floors">
+        <div v-if="tables.length && visibleTableCount" class="wt-floors">
             <section
-                v-for="floor in floors"
+                v-for="floor in visibleFloors"
                 :key="floor.location"
                 class="floor"
                 :aria-label="'Khu vực ' + floor.location"
@@ -103,19 +117,20 @@
                         :aria-label="`Bàn ${t.code}, ${t.capacity} chỗ, ${TABLE_STATUS_LABELS[t.status].label}`"
                         @click="onTableClick(t)"
                     >
-                        <!-- Status strip + label -->
-                        <div class="t-status-row">
-                            <div class="t-status-icon" v-html="TABLE_STATUS_ICONS[t.status]"></div>
-                            <span class="t-status-lbl">{{ TABLE_STATUS_LABELS[t.status].label }}</span>
-                        </div>
-
-                        <!-- Table code (primary) -->
-                        <div class="t-code">{{ t.code }}</div>
-
-                        <!-- Capacity -->
-                        <div class="t-cap">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            {{ t.capacity }}
+                        <div class="t-hero">
+                            <img :src="tableIllustrationUrl" alt="" width="1448" height="1086" loading="lazy" decoding="async" :style="{ objectPosition: tableImagePosition(t) }" />
+                            <div class="t-hero-shade"></div>
+                            <div class="t-status-row">
+                                <span class="t-status-icon" v-html="TABLE_STATUS_ICONS[t.status]"></span>
+                                <span class="t-status-lbl">{{ TABLE_STATUS_LABELS[t.status].label }}</span>
+                            </div>
+                            <div class="t-hero-caption">
+                                <span class="t-code">{{ t.code }}</span>
+                                <span class="t-cap">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                    {{ t.capacity }} chỗ
+                                </span>
+                            </div>
                         </div>
 
                         <!-- Active session info -->
@@ -137,9 +152,17 @@
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                             {{ t.reserved_time ?? '' }}
                         </div>
+                        <div v-if="!activeSessionFor(t.id) && t.status !== 'RESERVED'" class="t-card-hint">
+                            {{ t.status === 'AVAILABLE' ? 'Nhấn để mở bàn' : 'Nhấn để xem thao tác' }}
+                        </div>
                     </button>
                 </div>
             </section>
+        </div>
+        <div v-else-if="tables.length" class="wt-filter-empty" role="status">
+            <strong>Không tìm thấy bàn phù hợp</strong>
+            <span>Thử đổi từ khóa hoặc bỏ lọc trạng thái.</span>
+            <button type="button" @click="clearTableFilters">Xóa bộ lọc</button>
         </div>
     </div>
 
@@ -274,6 +297,17 @@
                             </div>
                             <svg class="wt-action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
+
+                        <button v-if="activeSessionFor(actionTable.id)" class="wt-action-card wt-action-danger" :disabled="cancelling" @click="cancelTableSession(actionTable)">
+                            <div class="wt-action-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                            </div>
+                            <div class="wt-action-body">
+                                <span class="wt-action-title">{{ cancelling ? 'Đang hủy phiên…' : 'Hủy bàn' }}</span>
+                                <span class="wt-action-desc">Chỉ hủy được khi phiên chưa có món</span>
+                            </div>
+                            <svg class="wt-action-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
                     </div>
                 </div>
 
@@ -338,7 +372,8 @@ import { storeToRefs } from 'pinia'
 import { useTablesStore } from '@/stores/staffTables'
 import { useStaffOrdersStore } from '@/stores/staffOrders'
 import { useToast, formatVND, formatTime } from '@/composables/useStaffUtils'
-import { TABLE_STATUS_LABELS, type RestaurantTable, type TableSession } from '@/types/staff'
+import { useAppDialog } from '@/composables/useAppDialog'
+import { TABLE_STATUS_LABELS, type RestaurantTable, type TableSession, type TableStatus } from '@/types/staff'
 import { staffOrders, type Order } from '@/api/staff'
 
 // ===== Status icons (inline SVG strings) =====
@@ -355,6 +390,10 @@ const tablesStore = useTablesStore()
 const ordersStore = useStaffOrdersStore()
 const { tables, sessions, stats, loading, error } = storeToRefs(tablesStore)
 const toast = useToast()
+const appDialog = useAppDialog()
+const tableIllustrationUrl = '/images/home/table-card.webp'
+const statusFilter = ref<TableStatus | null>(null)
+const tableSearch = ref('')
 
 const openDialogTable = ref<RestaurantTable | null>(null)
 const actionTable = ref<RestaurantTable | null>(null)
@@ -363,6 +402,7 @@ const opening = ref(false)
 const moving = ref(false)
 const paying = ref(false)
 const requestingInvoice = ref(false)
+const cancelling = ref(false)
 
 const newSession = reactive<{ guest_count: number; customer_name: string; note: string }>({
     guest_count: 2,
@@ -432,6 +472,36 @@ const floors = computed<FloorView[]>(() => {
         (a, b) => (FLOOR_META[a.location]?.order ?? 99) - (FLOOR_META[b.location]?.order ?? 99)
     )
 })
+
+const visibleFloors = computed<FloorView[]>(() => {
+    const query = tableSearch.value.toLocaleLowerCase('vi').trim()
+    return floors.value
+        .map((floor) => ({
+            ...floor,
+            tables: floor.tables.filter((table) => {
+                const matchesStatus = !statusFilter.value || table.status === statusFilter.value
+                const matchesSearch = !query || `${table.code} ${table.name} ${floor.location}`.toLocaleLowerCase('vi').includes(query)
+                return matchesStatus && matchesSearch
+            }),
+        }))
+        .filter((floor) => floor.tables.length > 0)
+})
+
+const visibleTableCount = computed(() => visibleFloors.value.reduce((total, floor) => total + floor.tables.length, 0))
+
+function toggleStatusFilter(status: TableStatus): void {
+    statusFilter.value = statusFilter.value === status ? null : status
+}
+
+function clearTableFilters(): void {
+    statusFilter.value = null
+    tableSearch.value = ''
+}
+
+function tableImagePosition(table: RestaurantTable): string {
+    const positions = ['center 56%', 'left 52%', 'right 50%', 'center 70%']
+    return positions[(table.id - 1) % positions.length] ?? 'center'
+}
 
 function countByStatus(list: RestaurantTable[], status: string): number {
     return list.filter((t) => t.status === status).length
@@ -541,6 +611,25 @@ async function requestInvoice(table: RestaurantTable): Promise<void> {
     }
 }
 
+async function cancelTableSession(table: RestaurantTable): Promise<void> {
+    const session = activeSessionFor(table.id)
+    if (!session || cancelling.value) return
+    const confirmed = await appDialog.confirm({ title: `Hủy phiên bàn ${table.code}?`, message: 'Bàn sẽ trở về trạng thái trống. Phiên đã có món không thể hủy.', confirmLabel: 'Hủy phiên bàn', tone: 'danger' })
+    if (!confirmed) return
+
+    cancelling.value = true
+    try {
+        await tablesStore.cancelSession(session.id)
+        actionTable.value = null
+        toast.success(`Đã hủy phiên phục vụ tại bàn ${table.code}.`)
+    } catch (err: unknown) {
+        const e = err as { message?: string; response?: { data?: { message?: string } } }
+        toast.error(e?.response?.data?.message || e?.message || 'Không thể hủy phiên bàn.')
+    } finally {
+        cancelling.value = false
+    }
+}
+
 // ===== Đổi bàn =====
 function openMoveDialog(table: RestaurantTable): void {
     moveDialog.value = { from: table }
@@ -608,11 +697,14 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 }
 
 .wt-title {
-    font-size: 22px;
+    font-size: clamp(24px, 2vw, 30px);
     font-weight: 800;
     color: var(--color-charcoal-black, #111111);
     margin: 0;
+    letter-spacing: -0.035em;
 }
+.wt-eyebrow { display: block; margin-bottom: 4px; color: #a94317; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; }
+.wt-subtitle { margin: 5px 0 0; color: #76655e; font-size: 13px; line-height: 1.45; }
 
 .wt-header-actions {
     display: flex;
@@ -667,7 +759,39 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     font-size: 13px;
     font-weight: 500;
     border: 1.5px solid transparent;
+    cursor: pointer;
+    font: inherit;
+    transition: box-shadow 160ms ease, transform 160ms ease, filter 160ms ease;
 }
+.stat-chip:hover { filter: saturate(1.15); transform: translateY(-1px); }
+.stat-chip:focus-visible { outline: 3px solid #a94317; outline-offset: 3px; }
+.stat-chip-active { box-shadow: 0 0 0 2px #302321, 0 4px 12px rgb(48 35 33 / 12%); }
+.wt-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wt-all-filter { min-height: 42px; flex: 0 0 auto; padding: 0 13px; border: 1px solid #e6d7d0; border-radius: 11px; background: #fff; color: #66534c; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease; }
+.wt-all-filter[aria-pressed="true"] { border-color: #b5121b; background: #fff1ee; color: #a71b22; }
+.wt-all-filter:focus-visible, .wt-search-clear:focus-visible, .wt-filter-empty button:focus-visible { outline: 3px solid #d28b25; outline-offset: 2px; }
+.wt-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(100%, 390px);
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid #e6d7d0;
+    border-radius: 12px;
+    background: #fff;
+    color: #806e66;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.wt-search:focus-within { border-color: #b5121b; box-shadow: 0 0 0 3px rgb(181 18 27 / 12%); }
+.wt-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #302321; font: inherit; font-size: 13px; }
+.wt-search input::placeholder { color: #9a8981; }
+.wt-search-clear { width: 28px; height: 28px; flex: 0 0 auto; border: 0; border-radius: 50%; background: #f4ece8; color: #55433d; font-size: 18px; cursor: pointer; }
+.wt-results { color: #76655e; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wt-filter-empty { display: grid; justify-items: center; gap: 7px; padding: 32px 16px; border: 1px dashed #ddc9bf; border-radius: 16px; background: #fffaf7; color: #76655e; text-align: center; }
+.wt-filter-empty strong { color: #302321; font-size: 15px; }
+.wt-filter-empty span { font-size: 13px; }
+.wt-filter-empty button { margin-top: 5px; padding: 8px 13px; border: 1px solid #e6d7d0; border-radius: 9px; background: white; color: #a71b22; font: inherit; font-weight: 700; cursor: pointer; }
 
 .stat-n {
     font-size: 16px;
@@ -719,7 +843,7 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 .wt-floors {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
 }
 
 .floor {}
@@ -728,7 +852,7 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .floor-id-badge {
@@ -738,7 +862,7 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     letter-spacing: 0.8px;
     color: var(--color-chili-red, #D71920);
     background: #FFF0F0;
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: var(--radius-full, 9999px);
     border: 1px solid #FFD0D0;
 }
@@ -761,8 +885,8 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 /* ===== Table grid ===== */
 .t-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(min(205px, 100%), 1fr));
+    gap: 14px;
 }
 
 /* ===== Table card ===== */
@@ -771,126 +895,108 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    padding: 0;
+    padding: 0 0 10px;
     background: #fff;
-    border-radius: var(--radius-lg, 12px);
-    border: 1.5px solid var(--color-gray-200, #e5e7eb);
+    border-radius: 16px;
+    border: 1px solid #eadbd4;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
-    transition: border-color var(--duration-fast, 150ms), box-shadow var(--duration-fast, 150ms), transform var(--duration-fast, 150ms);
+    transition: border-color 160ms ease, box-shadow 180ms ease, transform 180ms ease;
     position: relative;
     overflow: hidden;
-    min-height: 120px;
+    min-height: 246px;
 }
 
 .t-card:hover {
-    border-color: var(--color-gray-400, #9ca3af);
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0,0,0,0.1));
-    transform: translateY(-1px);
+    border-color: #d3a99a;
+    box-shadow: 0 12px 26px rgb(73 38 27 / 13%);
+    transform: translateY(-3px);
 }
 
 .t-card:focus-visible {
-    outline: 3px solid var(--color-chili-red, #D71920);
+    outline: 3px solid #d28b25;
     outline-offset: 2px;
 }
 
-/* Status color bar on left */
-.t-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-}
-
-.t-available::before { background: var(--color-success, #22C55E); }
-.t-occupied::before  { background: var(--color-error, #EF4444); }
-.t-reserved::before  { background: var(--color-warning, #F59E0B); }
-.t-waiting-payment::before { background: #F97316; }
-.t-cleaning::before { background: var(--color-info, #3B82F6); }
-
-/* Status row */
-.t-status-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 8px 10px 4px 14px;
-}
-
-.t-status-icon {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.t-available .t-status-icon { color: var(--color-success, #22C55E); }
-.t-occupied .t-status-icon  { color: var(--color-error, #EF4444); }
-.t-reserved .t-status-icon  { color: var(--color-warning, #F59E0B); }
-.t-waiting-payment .t-status-icon { color: #F97316; }
-.t-cleaning .t-status-icon   { color: var(--color-info, #3B82F6); }
-
-.t-status-lbl {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.t-available .t-status-lbl  { color: var(--color-success, #22C55E); }
-.t-occupied .t-status-lbl   { color: var(--color-error, #EF4444); }
-.t-reserved .t-status-lbl   { color: var(--color-warning, #F59E0B); }
-.t-waiting-payment .t-status-lbl { color: #F97316; }
-.t-cleaning .t-status-lbl   { color: var(--color-info, #3B82F6); }
+.t-available { border-color: #c8e4d4; }
+.t-occupied { border-color: #e8c2bd; }
+.t-reserved { border-color: #ead7a8; }
+.t-waiting-payment { border-color: #efc8a5; }
+.t-cleaning { border-color: #c6d7ee; }
+.t-hero { position: relative; height: 154px; overflow: hidden; border-radius: 15px 15px 0 0; background: #6d4632; }
+.t-hero > img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 420ms cubic-bezier(.2,.75,.25,1); }
+.t-card:hover .t-hero > img { transform: scale(1.055); }
+.t-hero-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(24 13 9 / 36%) 0%, transparent 38%, rgb(24 13 9 / 74%) 100%); }
+.t-status-row { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); padding: 6px 9px; border: 1px solid rgb(255 255 255 / 35%); border-radius: 999px; background: rgb(35 25 20 / 78%); color: #fff; box-shadow: 0 3px 12px rgb(0 0 0 / 16%); backdrop-filter: blur(8px); }
+.t-status-icon { display: flex; align-items: center; flex: 0 0 auto; color: currentColor; }
+.t-status-lbl { overflow: hidden; font-size: 10px; font-weight: 800; text-overflow: ellipsis; text-transform: uppercase; letter-spacing: .055em; white-space: nowrap; }
+.t-available .t-status-row { background: rgb(17 111 75 / 91%); }
+.t-occupied .t-status-row { background: rgb(153 27 27 / 92%); }
+.t-reserved .t-status-row { background: rgb(120 75 10 / 94%); }
+.t-waiting-payment .t-status-row { background: rgb(146 64 14 / 94%); }
+.t-cleaning .t-status-row { background: rgb(30 64 110 / 94%); }
+.t-hero-caption { position: absolute; right: 13px; bottom: 11px; left: 14px; display: flex; align-items: end; justify-content: space-between; gap: 8px; color: white; text-align: left; }
 
 /* Table code */
 .t-code {
-    font-size: 22px;
+    color: #fff;
+    font-size: 25px;
     font-weight: 900;
-    color: var(--color-charcoal-black, #111111);
-    padding: 2px 10px 4px 14px;
-    line-height: 1.1;
-    letter-spacing: -0.5px;
+    line-height: 1;
+    letter-spacing: -0.045em;
+    text-shadow: 0 2px 12px rgb(0 0 0 / 32%);
 }
 
 /* Capacity */
 .t-cap {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 0 10px 8px 14px;
+    gap: 5px;
+    padding: 6px 8px;
+    border: 1px solid rgb(255 255 255 / 36%);
+    border-radius: 999px;
+    background: rgb(35 25 20 / 60%);
+    color: #fff;
     font-size: 11px;
-    color: var(--color-gray-500, #6b7280);
-    font-weight: 500;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 /* Session info */
 .t-session {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 8px 10px 10px 14px;
-    border-top: 1px solid var(--color-gray-100, #f3f4f6);
-    background: var(--color-gray-50, #f9fafb);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 5px 8px;
+    margin: 10px 11px 0;
+    padding: 9px 10px;
+    border: 1px solid #f0e4de;
+    border-radius: 10px;
+    background: #fffaf7;
 }
 
 .t-session-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-size: 11px;
-    color: var(--color-gray-600, #4b5563);
-    font-weight: 500;
+    color: #66534c;
+    font-weight: 650;
 }
 
 .t-session-elapsed {
-    font-size: 13px;
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 12px;
     font-weight: 800;
     color: var(--color-chili-red, #D71920);
 }
 
 .t-session-total {
+    grid-column: 1 / -1;
+    padding-top: 5px;
+    border-top: 1px solid #eadbd4;
     font-size: 12px;
     font-weight: 700;
     color: var(--color-charcoal-black, #111111);
@@ -901,12 +1007,16 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 10px 8px 14px;
+    margin: 10px 11px 0;
+    padding: 8px 10px;
+    border: 1px solid #f1dfb2;
+    border-radius: 9px;
+    background: #fff9e9;
     font-size: 11px;
     font-weight: 600;
     color: var(--color-warning, #F59E0B);
-    border-top: 1px solid var(--color-gray-100, #f3f4f6);
 }
+.t-card-hint { margin: 11px 14px 1px; color: #806e66; font-size: 11px; font-weight: 650; }
 
 /* ===== State views ===== */
 .wt-state {
@@ -1312,6 +1422,18 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
     background: rgba(215, 25, 32, 0.12);
     border-color: var(--color-dark-red);
 }
+.wt-action-danger {
+    border-color: #fecaca;
+}
+.wt-action-danger:hover:not(:disabled) {
+    border-color: #dc2626;
+    background: #fff7f7;
+}
+.wt-action-danger .wt-action-icon {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+.wt-action-danger .wt-action-title { color: #b91c1c; }
 
 .wt-action-icon {
     width: 40px;
@@ -1425,18 +1547,35 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .wt-view { padding: 12px; gap: 12px; }
-    .t-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-    .t-code { font-size: 20px; }
-    .wt-stats { gap: 6px; }
-    .stat-chip { padding: 6px 10px; }
+    .t-grid { grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 10px; }
+    .wt-stats { gap: 7px; }
+    .stat-chip { min-height: 42px; padding: 7px 10px; }
     .stat-n { font-size: 15px; }
+    .wt-tools { align-items: center; }
+    .wt-search { flex: 1; }
     .wt-modal { max-width: 100%; margin: 0 8px; border-radius: var(--radius-xl, 16px) var(--radius-xl, 16px) 0 0; }
     .wt-modal-mask { align-items: flex-end; padding: 0; }
 }
 
 @media (max-width: 480px) {
-    .t-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-    .t-code { font-size: 18px; }
+    .wt-title-row { align-items: flex-start; }
+    .wt-header-actions { gap: 8px; }
+    .wt-clock { display: none; }
+    .wt-tools { flex-wrap: wrap; }
+    .wt-search { width: 100%; box-sizing: border-box; }
+    .t-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .t-card { min-height: 216px; }
+    .t-hero { height: 128px; }
+    .t-hero-caption { left: 11px; }
+    .t-code { font-size: 21px; }
+    .t-cap { gap: 3px; padding: 5px 6px; font-size: 10px; }
+    .t-status-row { top: 8px; left: 8px; gap: 4px; padding: 5px 7px; }
+    .t-status-lbl { font-size: 9px; }
     .t-session-elapsed { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stat-chip, .t-card, .t-hero > img, .btn-refresh { transition: none; }
+    .t-card:hover { transform: none; }
 }
 </style>
