@@ -238,6 +238,7 @@ class ChatbotController extends Controller
         }
 
         // Build request to AI Service
+
         try {
             $response = $this->callAiService(
                 $session,
@@ -247,21 +248,65 @@ class ChatbotController extends Controller
                 $userId,
                 $userId ? $request->bearerToken() : null,
             );
-            
+
             $aiResponse = $response->json();
-            if (!$response->successful() || !is_array($aiResponse) || ($aiResponse['intent'] ?? '') === 'error' || !is_string($aiResponse['reply'] ?? null) || trim($aiResponse['reply']) === '') {
-                Log::warning('AI Service failed', ['request_id' => $requestId, 'status' => $response->status()]);
+
+            // Ghi log để xác định nguyên nhân
+            Log::info('AI Service response', [
+                'request_id' => $requestId,
+                'http_status' => $response->status(),
+                'successful' => $response->successful(),
+                'intent' => is_array($aiResponse)
+                    ? ($aiResponse['intent'] ?? null)
+                    : null,
+                'reply_exists' => is_array($aiResponse)
+                    && isset($aiResponse['reply']),
+                'reply_type' => is_array($aiResponse)
+                    ? get_debug_type($aiResponse['reply'] ?? null)
+                    : null,
+                'response_keys' => is_array($aiResponse)
+                    ? array_keys($aiResponse)
+                    : [],
+            ]);
+
+            if (
+                !$response->successful() ||
+                !is_array($aiResponse) ||
+                ($aiResponse['intent'] ?? '') === 'error' ||
+                !is_string($aiResponse['reply'] ?? null) ||
+                trim($aiResponse['reply']) === ''
+            ) {
+                Log::warning('AI Service failed', [
+                    'request_id' => $requestId,
+                    'status' => $response->status(),
+                    'intent' => is_array($aiResponse)
+                        ? ($aiResponse['intent'] ?? null)
+                        : null,
+                ]);
+
                 return response()->json([
                     'success' => false,
-                    'message' => $response->status() === 504 ? 'Trợ lý phản hồi quá lâu. Vui lòng thử lại.' : 'Trợ lý tạm thời gián đoạn. Vui lòng thử lại.',
+                    'message' => $response->status() === 504
+                        ? 'Trợ lý phản hồi quá lâu. Vui lòng thử lại.'
+                        : 'Trợ lý tạm thời gián đoạn. Vui lòng thử lại.',
                     'request_id' => $requestId,
                 ], $response->status() === 504 ? 504 : 503);
             }
+
             $aiContent = $aiResponse['reply'];
         } catch (ConnectionException $e) {
-            Log::warning('AI Service connection failed', ['request_id' => $requestId]);
-            return response()->json(['success' => false, 'message' => 'Chưa kết nối được trợ lý. Vui lòng thử lại.', 'request_id' => $requestId], 504);
+            Log::warning('AI Service connection failed', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Chưa kết nối được trợ lý. Vui lòng thử lại.',
+                'request_id' => $requestId,
+            ], 504);
         }
+
 
         return DB::transaction(function () use ($session, $message, $aiResponse, $aiContent, $requestId, $useTools, $userId) {
             $userMessage = ChatMessage::create([

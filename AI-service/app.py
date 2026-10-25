@@ -110,6 +110,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
 app.include_router(quick_replies_router, prefix="/api/v1")
 
 
