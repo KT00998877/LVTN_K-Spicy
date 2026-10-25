@@ -42,6 +42,7 @@ class User extends Authenticatable
         'remember_token',
         'failed_login_count',
         'locked_until',
+        'two_factor_secret',
     ];
 
     protected function casts(): array
@@ -53,6 +54,8 @@ class User extends Authenticatable
             'locked_at'             => 'datetime',
             'locked_until'          => 'datetime',
             'last_failed_login_at'  => 'datetime',
+            'two_factor_secret'     => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
             'is_active'             => 'boolean',
             'can_close_daily_stock' => 'boolean',
             'loyalty_points'        => 'integer',
@@ -90,6 +93,11 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(\App\Models\Role::class, 'user_role', 'user_id', 'role_id')
             ->withPivot('assigned_at');
+    }
+
+    public function favoriteMenuItems(): BelongsToMany
+    {
+        return $this->belongsToMany(MenuItem::class, 'user_favorite_menu_items')->withTimestamps();
     }
 
     /**

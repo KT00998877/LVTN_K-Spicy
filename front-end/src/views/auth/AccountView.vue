@@ -6,6 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderStore } from '@/stores/orders'
+import { useAppDialog } from '@/composables/useAppDialog'
 import type { OrderStatus } from '@/types/orders'
 
 import NavbarHome from '@/components/home/NavbarHome.vue'
@@ -20,12 +21,15 @@ import type { Review } from '@/types/review'
 import ReviewList from '@/components/review/ReviewList.vue'
 import LoyaltyTierPanel from '@/components/loyalty/LoyaltyTierPanel.vue'
 import TierBadge from '@/components/loyalty/TierBadge.vue'
+import CustomerReservationsPanel from '@/components/customer/CustomerReservationsPanel.vue'
+import CustomerPromotionsPanel from '@/components/customer/CustomerPromotionsPanel.vue'
 
-type TabKey = 'profile' | 'orders' | 'security' | 'loyalty' | 'tier' | 'reviews'
+type TabKey = 'profile' | 'orders' | 'reservations' | 'promotions' | 'security' | 'loyalty' | 'tier' | 'reviews'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const appDialog = useAppDialog()
 const orderStore = useOrderStore()
 const { user, loading, validationErrors, error } = storeToRefs(authStore)
 const { items: orders, loadingList, meta: orderMeta } = storeToRefs(orderStore)
@@ -98,7 +102,7 @@ async function uploadAvatar(file: File): Promise<void> {
 }
 
 async function onDeleteAvatar(): Promise<void> {
-    if (!confirm('Xoá ảnh đại diện? Ảnh sẽ bị xoá khỏi hệ thống.')) return
+    if (!await appDialog.confirm({ title: 'Xóa ảnh đại diện?', message: 'Ảnh hiện tại sẽ bị xóa khỏi tài khoản.', confirmLabel: 'Xóa ảnh', tone: 'danger' })) return
     avatarUploading.value = true
     avatarMessage.value = null
     avatarError.value = null
@@ -192,7 +196,7 @@ async function onChangePassword() {
 
 // ===== Logout =====
 async function onLogout() {
-    if (!confirm('Bạn có chắc muốn đăng xuất?')) return
+    if (!await appDialog.confirm({ title: 'Đăng xuất?', message: 'Bạn sẽ cần đăng nhập lại để xem tài khoản và đơn hàng.', confirmLabel: 'Đăng xuất', tone: 'warning' })) return
     await authStore.logout()
     router.replace('/')
 }
@@ -325,7 +329,7 @@ async function setTab(t: TabKey) {
 // Đọc query ?tab=orders để auto-open tab khi back từ OrderDetail
 onMounted(() => {
     const tabFromQuery = route.query.tab as TabKey | undefined
-    if (tabFromQuery === 'orders' || tabFromQuery === 'profile' || tabFromQuery === 'security' || tabFromQuery === 'loyalty' || tabFromQuery === 'tier' || tabFromQuery === 'reviews') {
+    if (tabFromQuery === 'orders' || tabFromQuery === 'reservations' || tabFromQuery === 'promotions' || tabFromQuery === 'profile' || tabFromQuery === 'security' || tabFromQuery === 'loyalty' || tabFromQuery === 'tier' || tabFromQuery === 'reviews') {
         activeTab.value = tabFromQuery
     }
     if (activeTab.value === 'orders' && orders.value.length === 0 && !orderMeta.value.total) {
@@ -341,7 +345,7 @@ onMounted(() => {
 
 // Watch query change (trường hợp navigate trong cùng route)
 watch(() => route.query.tab, (newTab) => {
-    if (newTab === 'orders' || newTab === 'profile' || newTab === 'security' || newTab === 'loyalty' || newTab === 'tier' || newTab === 'reviews') {
+    if (newTab === 'orders' || newTab === 'reservations' || newTab === 'promotions' || newTab === 'profile' || newTab === 'security' || newTab === 'loyalty' || newTab === 'tier' || newTab === 'reviews') {
         activeTab.value = newTab as TabKey
         if (newTab === 'loyalty' && loyaltyEntries.value.length === 0 && !loyaltyMeta.value.total) {
             loadLoyalty()
@@ -448,6 +452,24 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     Đơn hàng của tôi
+                </button>
+                <button
+                    type="button"
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'reservations' }"
+                    @click="setTab('reservations')"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Lịch đặt bàn
+                </button>
+                <button
+                    type="button"
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'promotions' }"
+                    @click="setTab('promotions')"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5A2.5 2.5 0 1 1 10 4.5L12 7Z"></path><path d="M12 7h4.5A2.5 2.5 0 1 0 14 4.5L12 7Z"></path></svg>
+                    Ưu đãi của tôi
                 </button>
                 <button
                     type="button"
@@ -678,6 +700,16 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
                 <div v-if="orderMeta.last_page > 1" class="order-pagination">
                     <span>Trang {{ orderMeta.current_page }} / {{ orderMeta.last_page }} · Tổng {{ orderMeta.total }} đơn</span>
                 </div>
+            </section>
+
+            <!-- ============== TAB: RESERVATIONS ============== -->
+            <section v-if="activeTab === 'reservations'" class="account-card">
+                <CustomerReservationsPanel />
+            </section>
+
+            <!-- ============== TAB: PROMOTIONS ============== -->
+            <section v-if="activeTab === 'promotions'" class="account-card">
+                <CustomerPromotionsPanel />
             </section>
 
             <!-- ============== TAB: SECURITY ============== -->

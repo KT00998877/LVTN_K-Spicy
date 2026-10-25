@@ -8,6 +8,8 @@ const HomeView = () => import('../views/HomeView.vue')
 const AboutView = () => import('../views/AboutView.vue')
 const ReservationView = () => import('../views/ReservationView.vue')
 const MenuView = () => import('../views/MenuView.vue')
+const FeaturedMenuView = () => import('../views/FeaturedMenuView.vue')
+const FavoritesView = () => import('../views/FavoritesView.vue')
 const CheckoutView = () => import('../views/CheckoutView.vue')
 const LoginView = () => import('../views/auth/LoginView.vue')
 const RegisterView = () => import('../views/auth/RegisterView.vue')
@@ -43,6 +45,7 @@ const ManagerReportView    = () => import('../views/staff/manager/ManagerReportV
 const ManagerStatisticsView = () => import('../views/staff/manager/ManagerStatisticsView.vue')
 // Phase 3 — Promotions & Vouchers management
 const ManagerPromotionsView = () => import('../views/staff/manager/ManagerPromotionsView.vue')
+const ManagerMarketingCampaignsView = () => import('../views/staff/manager/ManagerMarketingCampaignsView.vue')
 // Phase 6.1 — AI Marketing Studio
 const ManagerMarketingView = () => import('../views/staff/manager/ManagerMarketingView.vue')
 // Phase 2 — Inventory & Recipe
@@ -52,6 +55,12 @@ const ManagerRecipeView      = () => import('../views/staff/manager/ManagerRecip
 const ManagerStockImportsView       = () => import('../views/staff/manager/ManagerStockImportsView.vue')
 const ManagerStockTransactionsView  = () => import('../views/staff/manager/ManagerStockTransactionsView.vue')
 const ManagerStocktakeView          = () => import('../views/staff/manager/ManagerStocktakeView.vue')
+// Phase F — Tiêu hao món bán + yêu cầu nhập kho từ bếp
+const ManagerConsumptionView        = () => import('../views/staff/manager/ManagerConsumptionView.vue')
+// Phase 3 — Combo nước uống (gợi ý món do quản lý cấu hình)
+const ManagerSuggestionsView        = () => import('../views/staff/manager/ManagerSuggestionsView.vue')
+const ManagerDeliveryRatingView    = () => import('../views/staff/manager/ManagerDeliveryRatingView.vue')
+const ManagerSecurityView          = () => import('../views/staff/manager/ManagerSecurityView.vue')
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -78,6 +87,18 @@ const router = createRouter({
             name: 'menu',
             component: MenuView,
             meta: { title: 'Thực đơn - Mì Cay Hàn Quốc' },
+        },
+        {
+            path: '/mon-dac-sac',
+            name: 'featured-menu',
+            component: FeaturedMenuView,
+            meta: { title: 'Món đặc sắc - Mì Cay Hàn Quốc' },
+        },
+        {
+            path: '/mon-yeu-thich',
+            name: 'favorites',
+            component: FavoritesView,
+            meta: { title: 'Món yêu thích - Mì Cay Hàn Quốc', requiresAuth: true },
         },
         {
             path: '/thanh-toan',
@@ -193,6 +214,7 @@ const router = createRouter({
                 { path: '', redirect: '/staff/manager/dashboard' },
                 { path: 'accounts', name: 'manager-accounts', component: () => import('../views/staff/manager/ManagerAccountsView.vue'), meta: { title: 'Quản lý tài khoản' } },
                 { path: 'permissions', name: 'manager-permissions', component: () => import('../views/staff/manager/ManagerAccountsView.vue'), meta: { title: 'Phân quyền' } },
+                { path: 'security', name: 'manager-security', component: ManagerSecurityView, meta: { title: 'Bảo mật đăng nhập', subtitle: 'Xác thực hai lớp cho tài khoản quản lý' } },
                 { path: 'orders', name: 'manager-orders', component: () => import('../views/staff/manager/ManagerSalesView.vue'), meta: { title: 'Quản lý đơn hàng' } },
                 { path: 'invoices', name: 'manager-invoices', component: () => import('../views/staff/manager/ManagerSalesView.vue'), meta: { title: 'Quản lý hóa đơn' } },
                 { path: 'online-orders', name: 'manager-online-orders', component: () => import('../views/staff/manager/ManagerOnlineOrdersView.vue'), meta: { title: 'Đơn giao hàng', subtitle: 'Xác nhận, từ chối, bàn giao shipper' } },
@@ -203,14 +225,18 @@ const router = createRouter({
                 { path: 'stock-imports', name: 'manager-stock-imports', component: ManagerStockImportsView, meta: { title: 'Phiếu nhập kho', subtitle: 'DRAFT → CONFIRMED, có audit history' } },
                 { path: 'stock-transactions', name: 'manager-stock-transactions', component: ManagerStockTransactionsView, meta: { title: 'Lịch sử giao dịch kho', subtitle: 'IMPORT · EXPORT · WASTE · ADJUSTMENT' } },
                 { path: 'stocktake', name: 'manager-stocktake', component: ManagerStocktakeView, meta: { title: 'Kiểm kê kho', subtitle: 'OPEN → COMPLETED, tạo ADJUSTMENT khi hoàn tất' } },
+                { path: 'consumption', name: 'manager-consumption', component: ManagerConsumptionView, meta: { title: 'Tiêu hao món bán', subtitle: 'Đã bán món nào trừ bao nhiêu nguyên liệu' } },
                 { path: 'daily-stock', name: 'manager-daily-stock', component: DailyStockSheetView, meta: { title: 'Sổ kho hằng ngày', subtitle: 'Xem số bếp đã chốt' } },
                 { path: 'categories', name: 'manager-categories', component: ManagerMenuView, meta: { title: 'Danh mục món ăn', subtitle: 'Phân nhóm và sắp xếp thực đơn' } },
                 { path: 'dashboard', name: 'manager-dashboard', component: ManagerDashboardView, meta: { title: 'Dashboard',           subtitle: 'Tổng quan hoạt động nhà hàng' } },
                 { path: 'menu',      name: 'manager-menu',      component: ManagerMenuView,      meta: { title: 'Quản lý thực đơn',   subtitle: 'Món ăn, danh mục, topping' } },
+                { path: 'combos',    name: 'manager-combos',    component: ManagerSuggestionsView, meta: { title: 'Combo nước uống', subtitle: 'Gợi ý món đi kèm và giá combo' } },
+                { path: 'delivery-ratings', name: 'manager-delivery-ratings', component: ManagerDeliveryRatingView, meta: { title: 'Đánh giá giao hàng', subtitle: 'Chấm điểm dịch vụ giao và phân tích theo shipper' } },
                 { path: 'inventory', name: 'manager-inventory', component: ManagerInventoryView, meta: { title: 'Kho & Nguyên liệu',  subtitle: 'Nhập / xuất / điều chỉnh tồn kho' } },
                 { path: 'staff',     name: 'manager-staff',     component: ManagerStaffView,     meta: { title: 'Quản lý nhân viên',  subtitle: 'Tài khoản, phân quyền' } },
                 { path: 'statistics', name: 'manager-statistics', component: ManagerStatisticsView, meta: { title: 'Thống kê tổng quan', subtitle: 'Dashboard end-to-end: KPI · Charts · Kho' } },
                 { path: 'promotions', name: 'manager-promotions', component: ManagerPromotionsView, meta: { title: 'Khuyến mãi & Voucher', subtitle: 'Quản lý mã giảm giá và chương trình khuyến mãi' } },
+                { path: 'marketing-campaigns', name: 'manager-marketing-campaigns', component: ManagerMarketingCampaignsView, meta: { title: 'Ưu đãi khung giờ vàng', subtitle: 'Gửi ưu đãi kèm mã voucher tới khách thân thiết' } },
                 { path: 'marketing', name: 'manager-marketing', component: ManagerMarketingView, meta: { title: 'AI Marketing Studio', subtitle: 'Sinh & duyệt content tự động' } },
                 { path: 'report',    name: 'manager-report',    component: ManagerReportView,    meta: { title: 'Báo cáo doanh thu', subtitle: 'Báo cáo gọn nhẹ (Phase 2)' } },
             ],

@@ -2,12 +2,19 @@
 
 Route::get('/reservations/options', [\App\Http\Controllers\Api\ReservationController::class, 'options']);
 Route::post('/reservations', [\App\Http\Controllers\Api\ReservationController::class, 'store'])->middleware('throttle:30,1');
+Route::middleware('auth:sanctum')->prefix('reservations/me')->group(function () {
+    $controller = \App\Http\Controllers\Api\ReservationController::class;
+    Route::get('/', [$controller, 'mine']);
+    Route::patch('/{id}', [$controller, 'update'])->whereNumber('id');
+    Route::post('/{id}/cancel', [$controller, 'cancel'])->whereNumber('id');
+});
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\LoyaltyTierController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\FavoriteMenuItemController;
 Route::get('/news', [\App\Http\Controllers\Api\CustomerPagesController::class,'news']);
 Route::get('/news/{slug}', [\App\Http\Controllers\Api\CustomerPagesController::class,'article']);
 Route::post('/contact', [\App\Http\Controllers\Api\CustomerPagesController::class,'contact'])->middleware('throttle:5,1');
@@ -30,6 +37,22 @@ Route::middleware('auth:sanctum')->get('/loyalty/me', [LoyaltyTierController::cl
 Route::get('/campaigns', [\App\Http\Controllers\Api\PublicCampaignController::class, 'index']);
 Route::get('/campaigns/{slug}', [\App\Http\Controllers\Api\PublicCampaignController::class, 'show'])
     ->where('slug', '[a-z0-9-]+');
+
+// Phase 1 — Ưu đãi nổi bật (banner + mã voucher cho trang chủ, xem được khi chưa đăng nhập).
+Route::get('/promotions/featured', [\App\Http\Controllers\Api\CustomerNotificationController::class, 'featuredPromotions']);
+Route::middleware('auth:sanctum')->group(function () {
+    $controller = \App\Http\Controllers\Api\CustomerNotificationController::class;
+    Route::get('/promotions/me', [$controller, 'myPromotions']);
+    Route::post('/promotions/{id}/claim', [$controller, 'claim'])->whereNumber('id');
+});
+
+// Phase 1 — Chuông thông báo của khách hàng.
+Route::middleware('auth:sanctum')->prefix('notifications')->group(function () {
+    $ctrl = \App\Http\Controllers\Api\CustomerNotificationController::class;
+    Route::get('/',                 [$ctrl, 'index']);
+    Route::get('/unread-count',     [$ctrl, 'unreadCount']);
+    Route::patch('/{id}/read',      [$ctrl, 'read'])->whereUuid('id');
+});
 
 Route::get('/checkout/config', [\App\Http\Controllers\Api\CheckoutQuoteController::class, 'config']);
 Route::post('/checkout/quote', [\App\Http\Controllers\Api\CheckoutQuoteController::class, 'quote'])->middleware('auth:sanctum');
@@ -116,6 +139,12 @@ Route::prefix('menu')->group(function () {
     Route::get('/{slug}',   [MenuController::class, 'show']);
 });
 
+Route::middleware('auth:sanctum')->prefix('favorites')->group(function () {
+    Route::get('/', [FavoriteMenuItemController::class, 'index']);
+    Route::put('/{menuItem}', [FavoriteMenuItemController::class, 'store'])->whereNumber('menuItem');
+    Route::delete('/{menuItem}', [FavoriteMenuItemController::class, 'destroy'])->whereNumber('menuItem');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Auth - Đăng ký / Đăng nhập / Quên mật khẩu
@@ -131,6 +160,7 @@ Route::prefix('auth')->group(function () {
     });
     Route::middleware('throttle:auth-login')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/two-factor-challenge', [AuthController::class, 'verifyTwoFactor']);
     });
     Route::middleware('throttle:auth-forgot')->group(function () {
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
@@ -159,8 +189,12 @@ Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
     Route::get('/me/{id}',    [OrderController::class, 'show'])->whereNumber('id');
     // Khách hàng xem hướng dẫn đường đi của shipper đến đơn mình (chỉ đơn ONLINE của chính user).
     Route::get('/me/{id}/route', [\App\Http\Controllers\Api\OnlineOrderController::class, 'customerRoute'])->whereNumber('id');
+    // Phase 2 — Vị trí shipper hiện tại (để khách biết shipper đang ở đâu).
+    Route::get('/me/{id}/shipper-location', [\App\Http\Controllers\Api\ShipperLocationController::class, 'orderLocation'])->whereNumber('id');
     // Khách hàng xác nhận đã nhận hàng → COMPLETED + tích điểm thưởng
     Route::post('/me/{id}/confirm-receipt', [OrderController::class, 'confirmReceipt'])->whereNumber('id');
+    // Phase 4 — Khách chấm điểm dịch vụ giao hàng (chỉ đơn ONLINE đã hoàn thành).
+    Route::post('/me/{id}/delivery-rating', [\App\Http\Controllers\Api\DeliveryRatingController::class, 'submit'])->whereNumber('id');
 });
 
 /*
@@ -194,6 +228,13 @@ Route::prefix('staff')->group(function () {
     Route::middleware(['auth:sanctum', 'staff'])->group(function () {
         Route::post('/auth/logout', [StaffAuthController::class, 'logout']);
         Route::get('/auth/me',      [StaffAuthController::class, 'me']);
+
+        Route::middleware('staff:MANAGER')->prefix('auth/two-factor')->group(function () {
+            Route::get('/', [AuthController::class, 'twoFactorStatus']);
+            Route::post('/setup', [AuthController::class, 'setupTwoFactor']);
+            Route::post('/confirm', [AuthController::class, 'confirmTwoFactor']);
+            Route::delete('/', [AuthController::class, 'disableTwoFactor']);
+        });
 
         Route::middleware('staff:MANAGER,KITCHEN,SHIPPER')->group(function () {
             Route::get('/notifications', [\App\Http\Controllers\Api\StaffNotificationController::class, 'index']);
@@ -301,6 +342,16 @@ Route::prefix('staff')->group(function () {
                     [\App\Http\Controllers\Api\ManagerInventoryBalanceController::class, 'index'])
             ->middleware('staff:MANAGER');
 
+        // ----- Manager: Báo cáo tiêu hao + yêu cầu nhập kho từ bếp (Phase F) -----
+        Route::middleware('staff:MANAGER')->prefix('manager')->group(function () {
+            // ?view=menu → mỗi món đã bán trừ bao nhiêu; ?view=ingredient → tồn + đã dùng
+            Route::get('/consumption', [\App\Http\Controllers\Api\ManagerConsumptionController::class, 'index']);
+            // Yêu cầu nhập kho do bếp gửi khi thiếu nguyên liệu
+            Route::get('/stock-requests', [\App\Http\Controllers\Api\ManagerConsumptionController::class, 'stockRequests']);
+            Route::patch('/stock-requests/{id}', [\App\Http\Controllers\Api\ManagerConsumptionController::class, 'resolveStockRequest'])
+                ->whereNumber('id');
+        });
+
         // ----- Manager: Stock Imports (Phase 4) -----
         Route::middleware('staff:MANAGER')->prefix('manager/stock-imports')->group(function () {
             Route::get('/',   [\App\Http\Controllers\Api\ManagerStockImportController::class, 'index']);
@@ -352,6 +403,19 @@ Route::prefix('staff')->group(function () {
             Route::get('/{id}/usages',    [$ctrl, 'usages'])->whereNumber('id');
         });
 
+        // Phase 3 — Gợi ý combo nước uống do quản lý cấu hình.
+        Route::middleware('staff:MANAGER')->prefix('manager/menu-suggestions')->group(function () {
+            $ctrl = \App\Http\Controllers\Api\ManagerMenuSuggestionController::class;
+            Route::get('/',           [$ctrl, 'index']);
+            Route::get('/options',   [$ctrl, 'options']);
+            Route::post('/',          [$ctrl, 'store']);
+            Route::patch('/{id}',     [$ctrl, 'update'])->whereNumber('id');
+            Route::delete('/{id}',    [$ctrl, 'destroy'])->whereNumber('id');
+        });
+
+        // Phase 4 — Thống kê đánh giá dịch vụ giao hàng (breakdown theo shipper).
+        Route::middleware('staff:MANAGER')->get('/manager/delivery-ratings', [\App\Http\Controllers\Api\DeliveryRatingController::class, 'summary']);
+
         // Phase 4 — Promotion CRUD (khuyến mãi tự động, không cần khách nhập mã).
         Route::middleware('staff:MANAGER')->prefix('manager/promotions')->group(function () {
             $ctrl = \App\Http\Controllers\Api\ManagerPromotionController::class;
@@ -375,6 +439,19 @@ Route::prefix('staff')->group(function () {
             Route::delete('/{id}',        [$ctrl, 'destroy'])->whereNumber('id');
             Route::post('/{id}/toggle',   [$ctrl, 'toggle'])->whereNumber('id');
             Route::get('/{id}/stats',     [$ctrl, 'stats'])->whereNumber('id');
+        });
+
+        // Phase 1 — Chiến dịch ưu đãi gửi khách theo khung giờ vàng.
+        Route::middleware('staff:MANAGER')->prefix('manager/marketing-campaigns')->group(function () {
+            $ctrl = \App\Http\Controllers\Api\ManagerMarketingCampaignController::class;
+            Route::get('/',                [$ctrl, 'index']);
+            Route::post('/',               [$ctrl, 'store']);
+            Route::get('/meta/vouchers',   [$ctrl, 'vouchers']);
+            Route::get('/meta/tiers',      [$ctrl, 'tiers']);
+            Route::put('/{id}',            [$ctrl, 'update'])->whereNumber('id');
+            Route::delete('/{id}',         [$ctrl, 'destroy'])->whereNumber('id');
+            Route::post('/{id}/send',      [$ctrl, 'sendNow'])->whereNumber('id');
+            Route::post('/{id}/cancel',    [$ctrl, 'cancel'])->whereNumber('id');
         });
 
         // Phase 6.2 — Blog CRUD (tin tức, khuyến mãi, sự kiện nhà hàng).
@@ -438,6 +515,16 @@ Route::middleware(['auth:sanctum', 'staff:SHIPPER'])->prefix('staff/deliveries')
     Route::post('/{id}/complete', [$controller, 'delivered'])->whereNumber('id');  // Bước 3: Giao thành công
     Route::post('/{id}/issue',   [$controller, 'issue'])->whereNumber('id');      // Sự cố
 });
+
+// Phase 2 — Vị trí shipper (cập nhật định kỳ) + nhận đơn + shipper gần nhất.
+Route::middleware(['auth:sanctum', 'staff:SHIPPER'])->prefix('staff/deliveries')->group(function () {
+    $ctrl = \App\Http\Controllers\Api\ShipperLocationController::class;
+    Route::post('/location',      [$ctrl, 'update']);
+    Route::get('/nearby-jobs',   [$ctrl, 'nearbyJobs']);
+    Route::post('/{id}/accept',   [$ctrl, 'accept'])->whereNumber('id');
+});
+Route::middleware(['auth:sanctum', 'staff:MANAGER'])
+    ->get('/staff/deliveries/nearest', [\App\Http\Controllers\Api\ShipperLocationController::class, 'nearest']);
 
 /*
 |--------------------------------------------------------------------------

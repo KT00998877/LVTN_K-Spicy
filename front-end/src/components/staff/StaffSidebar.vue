@@ -91,11 +91,14 @@ const isManager = computed(() => staffStore.currentRole === 'MANAGER')
 const managerGroups = [
     { id: 'menu', label: 'Quản lý thực đơn', items: [
         { path: '/staff/manager/menu', label: 'Món ăn' },
+        { path: '/staff/manager/recipes', label: 'Công thức món ăn' },
         { path: '/staff/manager/categories', label: 'Danh mục món ăn' },
+        { path: '/staff/manager/combos', label: 'Combo nước uống' },
     ] },
     { id: 'inventory', label: 'Kho & nguyên liệu', items: [
         { path: '/staff/manager/ingredients', label: 'Nguyên liệu' },
         { path: '/staff/manager/inventory', label: 'Kho hàng' },
+        { path: '/staff/manager/consumption', label: 'Tiêu hao món bán' },
         { path: '/staff/manager/daily-stock', label: 'Sổ kho hằng ngày' },
     ] },
     { id: 'sales', label: 'Đơn hàng & hóa đơn', items: [
@@ -105,18 +108,22 @@ const managerGroups = [
     ] },
     { id: 'promotions', label: 'Khuyến mãi & Voucher', items: [
         { path: '/staff/manager/promotions', label: 'Mã giảm giá' },
+        { path: '/staff/manager/marketing-campaigns', label: 'Ưu đãi khung giờ vàng' },
         { path: '/staff/manager/marketing', label: 'AI Marketing Studio' },
     ] },
     { id: 'accounts', label: 'Tài khoản & phân quyền', items: [
         { path: '/staff/manager/accounts', label: 'Tài khoản' },
         { path: '/staff/manager/staff', label: 'Nhân viên' },
         { path: '/staff/manager/permissions', label: 'Phân quyền' },
+        { path: '/staff/manager/security', label: 'Bảo mật đăng nhập' },
     ] },
     { id: 'service', label: 'Dịch vụ khách hàng', items: [
         { path: '/staff/manager/live-chat', label: 'Tư vấn trực tiếp' },
+        { path: '/staff/manager/delivery-ratings', label: 'Đánh giá giao hàng' },
     ] },
     { id: 'reports', label: 'Báo cáo thống kê', items: [
-        { path: '/staff/manager/report', label: 'Doanh thu & món bán chạy' },
+        { path: '/staff/manager/statistics', label: 'Phân tích kinh doanh' },
+        { path: '/staff/manager/report', label: 'Báo cáo & xuất dữ liệu' },
     ] },
 ]
 const openGroups = reactive<Record<string, boolean>>(

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { useStaffStore } from './staff'
 import { useCartStore } from './cart'
 import { useOrderStore } from './orders'
+import { useFavoritesStore } from './favorites'
 import * as authApi from '@/api/auth'
 import type { AuthUser, LoginPayload, RegisterPayload } from '@/types/auth'
 
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', {
         validationErrors: {} as Record<string, string[]>,
         // user vừa đăng ký → cần hiển thị thông báo đặc biệt
         justRegistered: false,
+        twoFactorChallenge: null as string | null,
         sessionRevision: 0,
     }),
 
@@ -39,6 +41,7 @@ export const useAuthStore = defineStore('auth', {
             this.sessionRevision++
             useCartStore().$reset()
             useOrderStore().$reset()
+            useFavoritesStore().$reset()
         },
 
         clearSession(): void {
@@ -49,6 +52,7 @@ export const useAuthStore = defineStore('auth', {
             this.error = null
             this.validationErrors = {}
             this.justRegistered = false
+            this.twoFactorChallenge = null
             this.clearStorage()
         },
 
@@ -120,25 +124,29 @@ export const useAuthStore = defineStore('auth', {
         /**
          * Đăng nhập.
          */
-        async login(payload: LoginPayload): Promise<boolean> {
+        async login(payload: LoginPayload): Promise<'authenticated' | 'two_factor' | false> {
             this.loading = true
             this.error = null
             this.validationErrors = {}
             try {
                 const result = await authApi.login(payload)
+                if (result.requires_two_factor) {
+                    this.twoFactorChallenge = result.challenge_token
+                    return 'two_factor'
+                }
                 const staff = useStaffStore()
                 staff.clearLocalSession()
                 this.clearSession()
                 if (result.primary_role) {
                     staff.acceptLogin({ ...result, primary_role: result.primary_role, roles: result.roles ?? [] })
                     this.justRegistered = false
-                    return true
+                    return 'authenticated'
                 }
                 this.user = result.user
                 this.token = result.token
                 this.persist()
                 this.justRegistered = false
-                return true
+                return 'authenticated'
             } catch (err) {
                 const e = err as AuthError
                 this.validationErrors = e.validationErrors ?? {}
@@ -147,6 +155,39 @@ export const useAuthStore = defineStore('auth', {
             } finally {
                 this.loading = false
             }
+        },
+
+        async verifyTwoFactor(code: string): Promise<boolean> {
+            if (!this.twoFactorChallenge) return false
+            this.loading = true
+            this.error = null
+            this.validationErrors = {}
+            try {
+                const result = await authApi.verifyTwoFactor(this.twoFactorChallenge, code)
+                const staff = useStaffStore()
+                staff.clearLocalSession()
+                this.clearSession()
+                if (!result.primary_role) throw new Error('Tài khoản quản lý không có vai trò hợp lệ.')
+                staff.acceptLogin({
+                    ...result,
+                    primary_role: result.primary_role,
+                    roles: result.roles ?? [],
+                })
+                return true
+            } catch (err) {
+                const e = err as AuthError
+                this.validationErrors = e.validationErrors ?? {}
+                this.error = this.extractErrorMessage(e) ?? 'Không thể xác minh mã bảo mật.'
+                return false
+            } finally {
+                this.loading = false
+            }
+        },
+
+        cancelTwoFactor(): void {
+            this.twoFactorChallenge = null
+            this.error = null
+            this.validationErrors = {}
         },
 
         /**

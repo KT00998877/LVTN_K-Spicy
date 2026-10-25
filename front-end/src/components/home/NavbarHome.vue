@@ -26,8 +26,11 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useHomeStore } from '@/stores/home'
 import { useCartStore } from '@/stores/cart'
+import { useCustomerNotificationsStore } from '@/stores/customerNotifications'
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { useNavbarState } from '@/composables/useNavbarState'
+import { useAppDialog } from '@/composables/useAppDialog'
+import CustomerPromoBell from '@/components/customer/CustomerPromoBell.vue'
 
 // --- Stores (logic preserved) ---
 const route = useRoute()
@@ -35,6 +38,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 const cartStore = useCartStore()
 const homeStore = useHomeStore()
+const promoStore = useCustomerNotificationsStore()
+const appDialog = useAppDialog()
 const { isAuthenticated, displayName } = storeToRefs(authStore)
 const { totalQuantity } = storeToRefs(cartStore)
 
@@ -103,6 +108,8 @@ watch(isMobileMenuOpen, (open) => {
 // dedicated /khuyen-mai route). Phase 3 may revisit if backend adds one.
 const primaryDestinations = [
     { name: 'menu',             label: 'Thực đơn',     path: '/thuc-don' },
+    { name: 'best-sellers',     label: 'Món bán chạy', path: '/ban-chay' },
+    { name: 'featured-menu',    label: 'Món đặc sắc',  path: '/mon-dac-sac' },
     { name: 'promotion',        label: 'Khuyến mãi',   path: '/tin-vui/tin-khuyen-mai' },
     { name: 'about',            label: 'Về chúng tôi', path: '/about' },
     { name: 'reservation',      label: 'Đặt bàn',      path: '/dat-ban' },
@@ -125,8 +132,17 @@ function goToMenu() {
     router.push('/thuc-don')
 }
 
+function goToFavorites() {
+    closeMobileMenu()
+    if (!isAuthenticated.value) {
+        router.push({ name: 'login', query: { redirect: '/mon-yeu-thich' } })
+        return
+    }
+    router.push('/mon-yeu-thich')
+}
+
 async function handleLogout() {
-    if (!confirm('Đăng xuất khỏi tài khoản?')) return
+    if (!await appDialog.confirm({ title: 'Đăng xuất?', message: 'Bạn sẽ cần đăng nhập lại để tiếp tục mua hàng.', confirmLabel: 'Đăng xuất', tone: 'warning' })) return
     await authStore.logout()
     router.replace('/')
     closeMobileMenu()
@@ -144,6 +160,17 @@ watch(isHome, () => {
 if (isAuthenticated.value) {
     cartStore.fetchCart().catch(() => undefined)
 }
+
+// --- Chuông ưu đãi (Phase 1) ---
+// Chỉ mở khi khách đã đăng nhập; đóng lại khi đăng xuất.
+watch(
+    () => ({ authenticated: isAuthenticated.value, userId: authStore.user?.id }),
+    ({ authenticated, userId }) => {
+        if (authenticated && userId) promoStore.start(userId)
+        else promoStore.stop()
+    },
+    { immediate: true },
+)
 
 useRealtimeRefresh(
     () => cartStore.fetchCart(true, true),
@@ -199,6 +226,33 @@ const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].inclu
             <!-- RIGHT: actions -->
             <div class="navbar-actions">
 
+                <!-- Chuông ưu đãi (Phase 1) — chỉ hiện khi khách đã đăng nhập -->
+                <CustomerPromoBell v-if="isAuthenticated" class="promo-bell-slot" />
+
+                <!-- Món yêu thích -->
+                <button
+                    class="icon-btn favorite-btn"
+                    :class="{ 'is-active': route.name === 'favorites' }"
+                    type="button"
+                    aria-label="Món yêu thích"
+                    :aria-current="route.name === 'favorites' ? 'page' : undefined"
+                    @click="goToFavorites"
+                >
+                    <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        :fill="route.name === 'favorites' ? 'currentColor' : 'none'"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                </button>
+
                 <!-- Account dropdown -->
                 <div ref="accountWrap" class="account-wrap">
                     <button
@@ -228,6 +282,9 @@ const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].inclu
                             </router-link>
                             <router-link to="/tai-khoan?tab=orders" class="account-item" @click="closeAccountMenu">
                                 Đơn hàng
+                            </router-link>
+                            <router-link to="/mon-yeu-thich" class="account-item" @click="closeAccountMenu">
+                                Món yêu thích
                             </router-link>
                             <router-link to="/tai-khoan?tab=tier" class="account-item" @click="closeAccountMenu">
                                 Hạng thành viên
@@ -330,6 +387,9 @@ const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].inclu
                     <router-link to="/tai-khoan" class="mobile-menu-account-link" @click="closeMobileMenu">
                         {{ displayName }}
                     </router-link>
+                    <router-link to="/mon-yeu-thich" class="mobile-menu-account-link" @click="closeMobileMenu">
+                        Món yêu thích
+                    </router-link>
                     <button class="mobile-menu-account-link mobile-menu-account-link--danger" type="button" @click="handleLogout">
                         Đăng xuất
                     </button>
@@ -360,7 +420,7 @@ const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].inclu
 .navbar {
     position: fixed;
     top: 0; left: 0; right: 0;
-    z-index: var(--z-sticky);
+    z-index: var(--z-navbar);
     height: var(--navbar-height);
     transition:
         background-color var(--dur-base) var(--ease-out),
@@ -868,8 +928,8 @@ const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].inclu
     }
 }
 
-/* Tablet/laptop ↔ mobile switch — primary nav must fit before this. */
-@media (max-width: 1024px) {
+/* Tablet/laptop ↔ mobile switch — protect the six primary links from crowding. */
+@media (max-width: 1120px) {
     .nav-links {
         display: none;
     }

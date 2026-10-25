@@ -28,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         'prefix' => 'api', 'middleware' => ['api', 'auth:sanctum', 'staff:MANAGER,KITCHEN,SHIPPER'],
     ])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->alias([
             'staff' => \App\Http\Middleware\EnsureStaffRole::class,
         ]);
@@ -54,6 +56,15 @@ return Application::configure(basePath: dirname(__DIR__))
             }
             // Web routes: redirect về /staff/login
             return response()->redirectTo('/staff/login');
+        });
+        // Thiếu nguyên liệu khi bếp bắt đầu nấu: đây là quyết định nghiệp vụ cần bếp
+        // hành động (tiếp tục nấu hoặc hủy món), không phải lỗi hệ thống.
+        $exceptions->render(function (\App\Exceptions\ShortageDetectedException $e, Request $request) {
+            return response()->json([
+                'success'   => false,
+                'message'   => $e->getMessage(),
+                'shortages' => $e->shortages,
+            ], 409);
         });
         // Hide SQL, stack traces and configuration in payment/checkout responses, including local debug mode.
         $exceptions->render(function (\Throwable $e, Request $request) {
