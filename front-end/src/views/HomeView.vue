@@ -8,6 +8,7 @@ import HeroSection from '@/components/home/HeroSection.vue'
 import UiLazySection from '@/components/ui/UiLazySection.vue'
 import FooterHome from '@/components/home/FooterHome.vue'
 import HomeLoading from '@/components/home/HomeLoading.vue'
+import PromoBanner from '@/components/customer/PromoBanner.vue'
 
 const CategoriesSection = defineAsyncComponent(() => import('@/components/home/CategoriesSection.vue'))
 const FeaturedSection = defineAsyncComponent(() => import('@/components/home/FeaturedSection.vue'))
@@ -37,6 +38,9 @@ onMounted(() => {
             @retry="store.refresh()"
         />
         <UiLazySection><CategoriesSection /></UiLazySection>
+        <section class="promo-strip">
+            <PromoBanner />
+        </section>
         <UiLazySection><FeaturedSection /></UiLazySection>
         <UiLazySection><ComboPromotionSection /></UiLazySection>
         <UiLazySection><SpicyLevelSection /></UiLazySection>
@@ -50,5 +54,12 @@ onMounted(() => {
 <style scoped>
 main {
     min-height: 100vh;
+}
+
+/* Banner ưu đãi: dải nền kem để nổi lên nhưng không cạnh tranh với hero. */
+.promo-strip {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 28px 20px 8px;
 }
 </style>

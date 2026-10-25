@@ -24,6 +24,11 @@ const props = defineProps<{
     modelValue: string | null
     subtotal: number
     disabled?: boolean
+    /**
+     * Mã cần tự áp dụng khi mount (vd khách bấm banner ưu đãi → /checkout?voucher=CODE).
+     * Component sẽ gọi preview và emit như khi khách tự nhập tay.
+     */
+    initialCode?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -42,6 +47,12 @@ const listLoading = ref(false)
 
 onMounted(async () => {
     await loadList()
+    // Mã đến từ banner/chuông ưu đãi → tự áp dụng luôn.
+    const initial = (props.initialCode ?? '').trim()
+    if (initial && initial !== appliedCode.value) {
+        codeInput.value = initial
+        await applyCode(initial)
+    }
 })
 
 async function loadList() {

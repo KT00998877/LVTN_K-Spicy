@@ -47,3 +47,16 @@ Broadcast::channel('live-chat-session.{id}', function (User $user, string $id) {
         ->where('user_id', $user->id)
         ->exists();
 }, ['guards' => ['sanctum']]);
+
+/*
+|--------------------------------------------------------------------------
+| Kênh realtime của khách hàng
+|--------------------------------------------------------------------------
+|
+| `customer.{id}` là kênh riêng của từng khách: dùng cho chuông thông báo
+| ưu đãi (Phase 1). Chỉ chính khách đó được nghe, nên không cần thêm
+| kiểm tra quyền theo role.
+*/
+Broadcast::channel('customer.{id}', function (User $user, string $id) {
+    return $user->is_active && (int) $user->id === (int) $id;
+}, ['guards' => ['sanctum']]);

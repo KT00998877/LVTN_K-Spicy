@@ -114,6 +114,7 @@ test('home keeps its hero rendered while loading and after an API timeout', asyn
         '@/stores/home': { useHomeStore: () => store },
         '@/components/home/NavbarHome.vue': { __esModule: true, default: stub('nav') },
         '@/components/home/HeroSection.vue': { __esModule: true, default: stub('h1') },
+        '@/components/customer/PromoBanner.vue': { __esModule: true, default: stub('aside') },
         '@/components/home/FooterHome.vue': { __esModule: true, default: stub('footer') },
         '@/components/home/HomeLoading.vue': { __esModule: true, default: loading },
         '@/components/ui/UiLazySection.vue': { __esModule: true, default: stub('div') },
