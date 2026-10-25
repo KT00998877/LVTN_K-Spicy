@@ -25,7 +25,7 @@
                     {{ refreshing ? 'Đang tải…' : 'Làm mới' }}
                 </button>
                 <router-link to="/staff/manager/report" class="mgr-btn mgr-btn--primary">
-                    Xem báo cáo đầy đủ
+                    Xem thống kê & báo cáo
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                         <polyline points="9 18 15 12 9 6" />
                     </svg>
@@ -165,6 +165,11 @@
                     <p class="mgr-tile__hint">
                         Giá trị trung bình:
                         <strong>{{ formatVND(avgOrderValue) }}</strong>/đơn
+                    </p>
+                    <p v-if="stats.orders_growth_pct != null" class="mgr-tile__hint">
+                        So với hôm qua:
+                        <strong :class="trendClass(stats.orders_growth_pct)">{{ Math.abs(stats.orders_growth_pct).toFixed(1) }}%</strong>
+                        {{ trendWord(stats.orders_growth_pct) }}
                     </p>
                 </article>
 
@@ -430,7 +435,7 @@ const EMPTY_STATS: DashboardStats = {
     ready_items: 0,
     total_staff: 0,
     revenue_growth_pct: null,
-    orders_growth_pct: 0,
+    orders_growth_pct: null,
 }
 
 const EMPTY_REPORT: RevenueReport = {

@@ -170,6 +170,24 @@ export interface CustomerStatsData {
         order_count: number
         total_spent: number
     }>
+    loyalty_tiers: Array<{
+        id: number
+        code: string
+        name: string
+        color: string
+        icon: string | null
+        customer_count: number
+        loyalty_points: number
+        total_spent: number
+    }>
+    top_loyalty_customers: Array<{
+        id: number
+        name: string
+        loyalty_points: number
+        total_spent: number
+        tier_name: string | null
+        tier_color: string | null
+    }>
 }
 
 /* ====================== Reservations ====================== */

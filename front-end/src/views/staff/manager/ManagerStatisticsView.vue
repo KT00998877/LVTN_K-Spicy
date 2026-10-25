@@ -28,6 +28,7 @@
                 </svg>
                 {{ statsStore.isAnyLoading ? 'Đang tải…' : 'Làm mới' }}
             </button>
+            <router-link class="stats-btn stats-btn--ghost" :to="reportLocation">Xem báo cáo / xuất dữ liệu</router-link>
         </header>
 
         <!-- ============================================================
@@ -87,16 +88,32 @@
                 <span class="stats-kpi__label">Đặt bàn</span>
                 <div class="stats-kpi__value">{{ formatInt(overview?.total_reservations ?? 0) }}</div>
                 <span class="stats-kpi__meta">
-                    Khách mới <strong>{{ formatInt(overview?.new_customers ?? 0) }}</strong> trong kỳ
+                    Số lượt đặt bàn trong kỳ
                 </span>
                 <GrowthPill :value="overview?.growth.total_reservations ?? null" suffix="so với kỳ trước" />
             </article>
         </section>
 
+        <section class="stats-section" aria-labelledby="loyalty-title">
+            <div class="stats-section__head">
+                <h2 id="loyalty-title" class="stats-section__title">Hạng thành viên tích lũy</h2>
+                <span class="stats-section__meta">Theo hạng hiện tại và tổng chi tiêu tích lũy</span>
+            </div>
+            <div class="stats-section__body">
+                <WidgetState :loading="statsStore.loading.customers" :error="statsStore.errors.customers ?? null" :empty="!statsStore.customers || statsStore.customers.loyalty_tiers.every(t => t.customer_count === 0)" empty-message="Chưa có dữ liệu hạng thành viên." @retry="statsStore.retry('customers')">
+                    <StatsBarChart v-if="statsStore.customers?.loyalty_tiers.length" :labels="statsStore.customers.loyalty_tiers.map(t => t.name)" :data="statsStore.customers.loyalty_tiers.map(t => t.customer_count)" label="Số khách theo hạng" :ariaLabel="'Biểu đồ số khách hàng theo hạng thành viên'" :height="Math.max(180, statsStore.customers.loyalty_tiers.length * 40)" />
+                </WidgetState>
+                <table v-if="statsStore.customers?.top_loyalty_customers.length" class="stats-rank-table" aria-label="Khách có tổng chi tiêu tích lũy cao nhất">
+                    <thead><tr><th>#</th><th>Khách hàng</th><th>Hạng</th><th class="ar">Điểm</th><th class="ar">Tích lũy</th></tr></thead>
+                    <tbody><tr v-for="(customer, index) in statsStore.customers.top_loyalty_customers" :key="customer.id"><td class="stats-rank-table__num">{{ index + 1 }}</td><td><strong>{{ customer.name }}</strong></td><td>{{ customer.tier_name ?? 'Chưa xếp hạng' }}</td><td class="ar">{{ formatInt(customer.loyalty_points) }}</td><td class="ar">{{ formatVND(customer.total_spent) }}</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="stats-grid">
             <article class="stats-section" aria-labelledby="customer-title">
                 <div class="stats-section__head">
-                    <h2 id="customer-title" class="stats-section__title">Khách hàng thân thiết</h2>
+                    <h2 id="customer-title" class="stats-section__title">Khách chi tiêu nhiều trong kỳ</h2>
                     <span class="stats-section__meta">Top khách theo chi tiêu trong kỳ</span>
                 </div>
                 <div class="stats-section__body">
@@ -463,6 +480,7 @@
  *  - Realtime: tự refresh khi có write event (qua useRealtimeRefresh).
  */
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { useManagerStatisticsStore } from '@/stores/managerStatistics'
 import type { StatisticsPeriod } from '@/api/statistics'
@@ -478,6 +496,7 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { formatVND } from '@/composables/useStaffUtils'
 
 const statsStore = useManagerStatisticsStore()
+const route = useRoute()
 
 const overview = computed(() => statsStore.overview)
 const revenueChart = computed(() => statsStore.revenueChart)
@@ -495,6 +514,14 @@ const totalOrders = computed(() => {
 })
 
 const periodLabel = computed(() => statsStore.overview?.period?.label ?? '')
+const reportLocation = computed(() => ({
+    path: '/staff/manager/report',
+    query: {
+        period: statsStore.period,
+        from: statsStore.period === 'custom' ? statsStore.fromDate : statsStore.overview?.period.from,
+        to: statsStore.period === 'custom' ? statsStore.toDate : statsStore.overview?.period.to,
+    },
+}))
 
 const PAYMENT_COLORS: Record<string, string> = {
     CASH: '#d71920',
@@ -562,13 +589,20 @@ async function onApply(): Promise<void> {
     await statsStore.fetchAll(false)
     isFirstLoad.value = false
 }
-
 async function onRefresh(): Promise<void> {
     await statsStore.fetchAll(false)
 }
 
 onMounted(() => {
-    if (isFirstLoad.value) onApply()
+    if (!isFirstLoad.value) return
+    const query = route.query
+    const period = typeof query.period === 'string' ? query.period : ''
+    const validPeriods: StatisticsPeriod[] = ['today', 'yesterday', 'last_7_days', 'last_30_days', 'this_week', 'previous_week', 'this_month', 'previous_month', 'this_quarter', 'this_year', 'custom']
+    if (validPeriods.includes(period as StatisticsPeriod)) {
+        statsStore.setPeriod(period as StatisticsPeriod)
+        if (period === 'custom' && typeof query.from === 'string' && typeof query.to === 'string') statsStore.setCustomRange(query.from, query.to)
+    }
+    onApply()
 })
 
 // Realtime refresh: khi có write event → fetchAll(quiet=true) không flash loading.

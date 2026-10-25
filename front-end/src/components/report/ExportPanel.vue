@@ -25,6 +25,8 @@ const props = withDefaults(
         allowedTypes?: ReportTypeOption[]
         defaultType?: ReportType
         showOrderFilters?: boolean
+        initialFrom?: string
+        initialTo?: string
     }>(),
     {
         allowedTypes: () => [
@@ -74,8 +76,8 @@ const staff = useStaffStore()
 const REPORT_OPTIONS: ReportTypeOption[] = props.allowedTypes
 
 const selectedType = ref<ReportType>(props.defaultType)
-const fromDate = ref<string>('')
-const toDate = ref<string>('')
+const fromDate = ref<string>(props.initialFrom ?? '')
+const toDate = ref<string>(props.initialTo ?? '')
 const orderStatus = ref<string>('')
 const orderType = ref<string>('')
 const loadingFormat = ref<ReportFormat | null>(null)
@@ -83,6 +85,15 @@ const lastError = ref<string | null>(null)
 const lastSuccess = ref<string | null>(null)
 
 const userRoles = computed(() => staff.session?.roles ?? [])
+
+watch(
+    () => [props.initialFrom, props.initialTo] as const,
+    ([from, to]) => {
+        if (from) fromDate.value = from
+        if (to) toDate.value = to
+    },
+    { immediate: true },
+)
 
 const canSubmit = computed(() => {
     if (!canExport(selectedType.value, userRoles.value)) {

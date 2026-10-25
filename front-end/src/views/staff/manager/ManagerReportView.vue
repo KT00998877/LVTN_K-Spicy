@@ -38,7 +38,7 @@
 
         <!-- EXPORT — Xuất báo cáo Excel/PDF (MANAGER full quyền) -->
         <section class="export-section">
-            <ExportPanel :default-type="'revenue'" />
+            <ExportPanel :default-type="'revenue'" :initial-from="fromDate" :initial-to="toDate" />
         </section>
 
         <Teleport to="body"><div v-if="printing && report" class="manager-report-print"><RevenueReportSheet :report="report" /></div></Teleport>
@@ -50,6 +50,7 @@ import { beginRead } from '@/utils/realtime'
 const liveReads = {}
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { onMounted, ref, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import RevenueReportSheet from '@/components/staff/RevenueReportSheet.vue'
 import ExportPanel from '@/components/report/ExportPanel.vue'
 import { useDashboardStore } from '@/stores/staffDashboard'
@@ -58,6 +59,7 @@ import { staffDashboard, type RevenueReport } from '@/api/staff'
 
 const dashboardStore = useDashboardStore()
 const toast = useToast()
+const route = useRoute()
 
 const report = ref<RevenueReport | null>(null)
 const period = ref<'today' | 'day' | 'month' | 'custom'>('month')
@@ -78,7 +80,14 @@ const periods: Array<{ value: 'today' | 'day' | 'month'; label: string }> = [
     { value: 'day',   label: '7 ngày qua' },
 ]
 
-onMounted(() => loadReport())
+onMounted(() => {
+    if (typeof route.query.from === 'string' && typeof route.query.to === 'string') {
+        fromDate.value = route.query.from
+        toDate.value = route.query.to
+        period.value = 'custom'
+    }
+    loadReport()
+})
 
 async function setPeriod(p: 'today' | 'day' | 'month'): Promise<void> {
     period.value = p

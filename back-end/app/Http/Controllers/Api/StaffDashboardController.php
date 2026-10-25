@@ -43,10 +43,12 @@ class StaffDashboardController extends Controller
         $today = $this->payments($from, $to);
         $revenue = (float) (clone $today)->sum('amount');
         $yesterday = (float) $this->payments($from->copy()->subDay(), $from)->sum('amount');
+        $todayOrders = Order::where('placed_at', '>=', $from)->where('placed_at', '<', $to)->where('status', '!=', 'CANCELLED')->count();
+        $yesterdayOrders = Order::where('placed_at', '>=', $from->copy()->subDay())->where('placed_at', '<', $from)->where('status', '!=', 'CANCELLED')->count();
         $items = OrderItem::whereHas('order', fn ($q) => $q->whereNotIn('status', ['CANCELLED', 'COMPLETED']));
         return response()->json(['data' => [
             'today_revenue' => $revenue,
-            'today_orders' => Order::where('placed_at', '>=', $from)->where('placed_at', '<', $to)->where('status', '!=', 'CANCELLED')->count(),
+            'today_orders' => $todayOrders,
             'today_invoices' => (clone $today)->distinct()->count('invoice_id'),
             'active_tables' => Table::where('status', 'OCCUPIED')->count(),
             'available_tables' => Table::where('status', 'AVAILABLE')->count(),
@@ -55,7 +57,7 @@ class StaffDashboardController extends Controller
             'ready_items' => (int) (clone $items)->where('status', 'READY')->sum('quantity'),
             'total_staff' => User::where('is_active', true)->whereHas('roles', fn ($q) => $q->whereIn('code', ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER']))->count(),
             'revenue_growth_pct' => $yesterday > 0 ? round(($revenue - $yesterday) / $yesterday * 100, 1) : null,
-            'orders_growth_pct' => 0,
+            'orders_growth_pct' => $yesterdayOrders > 0 ? round(($todayOrders - $yesterdayOrders) / $yesterdayOrders * 100, 1) : null,
         ]]);
     }
 

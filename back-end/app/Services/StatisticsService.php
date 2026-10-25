@@ -747,12 +747,56 @@ class StatisticsService
             'total_spent' => round((float) $r->total_spent, 2),
         ])->all();
 
+        $loyaltyTiers = DB::table('loyalty_tiers as lt')
+            ->leftJoin('users as u', 'u.loyalty_tier_id', '=', 'lt.id')
+            ->leftJoin('user_role as ur', 'ur.user_id', '=', 'u.id')
+            ->leftJoin('roles as r', 'r.id', '=', 'ur.role_id')
+            ->where(function ($query) {
+                $query->whereNull('u.id')->orWhere('r.code', 'CUSTOMER');
+            })
+            ->where('lt.is_active', true)
+            ->selectRaw('lt.id, lt.code, lt.name, lt.color, lt.icon, COUNT(DISTINCT u.id) as customer_count, COALESCE(SUM(u.loyalty_points), 0) as loyalty_points, COALESCE(SUM(u.total_spent), 0) as total_spent')
+            ->groupBy('lt.id', 'lt.code', 'lt.name', 'lt.color', 'lt.icon', 'lt.sort_order')
+            ->orderBy('lt.sort_order')
+            ->get()
+            ->map(fn ($tier) => [
+                'id' => (int) $tier->id,
+                'code' => $tier->code,
+                'name' => $tier->name,
+                'color' => $tier->color,
+                'icon' => $tier->icon,
+                'customer_count' => (int) $tier->customer_count,
+                'loyalty_points' => (int) $tier->loyalty_points,
+                'total_spent' => (float) $tier->total_spent,
+            ])->all();
+
+        $loyaltyTop = DB::table('users as u')
+            ->join('user_role as ur', 'ur.user_id', '=', 'u.id')
+            ->join('roles as r', 'r.id', '=', 'ur.role_id')
+            ->leftJoin('loyalty_tiers as lt', 'lt.id', '=', 'u.loyalty_tier_id')
+            ->where('r.code', 'CUSTOMER')
+            ->select('u.id', 'u.name', 'u.loyalty_points', 'u.total_spent', 'lt.name as tier_name', 'lt.color as tier_color')
+            ->groupBy('u.id', 'u.name', 'u.loyalty_points', 'u.total_spent', 'lt.name', 'lt.color')
+            ->orderByDesc('u.total_spent')
+            ->limit(10)
+            ->get()
+            ->map(fn ($customer) => [
+                'id' => (int) $customer->id,
+                'name' => $customer->name,
+                'loyalty_points' => (int) $customer->loyalty_points,
+                'total_spent' => (float) $customer->total_spent,
+                'tier_name' => $customer->tier_name,
+                'tier_color' => $customer->tier_color,
+            ])->all();
+
         return [
             'total_customers'  => $total,
             'new_customers'    => $new,
             'returning_customers' => $returning,
             'new_customers_growth_pct' => self::growthPct($new, $prevNew),
             'top_customers'    => $top,
+            'loyalty_tiers' => $loyaltyTiers,
+            'top_loyalty_customers' => $loyaltyTop,
         ];
     }
 
