@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{Order, User};
+use App\Models\{Order, OrderCancellationRequest, User};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -54,6 +54,9 @@ class OnlineOrderService
     public function presentation(Order $order): array
     {
         $invoice = DB::table('invoices')->where('order_id', $order->id)->first();
+        $cancellation = $order->relationLoaded('cancellationRequest')
+            ? $order->cancellationRequest
+            : $order->cancellationRequest()->first();
         return [
             'recipient_name'   => $order->recipient_name,
             'recipient_phone' => $order->recipient_phone,
@@ -90,6 +93,13 @@ class OnlineOrderService
                 'total'        => (float) $invoice->total_amount,
                 'paid'         => (float) $invoice->paid_amount,
                 'is_simulated' => DB::table('payments')->where('invoice_id', $invoice->id)->where('is_simulated', true)->exists(),
+            ] : null,
+            'cancellation_request' => $cancellation ? [
+                'status' => $cancellation->status,
+                'reason' => $cancellation->reason,
+                'requested_at' => $cancellation->requested_at?->toIso8601String(),
+                'approved_at' => $cancellation->approved_at?->toIso8601String(),
+                'refunded_at' => $cancellation->refunded_at?->toIso8601String(),
             ] : null,
             'events' => DB::table('order_events')->where('order_id', $order->id)->orderBy('id')
                 ->get(['event', 'status', 'note', 'created_at'])->all(),
@@ -206,6 +216,10 @@ class OnlineOrderService
     {
         DB::transaction(function () use ($actor, $id, $shipperId) {
             $order = $this->lockDelivery($id);
+            abort_if($order->cancellationRequest()->whereIn('status', [
+                OrderCancellationRequest::STATUS_PENDING,
+                OrderCancellationRequest::STATUS_APPROVED,
+            ])->exists(), 409, 'Đơn đang trong quy trình hủy và hoàn tiền.');
             // A null actor is reserved for verified gateway settlement inside its transaction.
             abort_if($actor === null && $order->payment_method !== 'PREPAID', 409);
             if ($order->confirmed_at) {
@@ -482,7 +496,7 @@ class OnlineOrderService
      *  - status = PENDING (nhà hàng chưa xác nhận)
      *  - PREPAID + VNPay chưa SUCCESS → tự động REFUND
      *  - PREPAID + VNPay đang PENDING → chặn, cần chờ IPN xác minh
-     *  - PREPAID + VNPay SUCCESS (tiền thực) → chặn, gợi ý gọi nhà hàng
+     *  - PREPAID + VNPay SUCCESS (tiền thực) → tạo yêu cầu để MANAGER duyệt
      *  - COD → huỷ thẳng
      *
      * Idempotent: nếu đã CANCELLED thì trả về OK.
@@ -510,13 +524,35 @@ class OnlineOrderService
                     409,
                     'Giao dịch VNPay đang chờ xác minh. Vui lòng chờ hoặc liên hệ nhà hàng.'
                 );
-                // Có payment thực (VNPay SUCCESS không phải simulated) → chặn
+                $paidVnpay = DB::table('payments')->where('invoice_id', $invoice->id)
+                    ->where('provider', 'vnpay')
+                    ->where('status', 'SUCCESS')
+                    ->where('is_simulated', false)
+                    ->exists();
+
+                if ($paidVnpay) {
+                    $request = OrderCancellationRequest::firstOrCreate(
+                        ['order_id' => $order->id],
+                        [
+                            'requested_by' => $customer->id,
+                            'reason' => $reason,
+                            'status' => OrderCancellationRequest::STATUS_PENDING,
+                            'requested_at' => now(),
+                        ],
+                    );
+                    if ($request->wasRecentlyCreated) {
+                        $this->event($order, $customer, 'CANCEL_REQUESTED', '[Khách yêu cầu hủy] '.$reason);
+                        app(StaffNotificationService::class)->orderCancellationRequested($order);
+                    }
+                    return;
+                }
+
                 abort_if(
                     DB::table('payments')->where('invoice_id', $invoice->id)
                         ->where('status', 'SUCCESS')
                         ->where('is_simulated', false)->exists(),
                     409,
-                    'Đơn đã thanh toán qua VNPay. Vui lòng liên hệ nhà hàng để được hoàn tiền.'
+                    'Phương thức thanh toán này cần nhà hàng hỗ trợ hủy riêng.'
                 );
                 // Đã SUCCESS nhưng là simulated (COD → PREPAID đổi) → refund
                 DB::table('payments')->where('invoice_id', $invoice->id)
@@ -547,6 +583,85 @@ class OnlineOrderService
         }, 3);
     }
 
+    public function approveCancellation(User $manager, int $orderId): void
+    {
+        DB::transaction(function () use ($manager, $orderId) {
+            $order = $this->lockDelivery($orderId);
+            $request = OrderCancellationRequest::where('order_id', $order->id)
+                ->lockForUpdate()->firstOrFail();
+
+            if (in_array($request->status, [
+                OrderCancellationRequest::STATUS_APPROVED,
+                OrderCancellationRequest::STATUS_REFUNDED,
+            ], true)) return;
+
+            abort_unless($request->status === OrderCancellationRequest::STATUS_PENDING, 409,
+                'Yêu cầu hủy không còn chờ duyệt.');
+            abort_unless($order->status === 'PENDING', 409,
+                'Chỉ có thể duyệt hủy khi đơn chưa được nhà hàng xác nhận.');
+
+            $order->items()->update([
+                'status' => 'CANCELLED',
+                'cancelled_by' => $manager->id,
+                'cancellation_reason' => '[Quản lý duyệt yêu cầu khách] '.$request->reason,
+            ]);
+            $order->update([
+                'status' => 'CANCELLED',
+                'cancelled_by_user_id' => $manager->id,
+                'cancelled_at' => now(),
+                'cancellation_reason' => $request->reason,
+            ]);
+            $request->update([
+                'status' => OrderCancellationRequest::STATUS_APPROVED,
+                'approved_by' => $manager->id,
+                'approved_at' => now(),
+            ]);
+
+            app(DeliveryPricingService::class)->refund($order);
+            app(\App\Services\VoucherService::class)->refund($order);
+            $this->event($order, $manager, 'CANCEL_APPROVED', '[Quản lý duyệt hủy] '.$request->reason);
+        }, 3);
+    }
+
+    public function confirmSandboxRefund(User $manager, int $orderId): void
+    {
+        DB::transaction(function () use ($manager, $orderId) {
+            $order = $this->lockDelivery($orderId);
+            $request = OrderCancellationRequest::where('order_id', $order->id)
+                ->lockForUpdate()->firstOrFail();
+
+            if ($request->status === OrderCancellationRequest::STATUS_REFUNDED) return;
+            abort_unless($request->status === OrderCancellationRequest::STATUS_APPROVED, 409,
+                'Yêu cầu hủy phải được duyệt trước khi xác nhận hoàn tiền.');
+            abort_unless($order->status === 'CANCELLED', 409, 'Đơn chưa được hủy.');
+
+            $invoice = $this->invoice($order);
+            $payment = DB::table('payments')->where('invoice_id', $invoice->id)
+                ->where('provider', 'vnpay')->where('status', 'SUCCESS')
+                ->where('is_simulated', false)->lockForUpdate()->first();
+            abort_unless($payment, 409, 'Không tìm thấy giao dịch VNPay đã thanh toán để hoàn tiền.');
+
+            DB::table('payments')->where('id', $payment->id)->update([
+                'status' => 'REFUNDED',
+                'note' => 'VNPay Sandbox: quản lý xác nhận đã hoàn tiền.',
+                'updated_at' => now(),
+            ]);
+            DB::table('invoices')->where('id', $invoice->id)->update([
+                'status' => 'REFUNDED',
+                'paid_amount' => 0,
+                'updated_at' => now(),
+            ]);
+            $request->update([
+                'status' => OrderCancellationRequest::STATUS_REFUNDED,
+                'refunded_by' => $manager->id,
+                'refunded_at' => now(),
+            ]);
+
+            $this->event($order, $manager, 'REFUND_CONFIRMED', 'Đã xác nhận hoàn tiền VNPay Sandbox.');
+            app(CustomerOrderNotificationService::class)->refundCompleted($order);
+        }, 3);
+    }
+
     /* ------------------------------------------------------------------ */
     /* Sự cố & từ chối                                                     */
     /* ------------------------------------------------------------------ */
@@ -566,6 +681,10 @@ class OnlineOrderService
         DB::transaction(function () use ($actor, $id, $reason) {
             $order = $this->lockDelivery($id);
             if ($order->status === 'CANCELLED') return;
+            abort_if($order->cancellationRequest()->whereIn('status', [
+                OrderCancellationRequest::STATUS_PENDING,
+                OrderCancellationRequest::STATUS_APPROVED,
+            ])->exists(), 409, 'Đơn đang trong quy trình hủy và hoàn tiền.');
             abort_unless($order->status === 'PENDING', 409, 'Chỉ từ chối đơn chưa xác nhận.');
             $invoice = $this->invoice($order);
             $payments = DB::table('payments')->where('invoice_id', $invoice->id)->where('status', 'SUCCESS')->get();

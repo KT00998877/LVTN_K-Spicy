@@ -5,7 +5,7 @@ import Pusher from 'pusher-js'
 import apiClient from '@/api/client'
 
 /**
- * Chuông thông báo ưu đãi cho khách hàng (Phase 1).
+ * Store chuông thông báo cho khách hàng.
  *
  * Sao chép pattern từ `stores/staffNotifications.ts` nhưng dùng token khách
  * (`auth_token`) và kênh `customer.{id}` thay vì `staff.{id}`.
@@ -17,14 +17,17 @@ export interface PromoNotification {
     id: string
     data: {
         event: string
-        campaign_id: number
+        campaign_id?: number
+        order_id?: number
+        order_code?: string
         name: string
         message: string
-        voucher_code: string
-        banner_image_url: string | null
-        accent_color: string
-        cta_text: string
-        landing_url: string | null
+        voucher_code?: string
+        banner_image_url?: string | null
+        accent_color?: string
+        cta_text?: string
+        landing_url?: string | null
+        url?: string
     }
     read_at: string | null
     created_at: string
@@ -185,6 +188,15 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
                 void fetchPage()
             })
             .listen('.customer.promo.created', (item: PromoNotification) => {
+                if (currentGeneration !== generation || seen.has(item.id)) return
+                seen.add(item.id)
+                revision++
+                items.value.unshift(item)
+                unreadCount.value++
+                latest.value = item
+                playSound()
+            })
+            .listen('.customer.order.created', (item: PromoNotification) => {
                 if (currentGeneration !== generation || seen.has(item.id)) return
                 seen.add(item.id)
                 revision++

@@ -33,6 +33,7 @@ class OrderController extends Controller
 
         $query = Order::query()
             ->where('customer_id', $user->id)
+            ->with('cancellationRequest')
             ->orderByDesc('placed_at');
 
         if ($status = $request->query('status')) {
@@ -64,7 +65,7 @@ class OrderController extends Controller
         $user = $request->user();
 
         $order = Order::query()
-            ->with(['items.toppings.topping'])
+            ->with(['items.toppings.topping', 'cancellationRequest'])
             ->where('customer_id', $user->id)
             ->where('id', $id)
             ->first();
@@ -105,7 +106,7 @@ class OrderController extends Controller
         app(\App\Services\OnlineOrderService::class)->customerConfirmReceipt($user, $id);
 
         $order = Order::query()
-            ->with(['items.toppings.topping'])
+            ->with(['items.toppings.topping', 'cancellationRequest'])
             ->where('customer_id', $user->id)
             ->where('id', $id)
             ->firstOrFail();

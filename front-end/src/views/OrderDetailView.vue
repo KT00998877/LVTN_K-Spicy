@@ -155,17 +155,23 @@ function backToList() {
 }
 
 const canCancelOrder = computed(() => isDeliveryOrder.value && current.value?.status === 'PENDING')
+const hasCancellationRequest = computed(() => !!current.value?.cancellation_request)
+const isPaidVnpayOrder = computed(() => current.value?.payment_method === 'PREPAID'
+    && current.value?.payment?.status === 'PAID'
+    && !current.value?.payment?.is_simulated)
 const cancelError = ref('')
 
 async function cancelOrder(): Promise<void> {
     if (!current.value || loadingCancel.value) return
     cancelError.value = ''
     const value = await appDialog.prompt({
-        title: 'Hủy đơn hàng?',
-        message: 'Đơn đang chờ nhà hàng xác nhận. Hãy cho nhà hàng biết lý do bạn muốn hủy.',
+        title: isPaidVnpayOrder.value ? 'Gửi yêu cầu hủy đơn?' : 'Hủy đơn hàng?',
+        message: isPaidVnpayOrder.value
+            ? 'Đơn đã thanh toán VNPay. Quản lý sẽ duyệt yêu cầu, xác nhận hoàn tiền sandbox và thông báo lại cho bạn.'
+            : 'Đơn đang chờ nhà hàng xác nhận. Hãy cho nhà hàng biết lý do bạn muốn hủy.',
         label: 'Lý do hủy',
         placeholder: 'Ví dụ: Tôi đặt nhầm món',
-        confirmLabel: 'Hủy đơn',
+        confirmLabel: isPaidVnpayOrder.value ? 'Gửi yêu cầu' : 'Hủy đơn',
         tone: 'danger',
     })
     if (value === null) return
@@ -472,7 +478,10 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
             Đơn hàng đã được tạo nhưng chưa mở được VNPAY. Bạn có thể thanh toán lại cho đơn này; không cần đặt đơn mới.
         </p>
         <div style="max-width: 880px; margin: 0 auto;">
-            <button class="back-link" @click="backToList">Quay lại đơn hàng của tôi</button>
+            <button type="button" class="back-link" @click="backToList">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                <span>Quay lại đơn hàng của tôi</span>
+            </button>
 
             <div v-if="loadingDetail" class="state-box">Đang tải chi tiết đơn hàng...</div>
 
@@ -496,6 +505,34 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                         {{ STATUS_LABELS[current.status].label }}
                     </span>
                 </div>
+
+                <section
+                    v-if="current.cancellation_request"
+                    class="refund-progress"
+                    :class="`is-${current.cancellation_request.status.toLowerCase()}`"
+                    aria-labelledby="refund-progress-title"
+                    aria-live="polite"
+                >
+                    <div class="refund-progress-copy">
+                        <span class="refund-kicker">YÊU CẦU HỦY ĐƠN VNPAY</span>
+                        <h2 id="refund-progress-title">
+                            <template v-if="current.cancellation_request.status === 'PENDING'">Đang chờ quản lý duyệt</template>
+                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">Đã duyệt hủy, đang chờ hoàn tiền</template>
+                            <template v-else>Hoàn tiền thành công</template>
+                        </h2>
+                        <p>
+                            <template v-if="current.cancellation_request.status === 'PENDING'">Nhà hàng đã nhận yêu cầu và sẽ phản hồi ngay trên tài khoản của bạn.</template>
+                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">Quản lý đã hủy đơn và đang xác nhận hoàn tiền trên VNPay Sandbox.</template>
+                            <template v-else>Khoản thanh toán đã được đánh dấu hoàn tiền. Thông báo xác nhận đã gửi đến bạn.</template>
+                        </p>
+                        <p class="refund-reason"><strong>Lý do:</strong> {{ current.cancellation_request.reason }}</p>
+                    </div>
+                    <ol class="refund-steps" aria-label="Tiến trình hủy và hoàn tiền">
+                        <li class="done"><span>1</span>Đã gửi yêu cầu</li>
+                        <li :class="{ done: current.cancellation_request.status !== 'PENDING' }"><span>2</span>Quản lý duyệt hủy</li>
+                        <li :class="{ done: current.cancellation_request.status === 'REFUNDED' }"><span>3</span>Hoàn tiền</li>
+                    </ol>
+                </section>
 
                 <!-- ====== Payment banner (chỉ cho ONLINE/TAKEAWAY chưa hủy) ====== -->
                 <div v-if="isDeliveryOrder && current.status !== 'CANCELLED'" class="payment-banner" :class="current.payment?.status === 'PAID' ? 'paid' : 'unpaid'">
@@ -521,14 +558,14 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                     </button>
                 </div>
 
-                <section v-if="canCancelOrder" class="cancel-order-card" aria-labelledby="cancel-order-title">
+                <section v-if="canCancelOrder && !hasCancellationRequest" class="cancel-order-card" aria-labelledby="cancel-order-title">
                     <div>
                         <strong id="cancel-order-title">Bạn cần thay đổi đơn?</strong>
-                        <p>Đơn chỉ có thể hủy trước khi nhà hàng xác nhận.</p>
+                        <p>{{ isPaidVnpayOrder ? 'Đơn đã thanh toán sẽ được quản lý duyệt và xác nhận hoàn tiền.' : 'Đơn chỉ có thể hủy trước khi nhà hàng xác nhận.' }}</p>
                         <p v-if="cancelError" class="cancel-order-error" role="alert">{{ cancelError }}</p>
                     </div>
                     <button type="button" class="au-btn au-btn-danger" :disabled="loadingCancel" @click="cancelOrder">
-                        {{ loadingCancel ? 'Đang hủy đơn…' : 'Hủy đơn' }}
+                        {{ loadingCancel ? 'Đang gửi…' : isPaidVnpayOrder ? 'Yêu cầu hủy đơn' : 'Hủy đơn' }}
                     </button>
                 </section>
 
@@ -1011,15 +1048,27 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
 
 <style scoped>
 .back-link {
-    background: transparent;
-    border: 0;
-    color: var(--hp-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin-bottom: 18px;
+    padding: 10px 16px;
+    border: 1px solid #decfc8;
+    border-radius: 10px;
+    background: #fff8f4;
+    color: #5f3833;
+    box-shadow: 0 4px 12px rgba(94, 32, 28, .08);
     cursor: pointer;
+    font: inherit;
     font-size: 14px;
-    margin-bottom: 14px;
-    padding: 0;
+    font-weight: 700;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease;
 }
-.back-link:hover { color: #e63946; }
+.back-link svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.back-link:hover { border-color: #c9988f; background: #fff1eb; color: var(--color-chili-red, #d71920); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(94, 32, 28, .12); }
+.back-link:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(94, 32, 28, .08); }
+.back-link:focus-visible { outline: 3px solid var(--color-chili-red, #d71920); outline-offset: 2px; }
 
 .state-box {
     background: #fff;
@@ -1307,6 +1356,19 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
 .cancel-order-card p { margin: 4px 0 0; color: var(--hp-muted); font-size: 14px; }
 .cancel-order-card .cancel-order-error { color: #991b1b; }
 
+.refund-progress { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); gap: 24px; margin-bottom: 16px; padding: 22px; border-radius: 14px; background: #fff4e5; color: #713f12; box-shadow: 0 8px 24px rgba(113, 63, 18, .08); }
+.refund-progress.is-approved { background: #fff1f2; color: #881337; }
+.refund-progress.is-refunded { background: #ecfdf3; color: #166534; }
+.refund-kicker { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: .09em; }
+.refund-progress h2 { margin: 0; color: inherit; font-size: 20px; }
+.refund-progress p { margin: 7px 0 0; color: inherit; line-height: 1.55; }
+.refund-reason { font-size: 14px; }
+.refund-steps { display: grid; gap: 9px; align-content: center; margin: 0; padding: 0; list-style: none; }
+.refund-steps li { display: flex; align-items: center; gap: 10px; min-height: 38px; color: rgba(51, 33, 30, .62); font-size: 14px; font-weight: 700; }
+.refund-steps li span { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1px rgba(83, 52, 45, .14); }
+.refund-steps li.done { color: inherit; }
+.refund-steps li.done span { background: currentColor; color: white; box-shadow: none; }
+
 .detail-actions { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
 
 /* ===== Modal ===== */
@@ -1407,6 +1469,7 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
     .step-label { font-size: 11px; }
     .info-grid { grid-template-columns: 1fr; }
     .cancel-order-card { align-items: stretch; flex-direction: column; }
+    .refund-progress { grid-template-columns: 1fr; padding: 18px; }
 }
 
 /* ===== Per-item review button ===== */

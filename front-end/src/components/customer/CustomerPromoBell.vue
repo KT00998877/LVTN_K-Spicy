@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * CustomerPromoBell — ô chuông ưu đãi cho khách hàng (Phase 1).
+ * CustomerPromoBell — chuông thông báo cho khách hàng.
  *
- * Khác `staff/StaffNotificationBell.vue` ở chỗ: nội dung là ưu đãi kèm
- * mã voucher, và dùng màu thương hiệu mì cay (spicy red) thay vì palette staff.
+ * Hiển thị ưu đãi, cập nhật đơn hàng và dùng màu thương hiệu mì cay.
  */
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -45,11 +44,18 @@ async function copyCode(code: string, id: string) {
     }, 2200)
 }
 
-/** Bấm ưu đãi → đánh dấu đã đọc + đi tới trang dùng mã (checkout kèm mã). */
-async function usePromo(item: PromoNotification) {
+/** Mở đích đến phù hợp của ưu đãi hoặc cập nhật đơn hàng. */
+async function openNotification(item: PromoNotification) {
     await store.markRead(item)
     toast.value = null
-    await router.push({ path: '/checkout', query: { voucher: item.data.voucher_code } })
+    open.value = false
+    if (item.data.url) {
+        await router.push(item.data.url)
+        return
+    }
+    if (item.data.voucher_code) {
+        await router.push({ path: '/checkout', query: { voucher: item.data.voucher_code } })
+    }
 }
 </script>
 
@@ -60,7 +66,7 @@ async function usePromo(item: PromoNotification) {
             type="button"
             :aria-expanded="open"
             aria-haspopup="true"
-            :aria-label="`Ưu đãi, ${store.unreadCount} chưa đọc`"
+            :aria-label="`Thông báo, ${store.unreadCount} chưa đọc`"
             @click="togglePanel"
         >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -69,24 +75,24 @@ async function usePromo(item: PromoNotification) {
             <span v-if="store.unreadCount" class="count">{{ store.unreadCount > 99 ? '99+' : store.unreadCount }}</span>
         </button>
 
-        <div v-if="open" class="promo-panel" role="dialog" aria-label="Ưu đãi của bạn">
+        <div v-if="open" class="promo-panel" role="dialog" aria-label="Thông báo của bạn">
             <header>
-                <strong>Ưu đãi dành cho bạn</strong>
+                <strong>Thông báo của bạn</strong>
                 <button class="close-button" type="button" aria-label="Đóng" @click="open = false">✕</button>
             </header>
 
             <p class="connection" role="status">{{ connectionLabel }}</p>
             <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>
 
-            <p v-if="store.loading && !store.items.length" role="status">Đang tải ưu đãi…</p>
+            <p v-if="store.loading && !store.items.length" role="status">Đang tải thông báo…</p>
             <p v-else-if="!store.items.length" class="empty">
-                Chưa có ưu đãi nào. Hãy quay lại vào khung giờ vàng nhé!
+                Chưa có thông báo mới.
             </p>
 
             <ul v-else>
                 <li v-for="item in store.items" :key="item.id" :class="{ unread: !item.read_at }">
                     <p class="promo-message">{{ item.data.message }}</p>
-                    <div class="promo-code-row">
+                    <div v-if="item.data.voucher_code" class="promo-code-row">
                         <code class="promo-code">{{ item.data.voucher_code }}</code>
                         <button
                             class="copy-button"
@@ -97,8 +103,8 @@ async function usePromo(item: PromoNotification) {
                             {{ copyState[item.id] === 'copied' ? 'Đã sao chép' : copyState[item.id] === 'failed' ? 'Thử lại' : 'Sao chép' }}
                         </button>
                     </div>
-                    <button class="use-button" type="button" @click="usePromo(item)">
-                        {{ item.data.cta_text || 'Nhận ưu đãi' }}
+                    <button class="use-button" type="button" @click="openNotification(item)">
+                        {{ item.data.cta_text || 'Xem chi tiết' }}
                     </button>
                     <time :datetime="item.created_at">{{ new Date(item.created_at).toLocaleString('vi-VN') }}</time>
                 </li>
@@ -115,10 +121,10 @@ async function usePromo(item: PromoNotification) {
         </div>
 
         <aside v-if="toast" class="promo-toast" aria-live="polite">
-            <button class="toast-body" type="button" @click="usePromo(toast)">
+            <button class="toast-body" type="button" @click="openNotification(toast)">
                 <strong>{{ toast.data.name }}</strong>
                 <span>{{ toast.data.message }}</span>
-                <code>{{ toast.data.voucher_code }}</code>
+                <code v-if="toast.data.voucher_code">{{ toast.data.voucher_code }}</code>
             </button>
             <button class="close-button" type="button" aria-label="Ẩn thông báo" @click="toast = null">✕</button>
         </aside>

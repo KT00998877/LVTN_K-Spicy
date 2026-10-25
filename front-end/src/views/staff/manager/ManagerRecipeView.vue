@@ -778,11 +778,16 @@ function formatNumber(value: number): string {
 .mgr-inline-input--num { max-width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
 .mgr-inline-input:focus { outline: 2px solid var(--mgr-chili-red); border-color: var(--mgr-chili-red); }
 
-.mgr-linkbtn { background: transparent; border: 0; color: var(--mgr-chili-red); font-weight: 700;
-               font-size: 13px; cursor: pointer; padding: 0; }
-.mgr-linkbtn:hover { text-decoration: underline; }
-.mgr-linkbtn--danger { color: #b91c1c; }
-.mgr-linkbtn--danger:hover { color: #7f1d1d; }
+.mgr-linkbtn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px;
+               padding: 8px 14px; border: 1px solid #d9c8c2; border-radius: 9px; background: #fff8f4;
+               color: var(--mgr-chili-red); font-weight: 700; font-size: 13px; cursor: pointer;
+               transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+.mgr-linkbtn:hover:not(:disabled) { background: #fff0ea; border-color: #c9988f; transform: translateY(-1px); }
+.mgr-linkbtn:active:not(:disabled) { transform: translateY(0); }
+.mgr-linkbtn:focus-visible { outline: 3px solid var(--mgr-chili-red, #d71920); outline-offset: 2px; }
+.mgr-linkbtn:disabled { opacity: .55; cursor: not-allowed; }
+.mgr-linkbtn--danger { border-color: #fecaca; background: #fff1f2; color: #991b1b; }
+.mgr-linkbtn--danger:hover:not(:disabled) { border-color: #fca5a5; background: #ffe4e6; color: #7f1d1d; }
 
 .mgr-footnote { font-size: 12px; color: var(--mgr-gray-500); line-height: 1.6; margin: 0;
                 padding-top: 12px; border-top: 1px dashed var(--mgr-gray-200); }

@@ -173,3 +173,23 @@ test('checkout GPS initialization cannot discard an uncertain order after refres
     )
     assert.equal(cartStore.pendingCheckout, pending)
 })
+
+test('cashier invoice payment uses one modal state and preserves detail items on refresh', () => {
+    const source = readFileSync(new URL('../src/views/staff/cashier/CashierInvoicesView.vue', import.meta.url), 'utf8')
+
+    assert.doesNotMatch(source, /showPayment/)
+    assert.match(source, /v-if="selected && !payment"/)
+    assert.match(source, /v-if="payment"/)
+    assert.match(source, /@click="openPaymentModal\(selected\)"/)
+    assert.match(source, /selected\.value = \{ \.\.\.summary, items: selected\.value\.items \}/)
+    assert.doesNotMatch(source, /selected\.value = invoices\.value\.find/)
+})
+
+test('cashier delivery screen does not expose manager-only refund actions', () => {
+    const source = readFileSync(new URL('../src/views/staff/manager/ManagerOnlineOrdersView.vue', import.meta.url), 'utf8')
+
+    assert.match(source, /const isManager = computed\(\(\) => staffStore\.hasRole\('MANAGER'\)\)/)
+    assert.match(source, /v-if="isManager" class="btn-danger-solid"/)
+    assert.match(source, /v-if="isManager" class="btn-primary"[^>]+@click="confirmRefund\(o\)"/)
+    assert.match(source, /if \(isManager\.value\) await loadNearestShippers\(\)/)
+})

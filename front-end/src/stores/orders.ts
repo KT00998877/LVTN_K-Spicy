@@ -205,7 +205,11 @@ export const useOrderStore = defineStore('orders', {
             try {
                 this.current = await ordersApi.cancelMyOrder(id, reason)
                 this.items = this.items.map((item) => item.id === Number(id)
-                    ? { ...item, status: 'CANCELLED' }
+                    ? {
+                        ...item,
+                        status: this.current?.status ?? item.status,
+                        cancellation_request: this.current?.cancellation_request ?? null,
+                    }
                     : item)
                 return true
             } catch (err) {

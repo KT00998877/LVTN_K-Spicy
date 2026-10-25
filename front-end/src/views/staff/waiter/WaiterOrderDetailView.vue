@@ -255,7 +255,13 @@ useRealtimeRefresh(() => loadMenu(true), () => !busy.value && !menuLoading.value
 .cancelled { opacity: .55; }
 .quantity { display: flex; align-items: center; gap: 10px; }
 .quantity button { width: 26px; height: 26px; border: 1px solid #e5e7eb; background: #fff; border-radius: 4px; cursor: pointer; }
-.remove { background: none; border: 0; color: #dc2626; cursor: pointer; font-size: 11px; }
+.remove { min-height: 34px; padding: 6px 11px; border: 1px solid #fecaca; border-radius: 8px;
+          background: #fff1f2; color: #991b1b; cursor: pointer; font-size: 12px; font-weight: 700;
+          transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+.remove:hover:not(:disabled) { background: #ffe4e6; border-color: #fca5a5; transform: translateY(-1px); }
+.remove:active:not(:disabled) { transform: translateY(0); }
+.remove:focus-visible { outline: 3px solid var(--color-chili-red, #d71920); outline-offset: 2px; }
+.remove:disabled { opacity: .55; cursor: not-allowed; }
 .serve { background: #dcfce7; border: 0; border-radius: 5px; padding: 6px; color: #166534; cursor: pointer; }
 .ticket-footer { padding: 15px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; }
 .total { font-size: 14px; }

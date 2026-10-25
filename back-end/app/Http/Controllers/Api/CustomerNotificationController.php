@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * API chuông thông báo + banner ưu đãi cho khách hàng (Phase 1).
+ * API chuông thông báo + banner ưu đãi cho khách hàng.
  *
  * - GET   /api/notifications               : danh sách thông báo của khách
  * - GET   /api/notifications/unread-count  : badge chuông
@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CustomerNotificationController extends Controller
 {
-    /** Loại notification dành riêng cho khách (ưu đãi). */
+    /** Giới hạn notification thuộc về khách đang đăng nhập. */
     private function owned(Request $request)
     {
         return DB::table('notifications')

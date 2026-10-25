@@ -632,9 +632,14 @@ function formatNumber(value: number): string {
 .mgr-pill--muted { background: var(--mgr-gray-100); color: var(--mgr-gray-600); }
 
 .mgr-rowactions { display: flex; gap: 12px; }
-.mgr-linkbtn { background: transparent; border: 0; color: var(--mgr-chili-red); font-weight: 700;
-               font-size: 13px; cursor: pointer; padding: 0; }
-.mgr-linkbtn:hover { color: #a80f17; text-decoration: underline; }
+.mgr-linkbtn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px;
+               padding: 8px 14px; border: 1px solid #d9c8c2; border-radius: 9px; background: #fff8f4;
+               color: var(--mgr-chili-red); font-weight: 700; font-size: 13px; cursor: pointer;
+               box-shadow: 0 3px 10px rgba(94, 32, 28, .07); transition: background-color .15s ease,
+               border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+.mgr-linkbtn:hover { color: #a80f17; background: #fff0ea; border-color: #c9988f; transform: translateY(-1px); }
+.mgr-linkbtn:active { transform: translateY(0); box-shadow: none; }
+.mgr-linkbtn:focus-visible { outline: 3px solid var(--mgr-chili-red, #d71920); outline-offset: 2px; }
 
 /* ---- Empty ---- */
 .mgr-empty { background: #fff; border: 1px dashed var(--mgr-gray-200); border-radius: 16px; padding: 56px 24px;

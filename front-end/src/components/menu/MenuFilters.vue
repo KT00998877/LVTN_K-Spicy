@@ -486,19 +486,30 @@ function getCategoryIcon(slug: string): string {
 }
 
 .reset-link {
-    background: none;
-    border: none;
+    min-height: 36px;
+    background: var(--color-cream, #fff8f4);
+    border: 1px solid rgba(215, 25, 32, 0.35);
     color: var(--color-chili-red);
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    transition: background-color var(--dur-fast) var(--ease-out);
+    padding: 6px 10px;
+    border-radius: 999px;
+    transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 
 .reset-link:hover {
     background: rgba(215, 25, 32, 0.08);
+    transform: translateY(-1px);
+}
+
+.reset-link:active {
+    transform: translateY(0);
+}
+
+.reset-link:focus-visible {
+    outline: 3px solid #d71920;
+    outline-offset: 2px;
 }
 
 .category-nav {

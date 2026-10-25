@@ -113,7 +113,7 @@
             <div v-if="store.loading" class="state">Đang tải…</div>
             <div v-else-if="store.error" class="state error">{{ store.error }}</div>
             <div v-else-if="store.rows.length === 0" class="state empty">
-                Chưa có asset nào. <button class="link" @click="switchTab('create')">Tạo asset đầu tiên →</button>
+                Chưa có asset nào. <button type="button" class="link" @click="switchTab('create')">Tạo asset đầu tiên →</button>
             </div>
             <div v-else class="asset-grid">
                 <article v-for="row in store.rows" :key="row.id" class="asset-card" :data-status="row.status">
@@ -333,7 +333,7 @@
                 <div v-if="blogStore.loading" class="state">Đang tải…</div>
                 <div v-else-if="blogStore.error" class="state error">{{ blogStore.error }}</div>
                 <div v-else-if="blogStore.rows.length === 0" class="state empty">
-                    Chưa có bài viết nào. <button class="link" @click="openCreateBlog">Tạo bài viết đầu tiên →</button>
+                    Chưa có bài viết nào. <button type="button" class="link" @click="openCreateBlog">Tạo bài viết đầu tiên →</button>
                 </div>
                 <div v-else class="asset-grid">
                     <article
@@ -1132,13 +1132,35 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .link {
-    background: transparent;
-    border: 0;
-    color: var(--color-chili-red, #d71920);
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    margin-left: 8px;
+    padding: 8px 14px;
+    background: #fff8f4;
+    border: 1px solid rgba(215, 25, 32, 0.35);
+    border-radius: 9px;
+    color: #991b1b;
+    font-weight: 700;
     cursor: pointer;
-    padding: 0;
     font-family: inherit;
+    box-shadow: 0 4px 12px rgba(94, 15, 24, 0.08);
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.link:hover {
+    background: #fff1f2;
+    border-color: #d71920;
+    transform: translateY(-1px);
+}
+
+.link:active {
+    transform: translateY(0);
+}
+
+.link:focus-visible {
+    outline: 3px solid #d71920;
+    outline-offset: 2px;
 }
 
 .pagination {

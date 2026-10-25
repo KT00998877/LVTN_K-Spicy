@@ -21,14 +21,19 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOnlineOrdersStore } from '@/stores/onlineOrders'
+import { useStaffStore } from '@/stores/staff'
 import { onlineOrders } from '@/api/staff'
 import type { DeliveryOrder, NearestShipper } from '@/api/staff'
 import { formatVND, formatDateTime, formatTime, useToast } from '@/composables/useStaffUtils'
+import { useAppDialog } from '@/composables/useAppDialog'
 
 const store = useOnlineOrdersStore()
+const staffStore = useStaffStore()
 const toast = useToast()
+const appDialog = useAppDialog()
 
 const { orders, shippers, loading, busyId, error } = storeToRefs(store)
+const isManager = computed(() => staffStore.hasRole('MANAGER'))
 
 const tab = ref<'pending' | 'preparing' | 'ready' | 'delivering' | 'delivered' | 'done'>('pending')
 const typeFilter = ref<'ALL' | 'ONLINE' | 'TAKEAWAY'>('ALL')
@@ -92,6 +97,10 @@ const counts = computed(() => {
 
 
 async function handleConfirm(o: DeliveryOrder) {
+    if (o.cancellation_request?.status === 'PENDING') {
+        toast.warning('Khách đang yêu cầu hủy đơn này. Hãy xử lý yêu cầu hủy trước.')
+        return
+    }
     if (o.payment_method === 'PREPAID' && (!o.payment || o.payment.status !== 'PAID')) {
         toast.warning('Đơn chọn thanh toán trước (PREPAID) — cần thanh toán trước khi xác nhận.')
         return
@@ -99,11 +108,42 @@ async function handleConfirm(o: DeliveryOrder) {
     if (o.order_type === 'ONLINE') {
         confirmTarget.value = o
         confirmShipperId.value = null
-        await loadNearestShippers()
+        if (isManager.value) await loadNearestShippers()
+        else nearestShippers.value = []
         return
     }
     const ok = await store.confirm(o.id)
     if (ok) toast.success(`Đã xác nhận đơn ${ok.code}.`)
+    else if (error.value) toast.error(error.value)
+}
+
+async function approveCancellation(o: DeliveryOrder) {
+    const confirmed = await appDialog.confirm({
+        title: `Duyệt hủy đơn ${o.code}?`,
+        message: 'Đơn sẽ chuyển sang Đã hủy. Sau đó bạn cần xác nhận hoàn tiền VNPay Sandbox ở bước tiếp theo.',
+        confirmLabel: 'Duyệt hủy đơn',
+        cancelLabel: 'Giữ đơn',
+        tone: 'danger',
+    })
+    if (!confirmed) return
+
+    const updated = await store.approveCancellation(o.id)
+    if (updated) toast.success(`Đã duyệt hủy đơn ${updated.code}. Vui lòng xác nhận hoàn tiền.`)
+    else if (error.value) toast.error(error.value)
+}
+
+async function confirmRefund(o: DeliveryOrder) {
+    const confirmed = await appDialog.confirm({
+        title: `Xác nhận hoàn tiền ${o.code}?`,
+        message: `Xác nhận đã hoàn ${formatVND(o.payment?.paid || o.total_amount)} trên VNPay Sandbox. Khách hàng sẽ nhận được thông báo ngay sau bước này.`,
+        confirmLabel: 'Xác nhận hoàn tiền',
+        cancelLabel: 'Để sau',
+        tone: 'default',
+    })
+    if (!confirmed) return
+
+    const updated = await store.confirmRefund(o.id)
+    if (updated) toast.success(`Đã hoàn tiền và gửi thông báo cho khách của đơn ${updated.code}.`)
     else if (error.value) toast.error(error.value)
 }
 
@@ -183,6 +223,7 @@ function pillFor(o: DeliveryOrder): { label: string; cls: string } {
 
 function paymentLabel(o: DeliveryOrder): string {
     if (!o.payment) return 'Không có hóa đơn'
+    if (o.payment.status === 'REFUNDED') return 'Đã hoàn tiền'
     return o.payment.status === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'
 }
 
@@ -290,6 +331,25 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                     <div><span>Sự cố</span><strong style="color:#b91c1c;">{{ o.delivery_issue || '—' }}</strong></div>
                 </section>
 
+                <section
+                    v-if="o.cancellation_request"
+                    class="cancellation-flow"
+                    :class="`is-${o.cancellation_request.status.toLowerCase()}`"
+                    aria-label="Trạng thái yêu cầu hủy đơn"
+                >
+                    <div>
+                        <strong>
+                            <template v-if="o.cancellation_request.status === 'PENDING'">Khách yêu cầu hủy đơn</template>
+                            <template v-else-if="o.cancellation_request.status === 'APPROVED'">Đã duyệt hủy · Chờ hoàn tiền</template>
+                            <template v-else>Hoàn tiền VNPay thành công</template>
+                        </strong>
+                        <p>{{ o.cancellation_request.reason }}</p>
+                    </div>
+                    <span class="cancellation-step">
+                        {{ o.cancellation_request.status === 'PENDING' ? 'Bước 1/2' : o.cancellation_request.status === 'APPROVED' ? 'Bước 2/2' : 'Hoàn tất' }}
+                    </span>
+                </section>
+
                 <section class="items">
                     <h3>Món ({{ o.items.length }})</h3>
                     <ul>
@@ -304,7 +364,22 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                 </section>
 
                 <footer class="actions">
-                    <template v-if="o.status === 'PENDING'">
+                    <template v-if="o.cancellation_request?.status === 'PENDING'">
+                        <button v-if="isManager" class="btn-danger-solid" :disabled="busyId === o.id" @click="approveCancellation(o)">
+                            {{ busyId === o.id ? 'Đang duyệt…' : 'Duyệt hủy đơn' }}
+                        </button>
+                        <span v-else class="note-info">Yêu cầu đang chờ quản lý duyệt.</span>
+                    </template>
+                    <template v-else-if="o.cancellation_request?.status === 'APPROVED'">
+                        <button v-if="isManager" class="btn-primary" :disabled="busyId === o.id" @click="confirmRefund(o)">
+                            {{ busyId === o.id ? 'Đang xác nhận…' : 'Xác nhận hoàn tiền' }}
+                        </button>
+                        <span v-else class="note-info">Quản lý đang xử lý hoàn tiền.</span>
+                    </template>
+                    <template v-else-if="o.cancellation_request?.status === 'REFUNDED'">
+                        <span class="note-info note-info--success">Đã hoàn tiền và thông báo cho khách hàng.</span>
+                    </template>
+                    <template v-else-if="o.status === 'PENDING'">
                         <button class="btn-ghost danger" :disabled="busyId === o.id" @click="openReject(o)">
                             Từ chối
                         </button>
@@ -466,6 +541,13 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
 .info-grid span { font-size: 11px; color: var(--color-gray-500, #777); text-transform: uppercase; letter-spacing: .04em; }
 .info-grid strong { font-size: 13px; color: var(--color-charcoal-black, #222); }
 
+.cancellation-flow { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 16px; border-radius: 10px; background: #fff4e5; color: #713f12; }
+.cancellation-flow.is-approved { background: #fff1f2; color: #881337; }
+.cancellation-flow.is-refunded { background: #ecfdf3; color: #166534; }
+.cancellation-flow strong { display: block; font-size: 14px; }
+.cancellation-flow p { margin: 4px 0 0; color: inherit; font-size: 13px; line-height: 1.5; }
+.cancellation-step { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; background: rgba(255,255,255,.72); color: inherit; font-size: 12px; font-weight: 700; }
+
 .items h3 { margin: 0 0 8px; font-size: 13px; color: var(--color-gray-600, #555); text-transform: uppercase; letter-spacing: .08em; }
 .items ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .items li { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; border-bottom: 1px dashed var(--color-gray-200, #eee); }
@@ -474,10 +556,16 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
 
 .actions { display: flex; gap: 8px; }
 .note-info { font-size: 13px; color: var(--color-gray-600, #555); padding: 8px 0; }
-.btn-ghost, .btn-primary { flex: 1; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid var(--color-gray-200, #eee); background: white; }
+.btn-ghost, .btn-primary, .btn-danger-solid { flex: 1; min-height: 44px; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; border: 1px solid var(--color-gray-200, #eee); background: white; transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
 .btn-primary { background: var(--color-chili-red, #d71920); color: white; border-color: var(--color-chili-red, #d71920); }
 .btn-ghost.danger { color: #991b1b; border-color: #fecaca; }
-.btn-primary:disabled, .btn-ghost:disabled { opacity: .6; cursor: not-allowed; }
+.btn-danger-solid { background: #a4131d; border-color: #a4131d; color: white; }
+.btn-primary:hover:not(:disabled), .btn-danger-solid:hover:not(:disabled) { filter: brightness(.92); transform: translateY(-1px); }
+.btn-ghost:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+.btn-primary:active:not(:disabled), .btn-danger-solid:active:not(:disabled), .btn-ghost:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:focus-visible, .btn-danger-solid:focus-visible, .btn-ghost:focus-visible { outline: 3px solid var(--color-chili-red, #d71920); outline-offset: 2px; }
+.btn-primary:disabled, .btn-ghost:disabled, .btn-danger-solid:disabled { opacity: .6; cursor: not-allowed; }
+.note-info--success { width: 100%; padding: 12px 14px; border-radius: 8px; background: #ecfdf3; color: #166534; font-weight: 700; }
 
 .modal-layer { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal { background: white; border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; }
@@ -499,5 +587,6 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
 @media (max-width: 640px) {
     .online-orders { padding: 16px; }
     .orders { grid-template-columns: 1fr; }
+    .cancellation-flow { flex-direction: column; }
 }
 </style>

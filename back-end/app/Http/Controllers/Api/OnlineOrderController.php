@@ -33,7 +33,7 @@ class OnlineOrderController extends Controller
             'order_type'=> ['nullable', 'in:ONLINE,TAKEAWAY'],
         ]);
         $query = Order::whereIn('order_type', ['ONLINE', 'TAKEAWAY'])
-            ->with(['items.toppings.topping', 'customer']);
+            ->with(['items.toppings.topping', 'customer', 'cancellationRequest']);
         if (!empty($data['order_type'])) $query->where('order_type', $data['order_type']);
         if (!empty($data['status']))    $query->where('status', $data['status']);
         return response()->json([
@@ -76,6 +76,18 @@ class OnlineOrderController extends Controller
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
         $this->service->reject($request->user(), $id, $data['reason']);
+        return $this->detail($id);
+    }
+
+    public function approveCancellation(Request $request, int $id)
+    {
+        $this->service->approveCancellation($request->user(), $id);
+        return $this->detail($id);
+    }
+
+    public function confirmRefund(Request $request, int $id)
+    {
+        $this->service->confirmSandboxRefund($request->user(), $id);
         return $this->detail($id);
     }
 
@@ -304,7 +316,7 @@ class OnlineOrderController extends Controller
 
         // Trả về chi tiết đơn (kèm status mới) để client refresh UI ngay.
         $order = \App\Models\Order::where('customer_id', $request->user()->id)
-            ->with(['items.toppings.topping'])->findOrFail($id);
+            ->with(['items.toppings.topping', 'cancellationRequest'])->findOrFail($id);
         return response()->json([
             'success' => true,
             'data'    => app(\App\Http\Controllers\Api\OrderController::class)

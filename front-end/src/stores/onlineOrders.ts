@@ -83,6 +83,14 @@ export const useOnlineOrdersStore = defineStore('onlineOrders', {
             return this._guard(id, () => onlineOrders.reject(id, reason))
         },
 
+        async approveCancellation(id: number): Promise<DeliveryOrder | null> {
+            return this._guard(id, () => onlineOrders.approveCancellation(id))
+        },
+
+        async confirmRefund(id: number): Promise<DeliveryOrder | null> {
+            return this._guard(id, () => onlineOrders.confirmRefund(id))
+        },
+
         async handover(id: number, shipperId: number): Promise<DeliveryOrder | null> {
             return this._guard(id, () => onlineOrders.handover(id, shipperId))
         },

@@ -24,6 +24,17 @@ class StaffNotificationService
         }
     }
 
+    public function orderCancellationRequested(Order $order): void
+    {
+        $this->sendRole(
+            $order,
+            'MANAGER',
+            'ORDER_CANCELLATION_REQUESTED',
+            'Khách yêu cầu hủy đơn VNPay đã thanh toán',
+            '/staff/manager/online-orders',
+        );
+    }
+
     public function kitchenReady(Order $order): void
     {
         if ($order->order_type !== 'ONLINE' || !$order->shipper_id) return;

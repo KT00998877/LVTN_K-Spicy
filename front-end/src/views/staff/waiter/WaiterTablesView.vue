@@ -1113,16 +1113,22 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 }
 
 .link-btn {
-    background: none;
-    border: none;
-    color: inherit;
+    min-height: 40px;
+    padding: 9px 16px;
+    border: 1px solid #d9c8c2;
+    border-radius: 9px;
+    background: #fff8f4;
+    color: #8f1119;
     font-weight: 700;
-    text-decoration: underline;
     cursor: pointer;
     font-family: inherit;
-    font-size: inherit;
-    padding: 0;
+    font-size: 13px;
+    box-shadow: 0 3px 10px rgb(94 32 28 / 7%);
+    transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
 }
+.link-btn:hover { background: #fff0ea; border-color: #c9988f; transform: translateY(-1px); }
+.link-btn:active { transform: translateY(0); }
+.link-btn:focus-visible { outline: 3px solid var(--color-chili-red, #d71920); outline-offset: 2px; }
 
 /* ===== Modal ===== */
 .wt-modal-mask {

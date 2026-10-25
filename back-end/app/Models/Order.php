@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -80,6 +81,11 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function cancellationRequest(): HasOne
+    {
+        return $this->hasOne(OrderCancellationRequest::class);
     }
 
     /** Phiên phục vụ chứa order này (1 order DINE_IN gắn với 1 phiên). */

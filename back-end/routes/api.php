@@ -506,6 +506,11 @@ Route::middleware(['auth:sanctum', 'staff:CASHIER,MANAGER'])->prefix('staff/onli
     Route::post('/{id}/reject', [$controller, 'reject'])->whereNumber('id');
     Route::post('/{id}/handover', [$controller, 'handover'])->whereNumber('id');
 });
+Route::middleware(['auth:sanctum', 'staff:MANAGER'])->prefix('staff/online-orders')->group(function () {
+    $controller = \App\Http\Controllers\Api\OnlineOrderController::class;
+    Route::post('/{id}/cancellation/approve', [$controller, 'approveCancellation'])->whereNumber('id');
+    Route::post('/{id}/refund/confirm', [$controller, 'confirmRefund'])->whereNumber('id');
+});
 Route::middleware(['auth:sanctum', 'staff:SHIPPER'])->prefix('staff/deliveries')->group(function () {
     $controller = \App\Http\Controllers\Api\OnlineOrderController::class;
     Route::get('/', [$controller, 'deliveries']);

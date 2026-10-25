@@ -26,7 +26,7 @@
         </div>
         <Teleport to="body">
             <!-- Receipt detail view -->
-            <div v-if="selected && !showPayment" class="payment-overlay" @click.self="selected = null">
+            <div v-if="selected && !payment" class="payment-overlay" @click.self="selected = null">
                 <section class="payment-dialog payment-dialog--receipt">
                     <header class="pay-header">
                         <div class="pay-header-left">
@@ -171,7 +171,7 @@
                     </div>
 
                     <footer class="pay-footer">
-                        <button class="pay-btn-pay" v-if="selected.status !== 'PAID'" @click="showPayment = true">
+                        <button class="pay-btn-pay" v-if="selected.status !== 'PAID'" @click="openPaymentModal(selected)">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                             Thu tiền ngay
                         </button>
@@ -184,7 +184,7 @@
             </div>
 
             <!-- Payment collection modal -->
-            <div v-if="payment && !showPayment" class="payment-overlay" @click.self="!busy && (payment = null)">
+            <div v-if="payment" class="payment-overlay" @click.self="!busy && (payment = null)">
                 <section class="payment-dialog payment-dialog--collect">
                     <header class="pay-header">
                         <div class="pay-header-left">
@@ -316,7 +316,6 @@ const orders = ref<RequestedOrder[]>([])
 const selected = ref<Invoice | null>(null)
 const payment = ref<Invoice | null>(null)
 const method = ref('CASH')
-const showPayment = ref(false)
 const showSuccess = ref(false)
 const successCode = ref('')
 const search = ref('')
@@ -362,7 +361,15 @@ async function refresh(quiet = false) {
     const fresh = beginRead(liveReads, 'list', quiet); try {
         const [list, orderList] = await Promise.all([apiClient.get<{ data: Invoice[] }>('/staff/invoices'), staffOrders.list()])
         if (!fresh()) return
-        if (!stopped) { invoices.value = list.data.data; orders.value = orderList as RequestedOrder[]; if (selected.value && !showPayment.value && !busy.value) selected.value = invoices.value.find(i => i.id === selected.value?.id) ?? selected.value; error.value = '' }
+        if (!stopped) {
+            invoices.value = list.data.data
+            orders.value = orderList as RequestedOrder[]
+            if (selected.value && !payment.value && !busy.value) {
+                const summary = invoices.value.find(i => i.id === selected.value?.id)
+                if (summary) selected.value = { ...summary, items: selected.value.items }
+            }
+            error.value = ''
+        }
     } catch (refreshError) { if (quiet) throw refreshError; if (!stopped) error.value = 'Không tải được dữ liệu hóa đơn. Vui lòng thử lại.' }
     finally { if (!quiet) loading.value = false }
 }
@@ -373,10 +380,8 @@ async function action(fn: () => Promise<void>) {
     finally { busy.value = false }
 }
 async function view(id: number) { await action(async () => { selected.value = (await apiClient.get<{ data: Invoice }>('/staff/invoices/' + id)).data.data }) }
-async function openPaymentModal(invoice: Invoice) {
-    selected.value = invoice
+function openPaymentModal(invoice: Invoice) {
     payment.value = invoice
-    showPayment.value = true
 }
 async function exportOrder(id: number) {
     await action(async () => {
@@ -400,7 +405,6 @@ async function collectPayment() {
         const updated = (await apiClient.patch<{ data: Invoice }>('/staff/invoices/' + payment.value!.id + '/pay', { method: method.value, amount: payment.value!.due })).data.data
         successCode.value = updated.code
         payment.value = null
-        showPayment.value = false
         selected.value = updated
         showSuccess.value = true
         await refresh()

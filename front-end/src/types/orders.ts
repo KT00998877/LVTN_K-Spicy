@@ -33,6 +33,7 @@ export interface OrderSummary {
     completed_at: string | null
     cancelled_at?: string | null
     cancellation_reason?: string | null
+    cancellation_request?: OrderCancellationRequest | null
     /** Trạng thái thanh toán rút gọn (UNPAID / PAID / ...). Có thể null nếu không phải ONLINE. */
     payment_status?: InvoiceStatus | null
     /** Thông tin người nhận (chỉ có với đơn ONLINE). */
@@ -74,6 +75,14 @@ export interface OrderPaymentInfo {
     total: number
     paid: number
     is_simulated: boolean
+}
+
+export interface OrderCancellationRequest {
+    status: 'PENDING' | 'APPROVED' | 'REFUNDED'
+    reason: string
+    requested_at: string | null
+    approved_at: string | null
+    refunded_at: string | null
 }
 
 /** Sự kiện trong đời số đơn hàng (timeline audit) */
@@ -131,6 +140,7 @@ export interface OrderDetail {
     delivery_rated_at?: string | null
     delivery_photos?: { id: number; url: string }[]
     payment?: OrderPaymentInfo | null
+    cancellation_request?: OrderCancellationRequest | null
     events?: OrderEvent[]
 }
 

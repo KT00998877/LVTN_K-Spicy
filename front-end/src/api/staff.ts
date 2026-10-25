@@ -765,6 +765,14 @@ export interface DeliveryEvent {
     created_at: string
 }
 
+export interface OrderCancellationRequestInfo {
+    status: 'PENDING' | 'APPROVED' | 'REFUNDED'
+    reason: string
+    requested_at: string | null
+    approved_at: string | null
+    refunded_at: string | null
+}
+
 export type PaymentMethod = 'COD' | 'PREPAID'
 
 export interface DeliveryOrder {
@@ -815,6 +823,7 @@ export interface DeliveryOrder {
         paid: number
         is_simulated: boolean
     } | null
+    cancellation_request: OrderCancellationRequestInfo | null
     events: DeliveryEvent[]
 }
 
@@ -890,6 +899,22 @@ export const onlineOrders = {
         const res = await apiClient.post<{ success: boolean; data: DeliveryOrder }>(
             `/staff/online-orders/${id}/reject`,
             { reason },
+        )
+        return res.data.data
+    },
+
+    /** MANAGER duyệt yêu cầu hủy đơn VNPay của khách. */
+    async approveCancellation(id: number): Promise<DeliveryOrder> {
+        const res = await apiClient.post<{ success: boolean; data: DeliveryOrder }>(
+            `/staff/online-orders/${id}/cancellation/approve`,
+        )
+        return res.data.data
+    },
+
+    /** MANAGER xác nhận hoàn tiền trên môi trường VNPay Sandbox. */
+    async confirmRefund(id: number): Promise<DeliveryOrder> {
+        const res = await apiClient.post<{ success: boolean; data: DeliveryOrder }>(
+            `/staff/online-orders/${id}/refund/confirm`,
         )
         return res.data.data
     },
