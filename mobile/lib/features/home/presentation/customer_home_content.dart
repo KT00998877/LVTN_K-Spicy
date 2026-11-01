@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../cart/presentation/cart_controller.dart';
-import '../../reservation/presentation/reservation_booking_screen.dart';
 import 'home_controller.dart';
 import 'menu_navigation.dart';
 import 'section_best_sellers.dart';
 import 'section_categories.dart';
-import 'section_combo_promo.dart';
+import 'section_combo_campaign.dart';
 import 'section_footer.dart';
 import 'section_hero.dart';
 import 'section_menu_discovery.dart';
 import 'section_reservation_cta.dart';
 import 'section_restaurant_story.dart';
-import 'section_spicy_level.dart';
+import 'section_vouchers.dart';
+import 'section_featured_promotions.dart';
 
 /// ============================================================
 /// 🏠 CUSTOMER HOME — phiên bản đầy đủ giống trang chủ web
@@ -53,20 +54,12 @@ class _CustomerHomeContentState
   }
 
   void _onReservationTap() {
-    // Mở booking form dưới dạng bottom sheet (mobile-first UX).
-    // User đã đăng nhập → dùng thông tin từ profile tự điền sẵn.
-    ReservationBookingScreen.openAsSheet(context);
+    context.push('/reservation');
   }
 
   void _openMenuWithCategory(String slug) {
     ref.read(pendingMenuFilterProvider.notifier).state =
         MenuFilter(categorySlug: slug);
-    widget.onSwitchToMenu();
-  }
-
-  void _openMenuWithSpicy(int level) {
-    ref.read(pendingMenuFilterProvider.notifier).state =
-        MenuFilter(spicyLevel: level);
     widget.onSwitchToMenu();
   }
 
@@ -82,6 +75,9 @@ class _CustomerHomeContentState
       onRefresh: () async {
         await ref.read(homeControllerProvider.notifier).refresh();
         await ref.read(cartControllerProvider.notifier).refresh();
+        ref.invalidate(featuredPromotionsProvider);
+        ref.invalidate(comboCampaignProvider);
+        ref.invalidate(homeVouchersProvider);
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -92,8 +88,9 @@ class _CustomerHomeContentState
           ),
           CategoriesSection(onOpenMenu: _openMenuWithCategory),
           const BestSellersSection(),
-          const ComboPromoSection(),
-          SpicyLevelSection(onOpenMenu: _openMenuWithSpicy),
+          ComboCampaignSection(onOpenMenu: () => _openMenuWithCategory('combo')),
+          const FeaturedPromotionsSection(),
+          const HomeVouchersSection(),
           MenuDiscoverySection(onOpenMenu: _openMenu),
           const RestaurantStorySection(),
           ReservationCtaSection(onReservationTap: _onReservationTap),

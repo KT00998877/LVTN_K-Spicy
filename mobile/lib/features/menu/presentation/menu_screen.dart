@@ -11,6 +11,7 @@ import 'package:micay_app/features/menu/domain/menu_models.dart';
 import 'package:micay_app/features/menu/presentation/quick_add_sheet.dart';
 import 'package:micay_app/shared/widgets/common_widgets.dart';
 import 'package:micay_app/shared/widgets/food_card.dart';
+import 'package:micay_app/shared/widgets/backend_image.dart';
 
 /// ============================================================
 /// 🍜 MENU SCREEN — danh sách món có filter category + search
@@ -63,6 +64,19 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       _loadCategories();
       _fetch();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant MenuScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCategorySlug != widget.initialCategorySlug ||
+        oldWidget.initialSpicyLevel != widget.initialSpicyLevel) {
+      _categorySlug = widget.initialCategorySlug;
+      _spicyLevel = widget.initialSpicyLevel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fetch();
+      });
+    }
   }
 
   void _onSearchChanged() {
@@ -203,7 +217,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         if (i == 0) {
           return _CategoryChip(
             label: 'Tất cả',
-            emoji: '🍽',
             selected: _categorySlug == null,
             onTap: () {
               setState(() => _categorySlug = null);
@@ -214,7 +227,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         final c = _categories[i - 1];
         return _CategoryChip(
           label: c.name,
-          emoji: c.emojiFor(),
           selected: _categorySlug == c.slug,
           onTap: () {
             setState(() => _categorySlug = c.slug);
@@ -245,6 +257,56 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         subtitle: 'Thử đổi danh mục hoặc từ khoá khác',
       );
     }
+    if (_categorySlug == 'combo') {
+      return RefreshIndicator(
+        onRefresh: _fetch,
+        child: ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          itemCount: _items.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+          itemBuilder: (_, index) {
+            final item = _items[index];
+            final suggestion = item.suggestions.firstOrNull;
+            return Card(
+              child: InkWell(
+                onTap: () => _goToDetail(item),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: Row(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: BackendImage(imageUrl: item.imageUrl, fit: BoxFit.cover),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(suggestion?.title ?? item.name,
+                          style: Theme.of(context).textTheme.titleMedium),
+                        if (suggestion != null) ...[
+                          Text('Kèm ${suggestion.suggestedItemName}',
+                            style: Theme.of(context).textTheme.bodySmall),
+                          Text(suggestion.comboPrice,
+                            style: const TextStyle(
+                              color: AppColors.spicyRed,
+                              fontWeight: FontWeight.w700,
+                            )),
+                        ],
+                      ],
+                    )),
+                    const Icon(Icons.chevron_right_rounded),
+                  ]),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
     return RefreshIndicator(
       onRefresh: _fetch,
       child: GridView.builder(
@@ -272,12 +334,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({
     required this.label,
-    required this.emoji,
     required this.selected,
     required this.onTap,
   });
   final String label;
-  final String emoji;
   final bool selected;
   final VoidCallback onTap;
 
@@ -301,8 +361,6 @@ class _CategoryChip extends StatelessWidget {
         alignment: Alignment.center,
         child: Row(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(

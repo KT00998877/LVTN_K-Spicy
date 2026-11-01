@@ -12,6 +12,30 @@ class CartRepository {
   CartRepository(this._dio);
   final Dio _dio;
 
+  Future<void> addCombo({
+    required int suggestionId,
+    required int menuItemId,
+    required int quantity,
+    required int spicyLevel,
+    required String note,
+    required List<int> toppingIds,
+  }) async {
+    try {
+      await _dio.post<Map<String, dynamic>>('/cart/combo', data: {
+        'suggestion_id': suggestionId,
+        'main': {
+          'menu_item_id': menuItemId,
+          'quantity': quantity,
+          'spicy_level': spicyLevel,
+          'note': note,
+          'topping_ids': toppingIds,
+        },
+      });
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
+
   /// GET /api/cart — lấy giỏ hàng hiện tại
   Future<Cart> get() async {
     try {

@@ -26,6 +26,7 @@ class MenuItem {
     this.categoryName,
     this.categorySlug,
     this.isAvailable = true,
+    this.suggestions = const [],
   });
 
   final int id;
@@ -41,6 +42,7 @@ class MenuItem {
   final String? categoryName;
   final String? categorySlug;
   final bool isAvailable;
+  final List<MenuSuggestion> suggestions;
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
     return MenuItem(
@@ -57,6 +59,37 @@ class MenuItem {
       categoryName: json['category_name']?.toString(),
       categorySlug: json['category_slug']?.toString(),
       isAvailable: json['is_available'] as bool? ?? true,
+      suggestions: (json['suggestions'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => MenuSuggestion.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
+    );
+  }
+}
+
+class MenuSuggestion {
+  const MenuSuggestion({
+    required this.id,
+    required this.title,
+    required this.comboPrice,
+    required this.suggestedItemName,
+    required this.suggestedImageUrl,
+  });
+
+  final int id;
+  final String title;
+  final String comboPrice;
+  final String suggestedItemName;
+  final String suggestedImageUrl;
+
+  factory MenuSuggestion.fromJson(Map<String, dynamic> json) {
+    final suggested = json['suggested_item'] as Map? ?? const {};
+    return MenuSuggestion(
+      id: (json['id'] as num).toInt(),
+      title: (json['title'] ?? '').toString(),
+      comboPrice: (json['combo_price_formatted'] ?? '').toString(),
+      suggestedItemName: (suggested['name'] ?? '').toString(),
+      suggestedImageUrl: (suggested['image_url'] ?? '').toString(),
     );
   }
 }

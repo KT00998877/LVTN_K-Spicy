@@ -131,6 +131,22 @@ class CartController extends StateNotifier<CartState> {
     );
   });
 
+  Future<bool> addCombo({
+    required int suggestionId,
+    required int menuItemId,
+    required int quantity,
+    required int spicyLevel,
+    required String note,
+    required List<int> toppingIds,
+  }) => _mutate(() => _repo.addCombo(
+    suggestionId: suggestionId,
+    menuItemId: menuItemId,
+    quantity: quantity,
+    spicyLevel: spicyLevel,
+    note: note,
+    toppingIds: toppingIds,
+  ));
+
   Future<bool> updateItem({
     required int cartItemId,
     required int quantity,

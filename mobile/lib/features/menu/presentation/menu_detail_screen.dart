@@ -96,6 +96,26 @@ class _MenuDetailScreenState extends ConsumerState<MenuDetailScreen> {
     }
   }
 
+  Future<void> _addCombo(MenuSuggestion suggestion) async {
+    if (_isAdding || !widget.item.isAvailable) return;
+    setState(() => _isAdding = true);
+    final ok = await ref.read(cartControllerProvider.notifier).addCombo(
+      suggestionId: suggestion.id,
+      menuItemId: widget.item.id,
+      quantity: 1,
+      spicyLevel: _spicyLevel,
+      note: _note.text.trim(),
+      toppingIds: _selectedToppings.toList(),
+    );
+    if (!mounted) return;
+    setState(() => _isAdding = false);
+    final message = ok
+        ? 'Đã thêm combo món và nước vào giỏ'
+        : ref.read(cartControllerProvider).errorMessage ?? 'Không thêm được combo';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (ok) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
@@ -158,6 +178,55 @@ class _MenuDetailScreenState extends ConsumerState<MenuDetailScreen> {
                       item.description!,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+                  ],
+                  if (item.suggestions.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Text('Combo món và nước', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: AppSpacing.xs),
+                    for (final suggestion in item.suggestions) ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                                  child: SizedBox(
+                                    width: 56,
+                                    height: 56,
+                                    child: BackendImage(
+                                      imageUrl: suggestion.suggestedImageUrl,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(suggestion.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                    Text(suggestion.comboPrice, style: const TextStyle(color: AppColors.spicyRed)),
+                                  ],
+                                )),
+                              ]),
+                              const SizedBox(height: AppSpacing.xs),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: _isAdding || !ref.watch(cartControllerProvider).canMutate
+                                      ? null
+                                      : () => _addCombo(suggestion),
+                                  child: const Text('Thêm 1 combo vào giỏ'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   TextFormField(

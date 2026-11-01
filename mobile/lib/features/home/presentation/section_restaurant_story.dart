@@ -31,8 +31,9 @@ class RestaurantStorySection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SectionHead(
-            eyebrow: 'Câu chuyện nhà hàng',
-            title: 'Hương vị chuẩn Hàn,\nnóng hổi mỗi ngày.',
+            eyebrow: 'Câu chuyện K-SPICY',
+            title: 'From heat to heart.',
+            subtitle: 'Hương vị cay nồng chuẩn Hàn Quốc',
             onDark: true,
           ),
           const SizedBox(height: 20),
