@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/app.dart';
 import 'core/config.dart';
@@ -10,6 +11,7 @@ import 'core/config.dart';
 /// ============================================================
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('vi');
   // Load .env một lần trước khi runApp — ApiConfig.baseUrl sẽ đọc
   // từ đây. Nếu .env thiếu → ApiConfig tự fallback, không crash.
   try {

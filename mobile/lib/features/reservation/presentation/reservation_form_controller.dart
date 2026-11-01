@@ -68,7 +68,11 @@ class ReservationFormController extends StateNotifier<ReservationFormState> {
 
       // Cache local (best-effort)
       if (cache != null) {
-        await cache.saveReceipt(receipt);
+        try {
+          await cache.saveReceipt(receipt);
+        } catch (_) {
+          // Server đã tạo đặt bàn; lỗi lưu trên máy không được báo là thất bại.
+        }
       }
 
       state = state.copyWith(isSubmitting: false, lastReceipt: receipt);

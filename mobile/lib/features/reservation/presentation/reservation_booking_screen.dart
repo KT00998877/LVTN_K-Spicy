@@ -30,17 +30,6 @@ import 'reservation_visuals.dart';
 class ReservationBookingScreen extends ConsumerStatefulWidget {
   const ReservationBookingScreen({super.key});
 
-  /// Mở như bottom sheet (modal_first) hoặc full screen.
-  /// Mobile thường dùng bottom sheet cho CTA từ Home.
-  static Future<void> openAsSheet(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const ReservationBookingSheet(),
-    );
-  }
-
   @override
   ConsumerState<ReservationBookingScreen> createState() =>
       _ReservationBookingScreenState();
@@ -182,7 +171,12 @@ class _ReservationBookingScreenState
       note: _noteCtrl.text,
     );
 
-    final cache = await ref.read(reservationLocalCacheProvider.future);
+    ReservationLocalCache? cache;
+    try {
+      cache = await ref.read(reservationLocalCacheProvider.future);
+    } catch (_) {
+      // Lưu tại máy là tùy chọn; lỗi cache không được chặn gửi đặt bàn.
+    }
     final receipt = await ref
         .read(reservationFormControllerProvider.notifier)
         .submit(form: form, cache: cache);
@@ -640,54 +634,6 @@ class _LocationSelector extends StatelessWidget {
 
 // ───────────────── Bottom sheet wrapper ─────────────────
 
-class ReservationBookingSheet extends StatelessWidget {
-  const ReservationBookingSheet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.5,
-      maxChildSize: 0.96,
-      expand: false,
-      builder: (_, scrollCtrl) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.cream,
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Reuse full-screen UI trong sheet
-              Expanded(
-                child: Theme(
-                  data: Theme.of(context),
-                  child: const ReservationBookingScreen(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ───────────────── Success sheet ─────────────────
-
 class _ReservationSuccessSheet extends StatelessWidget {
   const _ReservationSuccessSheet({required this.receipt});
   final ReservationReceipt receipt;
@@ -738,7 +684,7 @@ class _ReservationSuccessSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             const Text(
-              'Chúng tôi sẽ gọi xác nhận trước giờ đặt. Bạn có thể xem lại đơn đặt trong tab "Đơn đặt bàn".',
+              'Chúng tôi sẽ gọi xác nhận trước giờ đặt. Bạn có thể xem lại trong Tài khoản → Lịch sử đặt bàn.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, height: 1.5),
             ),
@@ -750,7 +696,7 @@ class _ReservationSuccessSheet extends StatelessWidget {
                 label: const Text('Về trang chủ'),
                 onPressed: () {
                   Navigator.of(context).pop(); // đóng success sheet
-                  Navigator.of(context).pop(); // đóng booking sheet
+                  Navigator.of(context).pop(); // trở về trang chủ
                 },
               ),
             ),
@@ -759,7 +705,6 @@ class _ReservationSuccessSheet extends StatelessWidget {
               width: double.infinity,
               child: TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
                   Navigator.of(context).pop();
                 },
                 child: const Text('Đặt thêm bàn khác'),
