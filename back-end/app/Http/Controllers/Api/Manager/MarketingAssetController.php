@@ -173,6 +173,7 @@ class MarketingAssetController extends Controller
             'category'      => 'nullable|string|in:NEWS,PROMOTION,NEW_DISH,EVENT,CULINARY',
             'news_section'  => 'nullable|string|in:NEWS,OPENING,PROMOTION',
             'title'         => 'nullable|string|max:250',
+            'menu_item_id'  => 'nullable|integer|exists:menu_items,id',
         ]);
 
         $version = $asset->versions()->where('id', $data['version_id'])->first();
@@ -190,6 +191,7 @@ class MarketingAssetController extends Controller
                 'category'     => $data['category'] ?? null,
                 'news_section' => $data['news_section'] ?? null,
                 'title'        => $data['title'] ?? null,
+                'menu_item_id' => $data['menu_item_id'] ?? null,
             ],
             (int) $request->user()->id,
         );

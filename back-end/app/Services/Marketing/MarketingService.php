@@ -74,6 +74,7 @@ class MarketingService
         if (!empty($input['menu_item_id'])) {
             $m = MenuItem::find($input['menu_item_id']);
             if ($m) {
+                $context['menu_item_id'] = (int) $m->id;
                 $context['subject'] = $context['subject'] ?: $m->name;
                 $context['price']   = (float) $m->price;
                 $context['description'] = $m->description;
@@ -124,14 +125,14 @@ class MarketingService
     {
         return MenuItem::query()
             ->where('is_active', true)
-            ->where('is_available', true)
             ->orderByDesc('id')
-            ->limit(30)
+            ->limit(200)
             ->get()
             ->map(fn (MenuItem $m) => [
                 'id'    => $m->id,
                 'name'  => $m->name,
                 'price' => (float) $m->price,
+                'image_url' => $m->image_url,
             ]);
     }
 

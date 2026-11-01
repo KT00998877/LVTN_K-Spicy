@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MarketingCampaign;
 use App\Models\MarketingCampaignClaim;
 use App\Models\User;
+use App\Models\Voucher;
 use App\Services\MarketingCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,7 @@ class CustomerNotificationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $request->validate(['unread' => ['sometimes', 'boolean']]);
+        app(\App\Services\ComboNotificationService::class)->syncForUser($request->user());
 
         $query = $this->owned($request);
         if ($request->boolean('unread')) $query->whereNull('read_at');
@@ -148,6 +150,63 @@ class CustomerNotificationController extends Controller
             ->values();
 
         return response()->json(['success' => true, 'data' => $claims]);
+    }
+
+    /** GET /api/vouchers/me — mã khách đã nhận từ banner hoặc chuông ưu đãi. */
+    public function myVouchers(Request $request): JsonResponse
+    {
+        $entries = collect();
+        $claims = MarketingCampaignClaim::query()
+            ->where('user_id', $request->user()->id)
+            ->with('campaign')
+            ->get();
+        foreach ($claims as $claim) {
+            $entries->push([
+                'id' => 'claim:'.$claim->id,
+                'voucher_code' => $claim->voucher_code,
+                'name' => $claim->campaign?->name,
+                'message' => $claim->campaign?->message,
+                'received_at' => $claim->claimed_at?->toIso8601String(),
+            ]);
+        }
+
+        $sent = $this->owned($request)
+            ->where('type', MarketingCampaignService::NOTIFICATION_TYPE)
+            ->get(['id', 'data', 'created_at']);
+        foreach ($sent as $notification) {
+            $data = json_decode($notification->data, true);
+            if (empty($data['voucher_code'])) continue;
+            $entries->push([
+                'id' => 'sent:'.$notification->id,
+                'voucher_code' => $data['voucher_code'],
+                'name' => $data['name'] ?? null,
+                'message' => $data['message'] ?? null,
+                'received_at' => $notification->created_at,
+            ]);
+        }
+
+        $vouchers = Voucher::query()->whereIn('code', $entries->pluck('voucher_code')->unique())->get()->keyBy('code');
+        $usedCounts = DB::table('voucher_usages')->where('user_id', $request->user()->id)
+            ->whereIn('voucher_id', $vouchers->pluck('id'))
+            ->selectRaw('voucher_id, COUNT(*) as total')->groupBy('voucher_id')
+            ->pluck('total', 'voucher_id');
+        $items = $entries->sortByDesc('received_at')->unique('voucher_code')
+            ->map(function (array $entry) use ($vouchers, $usedCounts): ?array {
+                $voucher = $vouchers->get($entry['voucher_code']);
+                if (!$voucher) return null;
+                return [
+                    ...$entry,
+                    'name' => $entry['name'] ?: $voucher->name,
+                    'message' => $entry['message'] ?: $voucher->description,
+                    'discount_label' => $voucher->type === Voucher::TYPE_PERCENT
+                        ? 'Giảm '.(int) round((float) $voucher->value).'%' : 'Giảm '.number_format((float) $voucher->value, 0, ',', '.').'đ',
+                    'ends_at' => $voucher->ends_at?->toIso8601String(),
+                    'is_usable' => $voucher->is_active && $voucher->isWithinWindow() && $voucher->hasGlobalQuota()
+                        && ($voucher->usage_limit_per_user === null || ($usedCounts[$voucher->id] ?? 0) < $voucher->usage_limit_per_user),
+                ];
+            })->filter()->values();
+
+        return response()->json(['success' => true, 'data' => $items]);
     }
 
     /** @return array<string, mixed> */

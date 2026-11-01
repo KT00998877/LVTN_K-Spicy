@@ -2,7 +2,7 @@
 /**
  * ManagerMarketingCampaignsView — quản lý chiến dịch ưu đãi gửi khách (Phase 1).
  *
- * Manager đặt lịch ưu đãi theo khung giờ vàng, gắn mã voucher sẵn có, chọn
+ * Manager đặt thời điểm gửi ưu đãi, gắn mã voucher sẵn có, chọn
  * hạng thành viên được nhận và theo dõi số khách đã gửi.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -46,8 +46,6 @@ const form = reactive<MarketingCampaignPayload>({
     landing_url: null,
     target_tier_ids: [],
     send_at: '',
-    window_start: '11:00',
-    window_end: '13:30',
 })
 
 const STATUS_LABELS: Record<MarketingCampaignStatus, string> = {
@@ -102,8 +100,6 @@ function openCreate() {
         landing_url: null,
         target_tier_ids: [],
         send_at: defaultSendAt(),
-        window_start: '11:00',
-        window_end: '13:30',
     })
     error.value = ''
     modalOpen.value = true
@@ -121,8 +117,6 @@ function openEdit(campaign: MarketingCampaign) {
         landing_url: campaign.landing_url,
         target_tier_ids: campaign.target_tier_ids ?? [],
         send_at: toLocalInput(campaign.send_at),
-        window_start: campaign.window_start,
-        window_end: campaign.window_end,
     })
     error.value = ''
     modalOpen.value = true
@@ -163,7 +157,7 @@ async function save() {
             notice.value = 'Đã cập nhật chiến dịch.'
         } else {
             await createMarketingCampaign(payload)
-            notice.value = 'Đã tạo chiến dịch. Hệ thống sẽ tự gửi trong khung giờ vàng.'
+            notice.value = 'Đã tạo chiến dịch. Hệ thống sẽ gửi từ thời điểm đã chọn.'
         }
         modalOpen.value = false
         await loadCampaigns()
@@ -200,7 +194,9 @@ async function cancel(campaign: MarketingCampaign) {
 }
 
 async function remove(campaign: MarketingCampaign) {
-    if (!await appDialog.confirm({ title: 'Xóa chiến dịch?', message: `Chiến dịch “${campaign.name}” sẽ bị xóa.`, confirmLabel: 'Xóa chiến dịch', tone: 'danger' })) return
+    if (!await appDialog.confirm({ title: 'Xóa chiến dịch?', message: campaign.status === 'SENT'
+        ? `Chiến dịch “${campaign.name}” sẽ được ẩn khỏi danh sách. Ưu đãi khách đã nhận vẫn được giữ.`
+        : `Chiến dịch “${campaign.name}” sẽ bị xóa.`, confirmLabel: 'Xóa chiến dịch', tone: 'danger' })) return
     try {
         await deleteMarketingCampaign(campaign.id)
         notice.value = 'Đã xoá chiến dịch.'
@@ -222,10 +218,10 @@ function formatDate(iso: string): string {
     <div class="campaigns-page">
         <header class="page-head">
             <div>
-                <span class="eyebrow">ƯU ĐÃI KHUNG GIỜ VÀNG</span>
+                <span class="eyebrow">CHIẾN DỊCH ƯU ĐÃI</span>
                 <h2>Chiến dịch ưu đãi tới khách</h2>
                 <p>
-                    Đặt lịch ưu đãi theo khung giờ vàng (trưa/tối). Hệ thống tự gửi thông báo
+                    Chọn thời điểm gửi ưu đãi. Hệ thống tự gửi thông báo
                     tới khách thân thiết kèm mã voucher, khách copy mã và áp dụng khi thanh toán.
                 </p>
             </div>
@@ -273,12 +269,6 @@ function formatDate(iso: string): string {
                         <span v-if="campaign.discount_label" class="discount-chip">{{ campaign.discount_label }}</span>
                         <span class="meta-item">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
-                            </svg>
-                            {{ campaign.window_start }}–{{ campaign.window_end }}
-                        </span>
-                        <span class="meta-item">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
                             </svg>
                             {{ formatDate(campaign.send_at) }}
@@ -312,7 +302,6 @@ function formatDate(iso: string): string {
                         Huỷ
                     </button>
                     <button
-                        v-if="campaign.status !== 'SENT'"
                         class="btn ghost danger"
                         @click="remove(campaign)"
                     >
@@ -346,7 +335,7 @@ function formatDate(iso: string): string {
                         <select v-model="form.voucher_code" required>
                             <option value="" disabled>— Chọn mã voucher —</option>
                             <option v-for="v in vouchers" :key="v.code" :value="v.code">
-                                {{ v.code }} — {{ v.name }}
+                                {{ v.code }} — {{ v.name }}{{ v.ends_at ? ` (hết hạn ${formatDate(v.ends_at)})` : '' }}
                             </option>
                         </select>
                         <small v-if="!vouchers.length" class="hint">
@@ -356,8 +345,9 @@ function formatDate(iso: string): string {
 
                     <div class="field-row">
                         <label class="field">
-                            <span>Ngày &amp; giờ gửi</span>
+                            <span>Thời điểm gửi</span>
                             <input v-model="form.send_at" type="datetime-local" required />
+                            <small class="hint">Voucher phải còn hiệu lực tại thời điểm này. Hệ thống kiểm tra lại trước khi gửi.</small>
                         </label>
                         <label class="field">
                             <span>Màu banner</span>
@@ -365,16 +355,6 @@ function formatDate(iso: string): string {
                         </label>
                     </div>
 
-                    <div class="field-row">
-                        <label class="field">
-                            <span>Khung giờ vàng — bắt đầu</span>
-                            <input v-model="form.window_start" type="time" required />
-                        </label>
-                        <label class="field">
-                            <span>Khung giờ vàng — kết thúc</span>
-                            <input v-model="form.window_end" type="time" required />
-                        </label>
-                    </div>
 
                     <div class="field-row">
                         <label class="field">

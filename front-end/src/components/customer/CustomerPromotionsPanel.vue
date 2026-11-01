@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { fetchMyPromotions, type ClaimedPromotion } from '@/api/promotions'
+import { fetchMyVouchers, type MyVoucher } from '@/api/promotions'
 
-const items = ref<ClaimedPromotion[]>([])
+const items = ref<MyVoucher[]>([])
 const loading = ref(false)
 const error = ref('')
-const copyState = ref<Record<number, 'idle' | 'copied' | 'failed'>>({})
+const copyState = ref<Record<string, 'idle' | 'copied' | 'failed'>>({})
 
 async function load(): Promise<void> {
     if (loading.value) return
     loading.value = true
     error.value = ''
     try {
-        items.value = await fetchMyPromotions()
+        items.value = await fetchMyVouchers()
     } catch {
         error.value = 'Không thể tải danh sách ưu đãi. Vui lòng thử lại.'
     } finally {
@@ -20,7 +20,7 @@ async function load(): Promise<void> {
     }
 }
 
-async function copyCode(item: ClaimedPromotion): Promise<void> {
+async function copyCode(item: MyVoucher): Promise<void> {
     try {
         await navigator.clipboard.writeText(item.voucher_code)
         copyState.value = { ...copyState.value, [item.id]: 'copied' }
@@ -44,8 +44,8 @@ onMounted(load)
     <div class="promotion-panel">
         <header class="promotion-head">
             <div>
-                <h2>Ưu đãi của tôi</h2>
-                <p>Các mã bạn đã nhận và có thể dùng khi thanh toán.</p>
+                <h2>Voucher của tôi</h2>
+                <p>Các mã bạn đã nhận từ ưu đãi và chuông thông báo.</p>
             </div>
             <button type="button" class="promotion-action" :disabled="loading" @click="load">
                 {{ loading ? 'Đang tải…' : 'Tải lại' }}
@@ -60,7 +60,7 @@ onMounted(load)
         </div>
 
         <div v-else-if="items.length === 0" class="promotion-state">
-            <h3>Chưa có mã ưu đãi</h3>
+            <h3>Bạn chưa có voucher</h3>
             <p>Nhận mã từ banner ưu đãi trên trang chủ để lưu vào tài khoản.</p>
             <router-link to="/" class="promotion-primary">Xem ưu đãi</router-link>
         </div>
@@ -72,8 +72,8 @@ onMounted(load)
                         <h3>{{ item.name }}</h3>
                         <span v-if="item.discount_label">{{ item.discount_label }}</span>
                     </div>
-                    <p>{{ item.message }}</p>
-                    <small>Đã nhận {{ formatDate(item.claimed_at) }} · Hết hạn {{ formatDate(item.ends_at) }}</small>
+                    <p v-if="item.message">{{ item.message }}</p>
+                    <small>Đã nhận {{ formatDate(item.received_at) }} · Hết hạn {{ formatDate(item.ends_at) }} · {{ item.is_usable ? 'Có thể dùng' : 'Chưa thể dùng' }}</small>
                 </div>
                 <div class="promotion-code-block">
                     <code>{{ item.voucher_code }}</code>
@@ -81,7 +81,7 @@ onMounted(load)
                         <button type="button" class="promotion-action" @click="copyCode(item)">
                             {{ copyState[item.id] === 'copied' ? 'Đã sao chép' : copyState[item.id] === 'failed' ? 'Thử lại' : 'Sao chép' }}
                         </button>
-                        <router-link :to="{ path: '/checkout', query: { voucher: item.voucher_code } }" class="promotion-primary">Dùng mã</router-link>
+                        <router-link v-if="item.is_usable" :to="{ path: '/thanh-toan', query: { voucher: item.voucher_code } }" class="promotion-primary">Dùng mã</router-link>
                     </div>
                 </div>
             </article>

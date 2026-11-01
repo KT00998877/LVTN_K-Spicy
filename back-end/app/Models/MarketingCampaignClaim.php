@@ -21,7 +21,7 @@ class MarketingCampaignClaim extends Model
 
     public function campaign(): BelongsTo
     {
-        return $this->belongsTo(MarketingCampaign::class, 'marketing_campaign_id');
+        return $this->belongsTo(MarketingCampaign::class, 'marketing_campaign_id')->withTrashed();
     }
 
     public function user(): BelongsTo

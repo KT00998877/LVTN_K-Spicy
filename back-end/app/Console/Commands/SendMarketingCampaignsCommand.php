@@ -23,8 +23,7 @@ class SendMarketingCampaignsCommand extends Command
     {
         $campaigns = MarketingCampaign::scheduled()
             ->where('send_at', '<=', now())
-            ->get()
-            ->filter(fn (MarketingCampaign $c) => $c->isWithinWindow());
+            ->get();
 
         if ($campaigns->isEmpty()) {
             $this->info('Không có chiến dịch ưu đãi nào đến hạn gửi.');

@@ -150,7 +150,9 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
 
         const key = import.meta.env.VITE_REVERB_APP_KEY
         if (!key) {
-            error.value = 'Chưa cấu hình kết nối real-time.'
+            retry = setInterval(() => {
+                if (currentGeneration === generation && navigator.onLine) void fetchPage()
+            }, 15000)
             return
         }
 

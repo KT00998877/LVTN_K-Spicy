@@ -31,6 +31,17 @@ export interface ClaimedPromotion {
     ends_at: string | null
 }
 
+export interface MyVoucher {
+    id: string
+    voucher_code: string
+    name: string
+    message: string | null
+    discount_label: string
+    received_at: string | null
+    ends_at: string | null
+    is_usable: boolean
+}
+
 interface FeaturedPromotionsResponse {
     data: FeaturedPromotion[]
 }
@@ -38,6 +49,7 @@ interface FeaturedPromotionsResponse {
 const ENDPOINTS = {
     featured: '/promotions/featured',
     mine: '/promotions/me',
+    myVouchers: '/vouchers/me',
     claim: (id: number) => `/promotions/${id}/claim`,
 } as const
 
@@ -56,5 +68,10 @@ export async function claimPromotion(id: number): Promise<ClaimedPromotion> {
 
 export async function fetchMyPromotions(): Promise<ClaimedPromotion[]> {
     const { data } = await apiClient.get<{ success: boolean; data: ClaimedPromotion[] }>(ENDPOINTS.mine)
+    return data.data
+}
+
+export async function fetchMyVouchers(): Promise<MyVoucher[]> {
+    const { data } = await apiClient.get<{ success: boolean; data: MyVoucher[] }>(ENDPOINTS.myVouchers)
     return data.data
 }

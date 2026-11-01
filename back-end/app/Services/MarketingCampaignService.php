@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * MarketingCampaignService — gửi ưu đãi theo khung giờ vàng tới khách thân thiết.
+ * MarketingCampaignService — gửi ưu đãi theo thời điểm hẹn tới khách thân thiết.
  *
  * Quy tắc BR-MKT-*:
  *  - BR-MKT-01: chỉ campaign SCHEDULED mới được gửi; SENT/SKIPPED/CANCELLED là kết thúc.
  *  - BR-MKT-02: ưu đãi có mã voucher bắt buộc.
- *  - BR-MKT-03: chỉ gửi khi hiện tại nằm trong [window_start, window_end].
+ *  - BR-MKT-03: chỉ gửi khi voucher còn hiệu lực và còn lượt sử dụng.
  *  - BR-MKT-04: mỗi khách tối đa 1 ưu đãi/ngày (chống spam).
  *  - BR-MKT-05: chỉ nhắm khách đã từng chi (khách thân thiết), trừ khi campaign
  *    nhắm tất cả (target_tier_ids rỗng) thì vẫn giới hạn khách đã đăng ký.
@@ -28,7 +28,7 @@ class MarketingCampaignService
     public const NOTIFICATION_TYPE = 'customer.promo';
 
     /**
-     * Tìm các campaign đến hạn gửi (đã tới send_at và đang trong khung giờ vàng).
+     * Tìm các campaign đã tới thời điểm gửi.
      *
      * @return \Illuminate\Support\Collection<int, MarketingCampaign>
      */
@@ -36,8 +36,7 @@ class MarketingCampaignService
     {
         return MarketingCampaign::scheduled()
             ->where('send_at', '<=', now())
-            ->get()
-            ->filter(fn (MarketingCampaign $c) => $c->isWithinWindow());
+            ->get();
     }
 
     /**
@@ -45,10 +44,20 @@ class MarketingCampaignService
      *
      * @return int số khách thực sự nhận được
      */
-    public function send(MarketingCampaign $campaign): int
+    public function send(MarketingCampaign $campaign, bool $skipInvalidVoucher = false): int
     {
         abort_if(! $campaign->isScheduled(), 422, 'Chiến dịch không ở trạng thái chờ gửi.');
         abort_if($campaign->voucher_code === null || $campaign->voucher_code === '', 422, 'Chiến dịch chưa có mã voucher.');
+
+        $voucher = $campaign->voucher()->first();
+        if (! $voucher || ! $voucher->is_active || ! $voucher->isWithinWindow() || ! $voucher->hasGlobalQuota()) {
+            if ($skipInvalidVoucher) {
+                $campaign->forceFill(['status' => MarketingCampaign::STATUS_SKIPPED])->save();
+            }
+            abort(422, $skipInvalidVoucher
+                ? 'Voucher đã hết hạn, bị tắt hoặc hết lượt sử dụng. Chiến dịch được đánh dấu bỏ qua.'
+                : 'Voucher chưa có hiệu lực, đã hết hạn, bị tắt hoặc hết lượt sử dụng.');
+        }
 
         $recipients = $this->recipients($campaign);
         $sent = 0;

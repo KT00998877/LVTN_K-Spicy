@@ -16,7 +16,7 @@ const copyState = ref<Record<string, 'idle' | 'copied' | 'failed'>>({})
 const toast = ref<PromoNotification | null>(null)
 
 const connectionLabel = computed(() =>
-    store.connected ? 'Cập nhật trực tiếp' : 'Tự động cập nhật mỗi vài giây',
+    store.connected ? 'Cập nhật trực tiếp' : '',
 )
 
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -30,6 +30,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
 
 function togglePanel() {
     open.value = !open.value
+    if (open.value) void store.fetchPage()
 }
 
 async function copyCode(code: string, id: string) {
@@ -54,7 +55,7 @@ async function openNotification(item: PromoNotification) {
         return
     }
     if (item.data.voucher_code) {
-        await router.push({ path: '/checkout', query: { voucher: item.data.voucher_code } })
+        await router.push({ path: '/thanh-toan', query: { voucher: item.data.voucher_code } })
     }
 }
 </script>
@@ -80,6 +81,7 @@ async function openNotification(item: PromoNotification) {
                 <strong>Thông báo của bạn</strong>
                 <button class="close-button" type="button" aria-label="Đóng" @click="open = false">✕</button>
             </header>
+            <router-link class="my-vouchers-link" to="/tai-khoan?tab=promotions" @click="open = false">Voucher của tôi</router-link>
 
             <p class="connection" role="status">{{ connectionLabel }}</p>
             <p v-if="store.error" class="error" role="alert">{{ store.error }}</p>
@@ -91,6 +93,9 @@ async function openNotification(item: PromoNotification) {
 
             <ul v-else>
                 <li v-for="item in store.items" :key="item.id" :class="{ unread: !item.read_at }">
+                    <strong v-if="item.data.event === 'PROMO_CAMPAIGN'" class="notification-kind">Ưu đãi từ quán</strong>
+                    <strong v-else-if="item.data.event === 'FLASH_SALE'" class="notification-kind">Flash Sale</strong>
+                    <strong v-else-if="item.data.event === 'COMBO_PROMOTION'" class="notification-kind">Combo món và nước</strong>
                     <p class="promo-message">{{ item.data.message }}</p>
                     <div v-if="item.data.voucher_code" class="promo-code-row">
                         <code class="promo-code">{{ item.data.voucher_code }}</code>
@@ -177,6 +182,7 @@ async function openNotification(item: PromoNotification) {
     padding: 16px;
     border-radius: 16px;
     background: var(--color-surface, #fff);
+    color: #2d211f;
     box-shadow: 0 12px 40px rgba(21, 21, 21, 0.18);
 }
 
@@ -199,6 +205,8 @@ header strong { font-size: 16px; }
     cursor: pointer;
 }
 .close-button:hover { background: rgba(0, 0, 0, 0.05); }
+.my-vouchers-link { display: inline-block; margin-top: 4px; color: var(--chili-red, #b9121b); font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.my-vouchers-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 
 .connection { margin: 6px 0 0; color: #6b6b6b; font-size: 12px; }
 .error { margin: 8px 0 0; color: #991b1b; font-size: 13px; }
@@ -210,11 +218,13 @@ li {
     padding: 12px;
     border-radius: 12px;
     background: var(--cream, #f8f6f3);
+    color: #2d211f;
 }
 li + li { margin-top: 8px; }
 li.unread { background: #fff0e0; }
+.notification-kind { display: block; margin-bottom: 6px; color: #991b1b; font-size: 12px; }
 
-.promo-message { margin: 0 0 10px; font-size: 14px; line-height: 1.45; }
+.promo-message { margin: 0 0 10px; color: #2d211f; font-size: 14px; line-height: 1.45; }
 
 .promo-code-row { display: flex; align-items: stretch; gap: 8px; }
 
@@ -290,6 +300,7 @@ time { display: block; margin-top: 8px; color: #7a7a7a; font-size: 12px; }
     border-left: 4px solid var(--chili-red, #e4263d);
     border-radius: 12px;
     background: #fff;
+    color: #2d211f;
     box-shadow: 0 8px 32px rgba(21, 21, 21, 0.2);
 }
 .toast-body {

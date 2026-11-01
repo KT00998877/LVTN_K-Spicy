@@ -6,6 +6,7 @@ use App\Models\MarketingCampaign;
 use App\Services\MarketingCampaignService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * SendMarketingCampaignJob — gửi 1 chiến dịch ưu đãi tới nhóm khách mục tiêu.
@@ -31,16 +32,10 @@ class SendMarketingCampaignJob implements ShouldQueue
         // Campaign đã bị xoá / đã gửi / đã huỷ → bỏ qua.
         if (! $campaign || ! $campaign->isScheduled()) return;
 
-        // Chưa tới khung giờ vàng → chờ cron lần sau (không phải SKIPPED).
-        if (! $campaign->isWithinWindow()) {
-            // Quá hạn (lỡ quên, quay lại sau nhiều ngày) thì đánh dấu bỏ qua.
-            if ($campaign->isPastWindow()) {
-                $campaign->forceFill(['status' => MarketingCampaign::STATUS_SKIPPED])->save();
-            }
-
-            return;
+        try {
+            $service->send($campaign, true);
+        } catch (HttpException $e) {
+            if ($e->getStatusCode() !== 422) throw $e;
         }
-
-        $service->send($campaign);
     }
 }

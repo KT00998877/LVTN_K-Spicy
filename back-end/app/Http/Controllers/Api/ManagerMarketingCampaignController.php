@@ -10,6 +10,7 @@ use App\Services\MarketingCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 /**
  * ManagerMarketingCampaignController — quản lý chiến dịch ưu đãi gửi khách (Phase 1).
@@ -100,14 +101,6 @@ class ManagerMarketingCampaignController extends Controller
     {
         $campaign = MarketingCampaign::findOrFail($id);
 
-        // Đã gửi rồi thì không xoá (giữ lịch sử), chỉ cho huỷ.
-        if ($campaign->status === MarketingCampaign::STATUS_SENT) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Chiến dịch đã gửi không thể xoá. Hãy huỷ lịch gửi thay vì xoá.',
-            ], 422);
-        }
-
         $campaign->delete();
 
         return response()->json(['success' => true]);
@@ -164,6 +157,8 @@ class ManagerMarketingCampaignController extends Controller
     {
         $vouchers = Voucher::query()
             ->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($query) => $query->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit'))
             ->orderByDesc('created_at')
             ->limit(100)
             ->get()
@@ -216,15 +211,17 @@ class ManagerMarketingCampaignController extends Controller
             'target_tier_ids' => ['nullable', 'array'],
             'target_tier_ids.*' => ['integer', 'exists:loyalty_tiers,id'],
             'send_at'         => ['required', 'date'],
-            'window_start'    => ['required', 'date_format:H:i'],
-            'window_end'      => ['required', 'date_format:H:i'],
         ]);
 
-        $start = Carbon::createFromFormat('H:i', $data['window_start']);
-        $end   = Carbon::createFromFormat('H:i', $data['window_end']);
-
-        if ($start->greaterThan($end)) {
-            abort(422, 'Giờ bắt đầu phải nhỏ hơn hoặc bằng giờ kết thúc.');
+        $sendAt = Carbon::parse($data['send_at']);
+        if ($sendAt->lte(now())) {
+            throw ValidationException::withMessages(['send_at' => 'Thời điểm gửi phải ở tương lai.']);
+        }
+        $voucher = Voucher::where('code', $data['voucher_code'])->firstOrFail();
+        if (! $voucher->is_active || ! $voucher->hasGlobalQuota()
+            || ($voucher->starts_at && $sendAt->lt($voucher->starts_at))
+            || ($voucher->ends_at && $sendAt->gt($voucher->ends_at))) {
+            throw ValidationException::withMessages(['voucher_code' => 'Voucher không còn dùng được tại thời điểm gửi đã chọn.']);
         }
 
         return [
@@ -237,8 +234,8 @@ class ManagerMarketingCampaignController extends Controller
             'landing_url'     => $data['landing_url'] ?? null,
             'target_tier_ids' => $data['target_tier_ids'] ?? null,
             'send_at'         => $data['send_at'],
-            'window_start'    => $data['window_start'],
-            'window_end'      => $data['window_end'],
+            'window_start'    => '00:00',
+            'window_end'      => '23:59',
         ];
     }
 

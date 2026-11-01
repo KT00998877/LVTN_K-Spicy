@@ -213,11 +213,15 @@ class MarketingAssetService
         array $options,
         int $authorId,
     ): Blog {
-        $title = (string) ($options['title'] ?? $asset->subject);
+        $title = (string) ($options['title'] ?? ($version->headline ?: $asset->subject));
         $title = $title !== '' ? $title : 'Bài viết từ AI Marketing Studio';
 
         $excerpt = $version->caption ? mb_substr((string) $version->caption, 0, 240) : null;
         $content = $version->body ?: ($version->caption ?: '');
+        if (!str_contains($content, '<')) {
+            $content = \Illuminate\Support\Str::markdown($content, ['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        }
+        $content = app(\App\Services\BlogService::class)->sanitizeHtml($content);
 
         // Map category từ context nếu không truyền override.
         $category = $options['category'] ?? null;
@@ -237,13 +241,21 @@ class MarketingAssetService
         }
         $newsSection = strtoupper((string) $newsSection);
 
-        return DB::transaction(function () use ($asset, $version, $title, $excerpt, $content, $category, $newsSection, $authorId) {
+        $menuItemId = array_key_exists('menu_item_id', $options)
+            ? $options['menu_item_id']
+            : (((array) $asset->context_payload)['menu_item_id'] ?? null);
+        $coverImage = $menuItemId
+            ? \App\Models\MenuItem::query()->whereKey($menuItemId)->where('is_active', true)->value('image_url')
+            : null;
+
+        return DB::transaction(function () use ($asset, $version, $title, $excerpt, $content, $category, $newsSection, $authorId, $coverImage) {
             $blog = Blog::create([
                 'title'        => $title,
                 'slug'         => $this->generateBlogSlug($title),
                 'excerpt'      => $excerpt,
                 'content'      => $content,
-                'cover_image'  => null,
+                'reading_time' => app(\App\Services\BlogService::class)->estimateReadingMinutes($content),
+                'cover_image'  => $coverImage,
                 'category'     => $category,
                 'news_section' => $newsSection,
                 'status'       => 'DRAFT',

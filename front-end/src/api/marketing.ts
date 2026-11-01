@@ -24,7 +24,7 @@ export interface MarketingDraftContext {
     brand: string
     store_info: string
     campaigns: Array<{ id: number; name: string; slug: string }>
-    menu_items: Array<{ id: number; name: string; price: number }>
+    menu_items: Array<{ id: number; name: string; price: number; image_url: string | null }>
     promotions: Array<{ id: number; name: string; kind: string; value: number }>
     tones: MarketingTone[]
     channels: MarketingChannel[]
@@ -109,13 +109,13 @@ export function getAsset(id: number): Promise<MarketingAsset> {
 
 export function createAsset(payload: CreateAssetPayload): Promise<MarketingAsset> {
     return apiClient
-        .post<{ success: boolean; data: MarketingAsset }>(`${BASE}/assets`, payload)
+        .post<{ success: boolean; data: MarketingAsset }>(`${BASE}/assets`, payload, { timeout: 60000 })
         .then((r) => r.data.data)
 }
 
 export function generateNewVersion(assetId: number): Promise<MarketingVersion> {
     return apiClient
-        .post<{ success: boolean; data: MarketingVersion }>(`${BASE}/assets/${assetId}/generate`)
+        .post<{ success: boolean; data: MarketingVersion }>(`${BASE}/assets/${assetId}/generate`, undefined, { timeout: 60000 })
         .then((r) => r.data.data)
 }
 
@@ -162,7 +162,7 @@ export function updateVersion(
 
 export function pushAssetVersionToBlog(
     assetId: number,
-    payload: { version_id: number; category?: string | null; news_section?: string | null; title?: string | null },
+    payload: { version_id: number; category?: string | null; news_section?: string | null; title?: string | null; menu_item_id?: number | null },
 ): Promise<{ id: number; slug: string }> {
     return apiClient
         .post<{ success: boolean; data: { id: number; slug: string; title: string; status: string } }>(

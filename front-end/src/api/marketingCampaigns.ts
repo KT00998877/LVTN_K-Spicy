@@ -18,8 +18,6 @@ export interface MarketingCampaign {
     landing_url: string | null
     target_tier_ids: number[] | null
     send_at: string
-    window_start: string
-    window_end: string
     status: MarketingCampaignStatus
     sent_at: string | null
     recipient_count: number
@@ -52,8 +50,6 @@ export interface MarketingCampaignPayload {
     landing_url?: string | null
     target_tier_ids?: number[] | null
     send_at: string
-    window_start: string
-    window_end: string
 }
 
 const ENDPOINTS = {
@@ -83,7 +79,7 @@ export async function updateMarketingCampaign(id: number, payload: MarketingCamp
     return data.data
 }
 
-/** DELETE — xoá chiến dịch (chỉ được xoá khi chưa gửi). */
+/** DELETE — ẩn chiến dịch khỏi danh sách quản lý. */
 export async function deleteMarketingCampaign(id: number): Promise<void> {
     await apiClient.delete(ENDPOINTS.campaign(id))
 }

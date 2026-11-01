@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\MarketingCampaign;
+use App\Jobs\SendMarketingCampaignJob;
+use App\Services\MarketingCampaignService;
 use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -60,6 +64,7 @@ class MarketingCampaignClaimTest extends TestCase
             $table->unsignedInteger('recipient_count')->default(0);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
         Schema::create('marketing_campaign_claims', function (Blueprint $table): void {
             $table->id();
@@ -69,6 +74,20 @@ class MarketingCampaignClaimTest extends TestCase
             $table->timestamp('claimed_at');
             $table->timestamps();
             $table->unique(['marketing_campaign_id', 'user_id']);
+        });
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->morphs('notifiable');
+            $table->text('data');
+            $table->string('deduplication_key')->unique();
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('voucher_usages', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('voucher_id');
+            $table->unsignedBigInteger('user_id');
         });
     }
 
@@ -88,6 +107,95 @@ class MarketingCampaignClaimTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.campaign_id', $campaign->id);
+    }
+
+    public function test_deleted_sent_campaign_preserves_claimed_voucher_history(): void
+    {
+        $user = $this->user(2);
+        $campaign = $this->campaign([2]);
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/promotions/{$campaign->id}/claim")->assertOk();
+        $campaign->delete();
+
+        $this->assertSoftDeleted('marketing_campaigns', ['id' => $campaign->id]);
+        $this->assertDatabaseCount('marketing_campaign_claims', 1);
+        $this->getJson('/api/promotions/me')
+            ->assertOk()
+            ->assertJsonPath('data.0.name', $campaign->name)
+            ->assertJsonPath('data.0.voucher_code', 'SPICY20');
+    }
+
+    public function test_expired_voucher_skips_due_campaign_without_notifying_customers(): void
+    {
+        $campaign = $this->campaign([2]);
+        $campaign->forceFill(['status' => MarketingCampaign::STATUS_SCHEDULED])->save();
+        Voucher::where('code', 'SPICY20')->update(['ends_at' => now()->subMinute()]);
+
+        (new SendMarketingCampaignJob($campaign->id))->handle(app(MarketingCampaignService::class));
+
+        $this->assertSame(MarketingCampaign::STATUS_SKIPPED, $campaign->fresh()->status);
+        $this->assertDatabaseCount('notifications', 0);
+    }
+
+    public function test_due_campaign_does_not_wait_for_old_time_window(): void
+    {
+        $campaign = $this->campaign([2]);
+        $campaign->forceFill([
+            'status' => MarketingCampaign::STATUS_SCHEDULED,
+            'window_start' => '00:00',
+            'window_end' => '00:01',
+        ])->save();
+
+        $this->assertTrue(app(MarketingCampaignService::class)->dueCampaigns()->contains('id', $campaign->id));
+    }
+
+    public function test_send_now_with_inactive_voucher_keeps_campaign_scheduled(): void
+    {
+        $campaign = $this->campaign([2]);
+        $campaign->forceFill(['status' => MarketingCampaign::STATUS_SCHEDULED])->save();
+        Voucher::where('code', 'SPICY20')->update(['is_active' => false]);
+
+        try {
+            app(MarketingCampaignService::class)->send($campaign);
+            $this->fail('Expected an invalid voucher response.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+        }
+
+        $this->assertSame(MarketingCampaign::STATUS_SCHEDULED, $campaign->fresh()->status);
+    }
+
+    public function test_received_voucher_appears_in_my_vouchers_without_duplicate_after_claim(): void
+    {
+        $user = $this->user(2);
+        $other = $this->user(1);
+        $campaign = $this->campaign([2]);
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'customer.promo',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'data' => json_encode(['event' => 'PROMO_CAMPAIGN', 'name' => 'Giờ vàng', 'message' => 'Giảm 20%', 'voucher_code' => 'SPICY20']),
+            'deduplication_key' => 'promo:'.$campaign->id.':'.$user->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Sanctum::actingAs($user);
+        $this->getJson('/api/vouchers/me')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.voucher_code', 'SPICY20')
+            ->assertJsonPath('data.0.is_usable', true);
+
+        $this->postJson("/api/promotions/{$campaign->id}/claim")->assertOk();
+        $this->getJson('/api/vouchers/me')->assertJsonCount(1, 'data');
+
+        DB::table('voucher_usages')->insert(['voucher_id' => Voucher::where('code', 'SPICY20')->value('id'), 'user_id' => $user->id]);
+        $this->getJson('/api/vouchers/me')->assertJsonPath('data.0.is_usable', false);
+
+        Sanctum::actingAs($other);
+        $this->getJson('/api/vouchers/me')->assertJsonCount(0, 'data');
     }
 
     public function test_customer_outside_target_tier_cannot_claim(): void

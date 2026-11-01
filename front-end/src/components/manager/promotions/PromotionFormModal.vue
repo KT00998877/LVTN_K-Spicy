@@ -273,8 +273,7 @@
                 <!-- Step 4: Xem trước -->
                 <section v-show="step === 3" class="step-pane">
                     <p class="hint">
-                        Tóm tắt cấu hình — kiểm tra nhanh trước khi lưu. Sau khi lưu, dùng panel
-                        "Xem trước cart mẫu" ở sidebar để chạy thử trên cart giả lập.
+                        Tóm tắt cấu hình — kiểm tra lại điều kiện và mức giảm trước khi lưu.
                     </p>
                     <dl class="summary">
                         <div>

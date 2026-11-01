@@ -80,7 +80,7 @@ class VoucherController extends Controller
             $cart = \App\Models\Cart::where('user_id', $user->id)
                 ->with(['items.menuItem', 'items.toppingRelations.topping'])->first();
             foreach ($cart?->items ?? [] as $item) {
-                $unit = \App\Services\Money::minor($item->menuItem->price);
+                $unit = \App\Services\Money::minor(app(\App\Services\FlashSaleService::class)->priceFor($item->menuItem));
                 foreach ($item->toppingRelations as $topping) {
                     $unit += \App\Services\Money::minor($topping->topping->price);
                 }

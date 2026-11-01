@@ -3,8 +3,8 @@
         <header class="page-head">
             <div>
                 <span class="eyebrow">AI MARKETING STUDIO</span>
-                <h2>Sinh &amp; duyệt content cho K-Spicy</h2>
-                <p>AI tự động viết caption, headline, hashtag theo tone — bạn duyệt rồi đăng.</p>
+                <h2>Viết bài cho trang khách hàng</h2>
+                <p>Chọn chủ đề, đọc và chỉnh bản AI, rồi xuất bản khi đã sẵn sàng.</p>
             </div>
             <div class="head-cta">
                 <button
@@ -13,7 +13,7 @@
                     :disabled="store.mutating"
                     @click="openCreate"
                 >
-                    + Tạo asset mới
+                    + Viết bài mới
                 </button>
                 <button
                     v-if="activeSection === 'blog'"
@@ -33,7 +33,7 @@
                 :class="{ active: activeSection === 'asset' }"
                 @click="switchSection('asset')"
             >
-                AI Content
+                Bài viết với AI
             </button>
             <button
                 role="tab"
@@ -41,7 +41,7 @@
                 :class="{ active: activeSection === 'blog' }"
                 @click="switchSection('blog')"
             >
-                Blog nhà hàng
+                Bài trên website
                 <span v-if="activeSection === 'blog'" class="tab-pill">{{ blogStore.meta.total }}</span>
             </button>
         </div>
@@ -50,6 +50,11 @@
         <!-- AI CONTENT SECTION                                          -->
         <!-- =========================================================== -->
         <template v-if="activeSection === 'asset'">
+            <div class="studio-steps" aria-label="Quy trình xuất bản">
+                <span :class="{ active: tab === 'create' }"><b>1</b> Chọn chủ đề</span>
+                <span :class="{ active: tab === 'review' }"><b>2</b> Đọc và chỉnh</span>
+                <span><b>3</b> Xuất bản lên website</span>
+            </div>
             <div class="view-toggle" role="tablist" aria-label="Chế độ xem">
                 <button
                     role="tab"
@@ -72,7 +77,7 @@
 
             <nav class="tabs" role="tablist" aria-label="Khu vực làm việc">
                 <button role="tab" :aria-selected="tab === 'list'" :class="{ active: tab === 'list' }" @click="switchTab('list')">
-                    Danh sách ({{ store.meta.total }})
+                    Bản thảo ({{ store.meta.total }})
                 </button>
                 <button
                     v-if="store.viewMode === 'active'"
@@ -81,7 +86,7 @@
                     :class="{ active: tab === 'create' }"
                     @click="switchTab('create')"
                 >
-                    Tạo mới
+                    Viết bài
                 </button>
                 <button
                     v-if="store.viewMode === 'active'"
@@ -90,7 +95,7 @@
                     :class="{ active: tab === 'review' }"
                     @click="switchTab('review')"
                 >
-                    Duyệt nội dung
+                    Xem bài AI
                     <span v-if="reviewId" class="tab-pill">#{{ reviewId }}</span>
                 </button>
             </nav>
@@ -102,18 +107,14 @@
                     <option value="">Tất cả trạng thái</option>
                     <option v-for="s in statuses" :key="s" :value="s">{{ statusLabel(s) }}</option>
                 </select>
-                <select v-model="filter.channel" @change="onFilterChange">
-                    <option value="">Tất cả kênh</option>
-                    <option v-for="c in (store.context?.channels ?? [])" :key="c" :value="c">{{ channelLabel(c) }}</option>
-                </select>
-                <input v-model="filter.q" type="text" placeholder="Tìm theo subject…" @keyup.enter="onFilterChange" />
+                <input v-model="filter.q" type="text" placeholder="Tìm theo chủ đề…" aria-label="Tìm theo chủ đề" @keyup.enter="onFilterChange" />
                 <button class="btn ghost" @click="onFilterChange">Lọc</button>
             </div>
 
             <div v-if="store.loading" class="state">Đang tải…</div>
             <div v-else-if="store.error" class="state error">{{ store.error }}</div>
             <div v-else-if="store.rows.length === 0" class="state empty">
-                Chưa có asset nào. <button type="button" class="link" @click="switchTab('create')">Tạo asset đầu tiên →</button>
+                Chưa có bản thảo nào. <button type="button" class="link" @click="switchTab('create')">Viết bài đầu tiên →</button>
             </div>
             <div v-else class="asset-grid">
                 <article v-for="row in store.rows" :key="row.id" class="asset-card" :data-status="row.status">
@@ -123,8 +124,8 @@
                     </header>
                     <h3 class="card-title">{{ row.subject }}</h3>
                     <div class="card-meta">
-                        <span>Tone: <strong>{{ row.tone }}</strong></span>
-                        <span>Versions: {{ row.versions_count ?? (row.versions?.length ?? 0) }}</span>
+                        <span>Giọng văn: <strong>{{ toneLabel(row.tone) }}</strong></span>
+                        <span>{{ row.versions_count ?? (row.versions?.length ?? 0) }} bản viết</span>
                     </div>
                     <footer class="card-foot">
                         <button
@@ -132,7 +133,7 @@
                             class="btn ghost sm"
                             @click="openReview(row)"
                         >
-                            Mở
+                            Xem và xuất bản
                         </button>
                         <button
                             v-if="store.viewMode === 'active'"
@@ -171,42 +172,36 @@
         <!-- ============ TAB: CREATE ============ -->
         <section v-if="tab === 'create'" class="create-section">
             <form class="create-form" @submit.prevent="onCreate">
+                <div class="form-intro">
+                    <span class="eyebrow">BƯỚC 1 / 3</span>
+                    <h3>Hôm nay bạn muốn kể chuyện gì?</h3>
+                    <p>Chọn một món hoặc nhập chủ đề. AI sẽ viết bài dài để bạn xem và chỉnh trước khi đăng.</p>
+                </div>
                 <div class="grid">
                     <label class="field">
-                        <span>Kênh đăng</span>
-                        <select v-model="form.channel" required>
-                            <option v-for="c in (store.context?.channels ?? [])" :key="c" :value="c">{{ channelLabel(c) }}</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Loại content</span>
-                        <select v-model="form.content_type" required>
-                            <option v-for="t in (store.context?.content_types ?? [])" :key="t" :value="t">{{ contentTypeLabel(t) }}</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Tone</span>
+                        <span>Giọng văn</span>
                         <select v-model="form.tone">
                             <option v-for="t in (store.context?.tones ?? [])" :key="t" :value="t">{{ toneLabel(t) }}</option>
                         </select>
                     </label>
                     <label class="field">
-                        <span>Chiến dịch (optional)</span>
+                        <span>Chiến dịch liên quan (nếu có)</span>
                         <select v-model="form.campaign_id">
                             <option :value="null">— Không gắn —</option>
                             <option v-for="c in (store.context?.campaigns ?? [])" :key="c.id" :value="c.id">{{ c.name }}</option>
                         </select>
                     </label>
                     <label class="field span-2">
-                        <span>Món ăn (gợi ý subject + giá)</span>
-                        <select v-model="form.menu_item_id" @change="onMenuItemChange">
-                            <option :value="null">— Tự nhập subject —</option>
-                            <option v-for="m in (store.context?.menu_items ?? [])" :key="m.id" :value="m.id">{{ m.name }} ({{ formatVnd(m.price) }}đ)</option>
-                        </select>
+                        <span>Món ăn liên quan (nếu có)</span>
+                        <input v-model="dishQuery" type="text" list="marketing-menu-items" placeholder="Gõ tên món hoặc chọn gợi ý…" autocomplete="off" @input="onMenuItemChange" />
+                        <datalist id="marketing-menu-items">
+                            <option v-for="m in (store.context?.menu_items ?? [])" :key="m.id" :value="m.name" />
+                        </datalist>
+                        <small>Gõ tên món tự do; món có trong thực đơn sẽ được gắn kèm dữ liệu giá và mô tả.</small>
                     </label>
                     <label class="field span-2">
-                        <span>Subject (tiêu đề)</span>
-                        <input v-model="form.subject" type="text" maxlength="200" placeholder="VD: Mì cay bò Mỹ" />
+                        <span>Chủ đề bài viết — nhập tại đây</span>
+                        <input ref="subjectInputRef" v-model="form.subject" type="text" maxlength="200" placeholder="Ví dụ: Một bữa mì cay ấm lòng ngày mưa" required />
                     </label>
                 </div>
 
@@ -216,7 +211,7 @@
 
                 <div class="form-actions">
                     <button type="submit" class="btn primary" :disabled="store.mutating">
-                        {{ store.mutating ? 'Đang sinh…' : 'Tạo asset + sinh version 1' }}
+                        {{ store.mutating ? 'Đang viết bài…' : 'Viết bản nháp với AI →' }}
                     </button>
                 </div>
             </form>
@@ -224,7 +219,7 @@
 
         <!-- ============ TAB: REVIEW ============ -->
         <section v-if="tab === 'review'" class="review-section">
-            <div v-if="!reviewId" class="state empty">Chọn 1 asset ở tab "Danh sách" để duyệt.</div>
+            <div v-if="!reviewId" class="state empty">Chọn một bản thảo để xem và xuất bản.</div>
             <div v-else-if="store.currentLoading" class="state">Đang tải asset…</div>
             <article v-else-if="store.current" class="review-detail">
                 <header class="review-head">
@@ -233,12 +228,24 @@
                         <span class="status-pill" :data-status="store.current.status">{{ statusLabel(store.current.status) }}</span>
                     </div>
                     <button class="btn primary sm" :disabled="store.mutating" @click="onGenerate">
-                        Sinh version mới
+                        Viết lại bản khác
                     </button>
                 </header>
 
                 <h2 class="review-title">{{ store.current.subject }}</h2>
-                <p class="review-meta">Tone: <strong>{{ store.current.tone }}</strong> · {{ store.current.versions?.length ?? 0 }} version</p>
+                <p class="review-meta">Giọng văn: <strong>{{ toneLabel(store.current.tone) }}</strong> · {{ store.current.versions?.length ?? 0 }} bản viết</p>
+                <p class="review-guidance">Đọc kỹ thông tin món, giá và ưu đãi. Bạn có thể sửa nội dung trước khi xuất bản.</p>
+                <div class="cover-picker">
+                    <label for="marketing-cover-item">Ảnh bìa từ thực đơn</label>
+                    <select id="marketing-cover-item" v-model="coverMenuItemId">
+                        <option :value="null">Không dùng ảnh bìa</option>
+                        <option v-for="item in menuItemsWithImages" :key="item.id" :value="item.id">{{ item.name }}</option>
+                    </select>
+                    <img v-if="selectedCoverItem?.image_url" :src="imageUrl(selectedCoverItem.image_url)" :alt="`Ảnh bìa món ${selectedCoverItem.name}`" />
+                    <small v-else-if="store.contextLoading">Đang tải ảnh món từ thực đơn…</small>
+                    <small v-else-if="menuItemsWithImages.length === 0">Chưa tải được danh sách ảnh món. Hãy tải lại trang để thử lại.</small>
+                    <small v-else>Chọn món có ảnh để xem trước. Ảnh này sẽ xuất hiện trên trang khách hàng.</small>
+                </div>
 
                 <div class="version-stack">
                     <article
@@ -248,7 +255,7 @@
                         :data-selected="v.is_selected ? 'true' : 'false'"
                     >
                         <header class="version-head">
-                            <span class="version-num">Version {{ v.version_number }}</span>
+                            <span class="version-num">Bản viết {{ v.version_number }}</span>
                             <span class="provider-pill" :data-provider="v.provider">{{ v.provider }}</span>
                             <button
                                 v-if="!v.is_selected && store.current.status !== 'ARCHIVED'"
@@ -256,7 +263,7 @@
                                 :disabled="store.mutating"
                                 @click="onSelectVersion(v.id)"
                             >
-                                Duyệt version này
+                                Chọn bản này
                             </button>
                             <button
                                 v-if="store.current.status !== 'ARCHIVED'"
@@ -272,7 +279,15 @@
                                 :disabled="blogStore.mutating"
                                 @click="onPushVersionToBlog(v)"
                             >
-                                Đẩy lên Blog
+                                Lưu thành nháp website
+                            </button>
+                            <button
+                                v-if="store.current.status !== 'ARCHIVED'"
+                                class="btn primary sm"
+                                :disabled="store.mutating || blogStore.mutating || publishingVersionId !== null"
+                                @click="onPublishVersionToWebsite(v)"
+                            >
+                                {{ publishingVersionId === v.id ? 'Đang xuất bản…' : 'Xuất bản lên website' }}
                             </button>
                             <span v-if="v.is_selected" class="approved-pill">Đã duyệt</span>
                         </header>
@@ -343,7 +358,7 @@
                         :data-status="b.status"
                     >
                         <div v-if="b.cover_image" class="blog-cover">
-                            <img :src="b.cover_image" :alt="b.title" loading="lazy" />
+                            <img :src="imageUrl(b.cover_image)" :alt="b.title" loading="lazy" />
                         </div>
                         <div v-else class="blog-cover fallback" :aria-label="'Không có ảnh bìa cho ' + b.title">
                             <span>{{ blogInitials(b.title) }}</span>
@@ -422,6 +437,7 @@ import BlogFormModal from '@/components/manager/promotions/BlogFormModal.vue'
 import type { CreateAssetPayload, MarketingAsset, MarketingVersion } from '@/api/marketing'
 import type { ManagerBlog, BlogPayload } from '@/api/managerBlog'
 import { pushAssetVersionToBlog } from '@/api/marketing'
+import { imageUrl } from '@/utils/image'
 
 const store = useMarketingStudioStore()
 const blogStore = useBlogManagerStore()
@@ -437,6 +453,14 @@ const reviewId = ref<number | null>(null)
 const activeSection = ref<'asset' | 'blog'>('asset')
 const blogTab = ref<'list'>('list')
 const editingBlog = ref<ManagerBlog | null>(null)
+const subjectInputRef = ref<HTMLInputElement | null>(null)
+const dishQuery = ref('')
+const lastDishQuery = ref('')
+const publishingVersionId = ref<number | null>(null)
+const websiteDraftIds = new Map<number, number>()
+const coverMenuItemId = ref<number | null>(null)
+const menuItemsWithImages = computed(() => store.context?.menu_items.filter((item) => item.image_url) ?? [])
+const selectedCoverItem = computed(() => menuItemsWithImages.value.find((item) => item.id === coverMenuItemId.value))
 const blogFormRef = ref<InstanceType<typeof BlogFormModal> | null>(null)
 
 const blogFilters = reactive({
@@ -448,7 +472,7 @@ const blogFilters = reactive({
 
 const filter = reactive({
     status: '' as '' | StatusValue,
-    channel: '' as string,
+    channel: 'BLOG' as string,
     q: '' as string,
 })
 
@@ -460,16 +484,17 @@ const form = reactive<{
     campaign_id: number | null
     menu_item_id: number | null
 }>({
-    channel: 'FACEBOOK',
-    content_type: 'POST',
-    tone: 'FUN',
+    channel: 'BLOG',
+    content_type: 'BLOG_ARTICLE',
+    tone: 'WARM',
     subject: '',
     campaign_id: null,
     menu_item_id: null,
 })
 
 onMounted(async () => {
-    await store.loadContext()
+    await store.loadContext(true)
+    store.setFilter({ channel: 'BLOG' })
     await store.loadAssets(1)
 })
 
@@ -556,7 +581,7 @@ async function onPushVersionToBlog(v: MarketingVersion) {
     if (!store.current) return
     if (!await appDialog.confirm({ title: 'Tạo bản nháp Blog?', message: `Version ${v.version_number} sẽ được tạo thành bài viết nháp trong mục Blog.`, confirmLabel: 'Tạo bản nháp' })) return
     try {
-        const blog = await pushAssetVersionToBlog(store.current.id, { version_id: v.id })
+        const blog = await pushAssetVersionToBlog(store.current.id, { version_id: v.id, menu_item_id: coverMenuItemId.value })
         toast.success('Đã tạo bài viết nháp trong Blog nhà hàng.')
         // Switch sang blog section để user xem ngay.
         activeSection.value = 'blog'
@@ -567,15 +592,49 @@ async function onPushVersionToBlog(v: MarketingVersion) {
     }
 }
 
+async function onPublishVersionToWebsite(v: MarketingVersion) {
+    if (!store.current || publishingVersionId.value !== null) return
+    const assetId = store.current.id
+    if (!await appDialog.confirm({
+        title: 'Xuất bản bài viết?',
+        message: `Bản viết ${v.version_number} sẽ xuất hiện trên trang khách hàng. Hãy chắc chắn bạn đã kiểm tra nội dung.`,
+        confirmLabel: 'Xuất bản',
+        tone: 'warning',
+    })) return
+    publishingVersionId.value = v.id
+    try {
+        if (!v.is_selected) await store.selectAssetVersion(assetId, v.id)
+        let blogId = websiteDraftIds.get(v.id)
+        if (!blogId) {
+            const blog = await pushAssetVersionToBlog(assetId, { version_id: v.id, menu_item_id: coverMenuItemId.value })
+            blogId = blog.id
+            websiteDraftIds.set(v.id, blogId)
+        }
+        await blogStore.publish(blogId)
+        websiteDraftIds.delete(v.id)
+        toast.success('Bài viết đã xuất bản trên trang khách hàng.')
+        activeSection.value = 'blog'
+        blogTab.value = 'list'
+        await blogStore.loadBlogs(1)
+    } catch (e: any) {
+        toast.error(e?.response?.data?.message || 'Chưa thể xuất bản. Nếu đã tạo bản nháp, hãy mở mục Bài trên website để tiếp tục.')
+    } finally {
+        publishingVersionId.value = null
+    }
+}
+
 function onFilterChange() {
     store.setFilter({ status: filter.status as any, channel: filter.channel, q: filter.q })
     store.loadAssets(1)
 }
 
 function onMenuItemChange() {
-    if (!form.menu_item_id) return
-    const m = store.context?.menu_items.find((x) => x.id === form.menu_item_id)
-    if (m && !form.subject) form.subject = m.name
+    const name = dishQuery.value.trim()
+    const wasSuggested = !form.subject.trim() || form.subject === lastDishQuery.value
+    const match = store.context?.menu_items.find((item) => item.name.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))
+    form.menu_item_id = match?.id ?? null
+    if (wasSuggested) form.subject = name
+    lastDishQuery.value = name
 }
 
 async function onCreate() {
@@ -591,10 +650,22 @@ async function onCreate() {
         campaign_id: form.campaign_id,
         menu_item_id: form.menu_item_id,
     }
-    const created = await store.create(payload)
-    tab.value = 'review'
-    reviewId.value = created.id
-    await store.loadAsset(created.id)
+    try {
+        const created = await store.create(payload)
+        tab.value = 'review'
+        reviewId.value = created.id
+        coverMenuItemId.value = form.menu_item_id
+        await store.loadAsset(created.id)
+    } catch (e: any) {
+        const validation = e?.response?.data?.errors
+        const fieldError = validation && Object.values(validation).flat().find((message) => typeof message === 'string')
+        toast.error(
+            (typeof fieldError === 'string' && fieldError)
+            || e?.response?.data?.message
+            || (e?.code === 'ECONNABORTED' ? 'AI xử lý quá lâu. Hãy kiểm tra danh sách bản thảo trước khi thử lại.' : '')
+            || 'Không kết nối được máy chủ. Vui lòng kiểm tra backend rồi thử lại.',
+        )
+    }
 }
 
 function openCreate() {
@@ -605,6 +676,7 @@ async function openReview(row: MarketingAsset) {
     tab.value = 'review'
     reviewId.value = row.id
     await store.loadAsset(row.id)
+    coverMenuItemId.value = Number(store.current?.context_payload?.menu_item_id) || null
 }
 
 async function onGenerate() {
@@ -639,10 +711,9 @@ async function onForceDelete(row: MarketingAsset) {
         tone: 'danger',
     })
     if (!ok) return
-    // Lớp confirm 2: bắt buộc nhập đúng tên asset để xác nhận.
-    const typed = await appDialog.prompt({ title: 'Xác nhận tên nội dung', message: 'Nhập đúng tên nội dung để hoàn tất thao tác xóa vĩnh viễn.', label: 'Tên nội dung', placeholder: row.subject, confirmLabel: 'Xóa vĩnh viễn', tone: 'danger' })
-    if (typed !== row.subject) {
-        toast.info('Đã hủy thao tác vì tên không khớp.')
+    const typed = await appDialog.prompt({ title: 'Xác nhận xóa vĩnh viễn', message: 'Nhập yes để xóa vĩnh viễn nội dung này.', label: 'Nhập yes', placeholder: 'yes', confirmLabel: 'Xóa vĩnh viễn', tone: 'danger' })
+    if (typed?.trim().toLowerCase() !== 'yes') {
+        toast.info('Đã hủy thao tác xóa.')
         return
     }
     try {
@@ -679,6 +750,7 @@ async function onSaveVersion(payload: {
 
 function switchView(mode: 'active' | 'trash') {
     store.setViewMode(mode)
+    if (mode === 'active') store.setFilter({ channel: 'BLOG' })
     // Reset tab về list để tránh nhảy sang review/create khi chuyển thùng rác.
     tab.value = 'list'
     reviewId.value = null
@@ -983,8 +1055,32 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
     background: #fff;
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 12px;
-    padding: 20px;
+    padding: clamp(20px, 3vw, 32px);
+    max-width: 760px;
 }
+.studio-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 4px 0 20px;
+    color: var(--color-gray-600);
+    font-size: 13px;
+}
+.studio-steps span { display: inline-flex; align-items: center; gap: 7px; }
+.studio-steps b {
+    display: inline-grid;
+    place-items: center;
+    width: 23px;
+    height: 23px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 50%;
+    font-size: 12px;
+}
+.studio-steps .active { color: var(--color-chili-red); font-weight: 700; }
+.studio-steps .active b { color: #fff; background: var(--color-chili-red); border-color: var(--color-chili-red); }
+.form-intro { margin-bottom: 24px; }
+.form-intro h3 { font-size: clamp(20px, 2vw, 26px); margin: 6px 0 8px; }
+.form-intro p { margin: 0; color: var(--color-gray-600); line-height: 1.6; }
 .grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1036,6 +1132,18 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
 }
 .review-title { margin: 0 0 6px; font-size: 22px; line-height: 1.25; }
 .review-meta { color: rgba(0, 0, 0, 0.55); font-size: 13px; margin: 0 0 18px; }
+.review-guidance { margin: 0 0 20px; color: var(--color-gray-700); font-size: 14px; line-height: 1.6; }
+.cover-picker {
+    display: grid;
+    gap: 10px;
+    max-width: 420px;
+    margin: 0 0 24px;
+}
+.cover-picker label { font-size: 14px; font-weight: 700; }
+.cover-picker select { padding: 10px 12px; border: 1px solid var(--color-gray-300); border-radius: 8px; background: #fff; font: inherit; }
+.cover-picker select:focus-visible { outline: 2px solid var(--color-chili-red); outline-offset: 2px; }
+.cover-picker img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+.cover-picker small { color: var(--color-gray-600); line-height: 1.5; }
 
 .version-stack { display: flex; flex-direction: column; gap: 14px; }
 .version-card {
@@ -1081,14 +1189,14 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
 }
 .version-body {
     margin: 0 0 10px;
-    padding: 10px 12px;
+    padding: 20px;
     background: #fff;
-    border: 1px dashed rgba(0, 0, 0, 0.1);
-    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 15px;
     white-space: pre-wrap;
-    line-height: 1.55;
+    line-height: 1.75;
     color: rgba(0, 0, 0, 0.78);
 }
 .hashtags { display: flex; flex-wrap: wrap; gap: 6px; }

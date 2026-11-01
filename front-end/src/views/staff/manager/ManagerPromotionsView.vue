@@ -232,13 +232,6 @@
                     </template>
                 </section>
 
-                <aside class="side">
-                    <VoucherPreviewPanel
-                        ref="voucherPreviewRef"
-                        :initial-code="lastVoucherCode"
-                        @submit="onTestVoucher"
-                    />
-                </aside>
             </div>
 
             <VoucherFormModal
@@ -357,9 +350,6 @@
                     </template>
                 </section>
 
-                <aside class="side">
-                    <PromotionPreviewPanel />
-                </aside>
             </div>
 
             <PromotionFormModal
@@ -503,10 +493,8 @@ import type { ManagerPromotion, PromotionPayload } from '@/types/promotion'
 import type { ManagerVoucher, VoucherPayload } from '@/api/managerVoucher'
 import VoucherFormModal from '@/components/manager/promotions/VoucherFormModal.vue'
 import VoucherUsagesDrawer from '@/components/manager/promotions/VoucherUsagesDrawer.vue'
-import VoucherPreviewPanel from '@/components/manager/promotions/VoucherPreviewPanel.vue'
 import PromotionFormModal from '@/components/manager/promotions/PromotionFormModal.vue'
 import PromotionListTable from '@/components/manager/promotions/PromotionListTable.vue'
-import PromotionPreviewPanel from '@/components/manager/promotions/PromotionPreviewPanel.vue'
 import PromotionUsagesDrawer from '@/components/manager/promotions/PromotionUsagesDrawer.vue'
 import CampaignFormModal from '@/components/manager/promotions/CampaignFormModal.vue'
 import CampaignListTable from '@/components/manager/promotions/CampaignListTable.vue'
@@ -639,22 +627,6 @@ async function onVoucherDrawerPage(p: number): Promise<void> {
     if (!voucherDrawer.value) return
     voucherUsagesPage.value = p
     await store.loadUsages(voucherDrawer.value.id, p)
-}
-
-const voucherPreviewRef = ref<InstanceType<typeof VoucherPreviewPanel> | null>(null)
-const lastVoucherCode = ref('')
-
-async function onTestVoucher(payload: { code: string; subtotal: number }): Promise<void> {
-    lastVoucherCode.value = payload.code
-    try {
-        const r = await store.runPreview(payload.code, payload.subtotal)
-        voucherPreviewRef.value?.setResult(r)
-    } catch (e: unknown) {
-        const err = e as { response?: { data?: { message?: string } } }
-        voucherPreviewRef.value?.setError(err.response?.data?.message || 'Mã không hợp lệ hoặc không đủ điều kiện.')
-    } finally {
-        voucherPreviewRef.value?.setLoading(false)
-    }
 }
 
 /* ============================================================
@@ -1123,7 +1095,7 @@ useRealtimeRefresh(
 
 .layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 22px;
     align-items: start;
 }
@@ -1131,10 +1103,6 @@ useRealtimeRefresh(
     display: flex;
     flex-direction: column;
     gap: 14px;
-}
-.side {
-    position: sticky;
-    top: 12px;
 }
 
 .filters {
@@ -1418,9 +1386,6 @@ tbody tr:last-child td {
 @media (max-width: 1024px) {
     .layout {
         grid-template-columns: 1fr;
-    }
-    .side {
-        position: static;
     }
     .kpi-strip {
         grid-template-columns: repeat(2, 1fr);

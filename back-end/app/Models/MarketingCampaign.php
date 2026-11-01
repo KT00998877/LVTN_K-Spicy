@@ -4,26 +4,28 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * MarketingCampaign — chiến dịch ưu đãi gửi tới khách hàng theo khung giờ vàng.
+ * MarketingCampaign — chiến dịch ưu đãi gửi tới khách hàng theo thời điểm đã hẹn.
  *
  * Khác với `Campaign` (trang public / AI Marketing Studio), bảng này mô tả
  * một lần gửi ưu đãi có kiểm soát:
  *  - Gắn 1 mã voucher (`voucher_code` → vouchers.code) để khách copy.
- *  - Có "khung giờ vàng": `send_at` là mốc mong muốn, `window_start`/`window_end`
- *    là cửa sổ cho phép gửi (nếu quá cửa sổ thì đánh dấu SKIPPED).
+ *  - `send_at` là thời điểm bắt đầu gửi; hai cột window_* cũ không còn điều khiển việc gửi.
  *  - `target_tier_ids` giới hạn hạng thành viên được nhận (null = tất cả).
  *
  * Quy tắc BR-MKT-*:
  *  - BR-MKT-01: chỉ campaign SCHEDULED mới được gửi; SENT/SKIPPED/CANCELLED là kết thúc.
  *  - BR-MKT-02: ưu đãi có mã voucher bắt buộc (không gửi mà không có mã để dùng).
- *  - BR-MKT-03: khung giờ vàng luôn nằm trong 00:00–23:59, window_start < window_end.
+ *  - BR-MKT-03: voucher phải còn hiệu lực tại lúc gửi.
  */
 class MarketingCampaign extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'marketing_campaigns';
 
     /** @var list<string> */
