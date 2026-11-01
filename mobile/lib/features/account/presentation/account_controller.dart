@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/dio_client.dart';
@@ -117,14 +118,14 @@ class ProfileController extends StateNotifier<ProfileState> {
   }
 
   /// POST /api/auth/me/avatar — sau đó nạp lại user để avatar mới hiện ngay.
-  Future<bool> uploadAvatar(String filePath) async {
+  Future<bool> uploadAvatar(XFile file) async {
     state = state.copyWith(
       isUploadingAvatar: true,
       clearError: true,
       clearMessage: true,
     );
     try {
-      await _repo.uploadAvatar(filePath);
+      await _repo.uploadAvatar(file);
       await _auth.refreshCurrentUser();
       state = state.copyWith(
         isUploadingAvatar: false,
@@ -133,6 +134,12 @@ class ProfileController extends StateNotifier<ProfileState> {
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(isUploadingAvatar: false, error: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isUploadingAvatar: false,
+        error: 'Không đọc được ảnh đã chọn. Vui lòng thử ảnh khác.',
+      );
       return false;
     }
   }

@@ -87,19 +87,23 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   Future<void> _pickAvatar(ImageSource source) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: source,
-      // Server giới hạn 4MB — resize nhẹ phía client để tránh 422.
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-    if (file == null || !mounted) return;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: source,
+        // Server giới hạn 4MB — resize nhẹ phía client để tránh 422.
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
 
-    await ref
-        .read(profileControllerProvider.notifier)
-        .uploadAvatar(file.path);
+      await ref.read(profileControllerProvider.notifier).uploadAvatar(file);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không mở được ảnh. Vui lòng thử lại.')),
+      );
+    }
   }
 
   Future<void> _confirmDeleteAvatar() async {

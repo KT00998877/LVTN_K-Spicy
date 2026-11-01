@@ -21,6 +21,16 @@ String backendImageUrl(String? value, {String? baseUrl}) {
   // valid URL with a scheme but no leading slash.
   final rawLower = raw.toLowerCase();
   if (rawLower.startsWith('http://') || rawLower.startsWith('https://')) {
+    final absolute = Uri.tryParse(raw);
+    if (absolute != null &&
+        (absolute.host == 'localhost' || absolute.host == '127.0.0.1')) {
+      final api = Uri.parse(baseUrl ?? AppConfig.apiBaseUrl);
+      return absolute.replace(
+        scheme: api.scheme,
+        host: api.host,
+        port: api.hasPort ? api.port : null,
+      ).toString();
+    }
     return raw;
   }
 

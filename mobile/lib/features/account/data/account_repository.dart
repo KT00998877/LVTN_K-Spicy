@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/dio_client.dart';
@@ -34,10 +35,13 @@ class AccountRepository {
   ///
   /// Multipart: phải bỏ header Content-Type để Dio tự sinh kèm
   /// `boundary`, nếu không Laravel sẽ không parse được file.
-  Future<void> uploadAvatar(String avatarPath) async {
+  Future<void> uploadAvatar(XFile avatar) async {
     try {
       final form = FormData.fromMap({
-        'avatar': await MultipartFile.fromFile(avatarPath),
+        'avatar': MultipartFile.fromBytes(
+          await avatar.readAsBytes(),
+          filename: avatar.name.isEmpty ? 'avatar.jpg' : avatar.name,
+        ),
       });
       await _dio.post<void>(
         '${_auth}me/avatar',

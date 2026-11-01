@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme.dart';
 import '../../../../core/utils/backend_image_url.dart';
+import '../../../../shared/widgets/backend_image.dart';
 import '../../../auth/domain/app_user.dart';
 
 /// ============================================================
@@ -50,7 +50,7 @@ class UserAvatar extends StatelessWidget {
         width: size,
         height: size,
         child: url.isNotEmpty
-            ? CachedNetworkImage(
+            ? BackendImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => ColoredBox(
