@@ -157,6 +157,26 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        async loginWithGoogleTicket(ticket: string, nonce: string): Promise<boolean> {
+            this.loading = true
+            this.error = null
+            try {
+                const result = await authApi.exchangeGoogleTicket(ticket, nonce)
+                useStaffStore().clearLocalSession()
+                this.clearSession()
+                this.user = result.user
+                this.token = result.token
+                this.persist()
+                return true
+            } catch (err) {
+                const e = err as { response?: { data?: { message?: string } } }
+                this.error = e.response?.data?.message || 'Không thể đăng nhập bằng Google. Vui lòng thử lại.'
+                return false
+            } finally {
+                this.loading = false
+            }
+        },
+
         async verifyTwoFactor(code: string): Promise<boolean> {
             if (!this.twoFactorChallenge) return false
             this.loading = true

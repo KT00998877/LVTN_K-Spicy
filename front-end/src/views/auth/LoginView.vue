@@ -48,7 +48,7 @@ function redirectAfterLogin() {
         const staff = useStaffStore()
         const roots: Record<StaffRole, string> = {
             WAITER: '/staff/waiter/tables', KITCHEN: '/staff/kitchen/queue',
-            CASHIER: '/staff/cashier/invoices', SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard',
+            CASHIER: '/staff/cashier/invoices', SHIPPER: '/staff/shipper', SUPPLIER: '/staff/supplier/purchase-orders', MANAGER: '/staff/manager/dashboard',
         }
         router.replace(staff.currentRole ? roots[staff.currentRole] : redirectTarget.value)
 }

@@ -26,7 +26,8 @@ return [
 
     'allowed_origins' => $allowedOrigins,
 
-    'allowed_origins_patterns' => [],
+    // Flutter Web dev server uses a different local port on each run.
+    'allowed_origins_patterns' => ['#^http://(?:localhost|127\.0\.0\.1):[0-9]+$#'],
 
     'allowed_headers' => [
         'Accept',

@@ -43,7 +43,7 @@ const info = computed<PasswordStrengthInfo>(() => {
 
     if (score <= 2) {
         level = 'weak'
-        hint = 'Yếu — dễ bị bẻ khóa'
+        hint = 'Yếu — Mật khẩu phải có ít nhất một chữ hoa và một chữ thường'
     } else if (score === 3) {
         level = 'fair'
         hint = 'Trung bình — nên thêm ký tự đặc biệt'

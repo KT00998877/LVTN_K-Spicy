@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test",
     "test:staff-notifications": "node --test tests/staff-notifications.test.mjs",
     "test:payments": "node --test tests/payment-flow.test.mjs",
     "test:realtime": "node --test tests/realtime.test.mjs tests/realtime-stores.test.mjs",

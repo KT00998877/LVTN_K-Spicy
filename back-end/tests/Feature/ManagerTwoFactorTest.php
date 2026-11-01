@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\AuthService;
+use App\Services\LoyaltyTierService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -144,6 +145,32 @@ class ManagerTwoFactorTest extends TestCase
         }
 
         $this->assertSame($setup['secret'], $user->fresh()->two_factor_secret);
+    }
+
+    public function test_supplier_login_is_classified_as_staff_on_both_login_routes(): void
+    {
+        $this->mock(LoyaltyTierService::class)
+            ->shouldReceive('resolveForUser')
+            ->twice()
+            ->andReturn([null, null]);
+        $user = User::create([
+            'name' => 'Nhà cung cấp K',
+            'email' => 'supplier@micay.local',
+            'password' => Hash::make('00998877'),
+            'is_active' => true,
+        ]);
+        $role = Role::create(['code' => 'SUPPLIER', 'name' => 'Nhà cung cấp']);
+        $user->roles()->attach($role->id, ['assigned_at' => now()]);
+
+        $this->postJson('/api/auth/login', [
+            'identifier' => 'supplier@micay.local',
+            'password' => '00998877',
+        ])->assertOk()->assertJsonPath('data.primary_role', 'SUPPLIER');
+
+        $this->postJson('/api/staff/auth/login', [
+            'email' => 'supplier@micay.local',
+            'password' => '00998877',
+        ])->assertOk()->assertJsonPath('data.primary_role', 'SUPPLIER');
     }
 
     /** @return array{User, AuthService, Request} */

@@ -4,11 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Role;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -16,6 +23,114 @@ class AuthController extends Controller
 {
     public function __construct(private readonly AuthService $authService)
     {
+    }
+
+    public function googleStart(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['nonce' => ['required', 'string', 'size:64', 'regex:/\A[a-f0-9]{64}\z/']]);
+        $google = config('services.google');
+        abort_unless($google['client_id'] && $google['client_secret'] && $google['redirect_uri'], 503, 'Đăng nhập Google chưa được cấu hình.');
+
+        $state = Str::random(64);
+        Cache::put('auth:google:state:' . $state, hash('sha256', $data['nonce']), now()->addMinutes(10));
+        $query = http_build_query([
+            'client_id' => $google['client_id'],
+            'redirect_uri' => $google['redirect_uri'],
+            'response_type' => 'code',
+            'scope' => 'openid email profile',
+            'state' => $state,
+            'prompt' => 'select_account',
+        ], '', '&', PHP_QUERY_RFC3986);
+
+        return redirect()->away('https://accounts.google.com/o/oauth2/v2/auth?' . $query);
+    }
+
+    public function googleCallback(Request $request): RedirectResponse
+    {
+        $frontend = rtrim((string) config('services.google.frontend_url'), '/') . '/dang-nhap/google/callback';
+        $state = $request->query('state');
+        $nonceHash = is_string($state) ? Cache::pull('auth:google:state:' . $state) : null;
+        if (!is_string($nonceHash)) {
+            return redirect()->away($frontend . '?error=invalid_state');
+        }
+        $code = $request->query('code');
+        if (!is_string($code) || $code === '') {
+            return redirect()->away($frontend . '?error=cancelled');
+        }
+
+        try {
+            $google = config('services.google');
+            $token = $this->googleHttp()->asForm()->post('https://oauth2.googleapis.com/token', [
+                'code' => $code,
+                'client_id' => $google['client_id'],
+                'client_secret' => $google['client_secret'],
+                'redirect_uri' => $google['redirect_uri'],
+                'grant_type' => 'authorization_code',
+            ])->throw()->json('access_token');
+            if (!is_string($token) || $token === '') throw new \RuntimeException('Missing Google access token');
+
+            $profile = $this->googleHttp()->withToken($token)->get('https://openidconnect.googleapis.com/v1/userinfo')->throw()->json();
+            $googleId = $profile['sub'] ?? null;
+            $email = $profile['email'] ?? null;
+            if (!is_string($googleId) || $googleId === '' || !is_string($email) || !filter_var($email, FILTER_VALIDATE_EMAIL) || ($profile['email_verified'] ?? false) !== true) {
+                return redirect()->away($frontend . '?error=unverified_email');
+            }
+
+            $user = DB::transaction(function () use ($googleId, $email, $profile): ?User {
+                $user = User::where('google_id', $googleId)->lockForUpdate()->first();
+                if (!$user) $user = User::where('email', $email)->lockForUpdate()->first();
+                if ($user) {
+                    if (!$user->is_active || ($user->google_id && $user->google_id !== $googleId)
+                        || !$user->roles()->where('code', 'CUSTOMER')->exists()
+                        || $user->roles()->whereIn('code', ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'])->exists()) return null;
+                    if (!$user->google_id) $user->forceFill(['google_id' => $googleId])->save();
+                    return $user;
+                }
+
+                $name = trim((string) ($profile['name'] ?? '')) ?: explode('@', $email)[0];
+                $role = Role::firstOrCreate(['code' => 'CUSTOMER'], ['name' => 'Khách hàng', 'description' => 'Đặt món, xem menu, thanh toán trực tuyến']);
+                $user = User::create([
+                    'name' => mb_substr($name, 0, 100), 'full_name' => mb_substr($name, 0, 100),
+                    'email' => $email, 'password' => Str::random(64), 'is_active' => true,
+                ]);
+                $user->forceFill(['google_id' => $googleId, 'email_verified_at' => now()])->save();
+                $user->roles()->attach($role->id, ['assigned_at' => now()]);
+                return $user;
+            });
+            if (!$user) return redirect()->away($frontend . '?error=account_unavailable');
+
+            $ticket = Str::random(64);
+            Cache::put('auth:google:ticket:' . $ticket, ['user_id' => $user->id, 'nonce_hash' => $nonceHash], now()->addMinutes(2));
+            return redirect()->away($frontend . '?ticket=' . rawurlencode($ticket));
+        } catch (\Throwable $e) {
+            report($e);
+            return redirect()->away($frontend . '?error=google_unavailable');
+        }
+    }
+
+    public function googleExchange(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ticket' => ['required', 'string', 'size:64'],
+            'nonce' => ['required', 'string', 'size:64', 'regex:/\A[a-f0-9]{64}\z/'],
+        ]);
+        $ticketData = Cache::pull('auth:google:ticket:' . $data['ticket']);
+        $user = is_array($ticketData) && hash_equals($ticketData['nonce_hash'], hash('sha256', $data['nonce']))
+            ? User::find($ticketData['user_id']) : null;
+        if (!$user || !$user->is_active || !$user->roles()->where('code', 'CUSTOMER')->exists()
+            || $user->roles()->whereIn('code', ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'])->exists()) {
+            return response()->json(['message' => 'Phiên đăng nhập Google không còn hợp lệ. Vui lòng thử lại.'], 422);
+        }
+
+        $token = $user->createToken('spa', ['*'], now()->addDays(7))->plainTextToken;
+        return response()->json(['success' => true, 'data' => ['user' => $this->formatUser($user), 'token' => $token]]);
+    }
+
+    private function googleHttp(): PendingRequest
+    {
+        $options = PHP_OS_FAMILY === 'Windows' && defined('CURLSSLOPT_NATIVE_CA')
+            ? ['curl' => [CURLOPT_SSL_OPTIONS => CURLSSLOPT_NATIVE_CA]] : [];
+        return Http::withOptions($options)->timeout(10);
     }
 
     /**
@@ -46,6 +161,7 @@ class AuthController extends Controller
             'phone.unique' => 'Số điện thoại đã được sử dụng.',
             'password.required' => 'Vui lòng nhập mật khẩu.',
             'password.confirmed' => 'Xác nhận mật khẩu không khớp.',
+            'password.mixed' => 'Mật khẩu phải có ít nhất một chữ hoa và một chữ thường.',
             'password.min' => 'Mật khẩu phải có ít nhất 8 ký tự.',
         ]);
 
@@ -76,7 +192,7 @@ class AuthController extends Controller
 
         $result = $this->authService->login($data['identifier'], $data['password'], $request);
         $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
-        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
+        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'], $roles));
 
         if ($result['requires_two_factor']) {
             return response()->json([
@@ -114,7 +230,7 @@ class AuthController extends Controller
             $request,
         );
         $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
-        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
+        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'], $roles));
 
         return response()->json([
             'success' => true,
@@ -414,6 +530,9 @@ class AuthController extends Controller
         $tierService = app(\App\Services\LoyaltyTierService::class);
         [$current, $next] = $tierService->resolveForUser($user);
 
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $publicDisk */
+        $publicDisk = Storage::disk('public');
+
         $payload = [
             'id'             => $user->id,
             'name'           => $user->name,
@@ -421,7 +540,7 @@ class AuthController extends Controller
             'email'          => $user->email,
             'phone'          => $user->phone,
             'avatar_url'     => $user->avatar_path
-                ? Storage::disk('public')->url($user->avatar_path)
+                ? $publicDisk->url($user->avatar_path)
                 : null,
             'is_active'      => (bool) $user->is_active,
             'can_close_daily_stock' => (bool) $user->can_close_daily_stock,

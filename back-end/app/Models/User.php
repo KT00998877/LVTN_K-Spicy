@@ -27,6 +27,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name',
+        'supplier_id',
         'full_name',
         'email',
         'phone',
@@ -93,6 +94,11 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(\App\Models\Role::class, 'user_role', 'user_id', 'role_id')
             ->withPivot('assigned_at');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function favoriteMenuItems(): BelongsToMany

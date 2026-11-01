@@ -52,6 +52,18 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     }
 }
 
+export function googleStartUrl(nonce: string): string {
+    const base = apiClient.defaults.baseURL || '/api'
+    const url = new URL(base.replace(/\/$/, '') + '/auth/google/start', window.location.origin)
+    url.searchParams.set('nonce', nonce)
+    return url.toString()
+}
+
+export async function exchangeGoogleTicket(ticket: string, nonce: string): Promise<AuthResponse> {
+    const { data } = await apiClient.post<{ data: AuthResponse }>('/auth/google/exchange', { ticket, nonce })
+    return data.data
+}
+
 export async function verifyTwoFactor(challengeToken: string, code: string): Promise<AuthResponse> {
     try {
         const { data } = await apiClient.post<{ success: boolean; data: AuthResponse }>(
@@ -86,11 +98,10 @@ export async function uploadAvatar(file: File): Promise<AuthUser> {
     try {
         const body = new FormData()
         body.append('avatar', file)
-        // KHÔNG đặt Content-Type thủ công — axios sẽ tự gắn kèm boundary.
-        // Đặt tay sẽ khiến Laravel không parse được file.
         const { data } = await apiClient.post<{ success: boolean; message: string; data: AuthUser }>(
             `${ENDPOINTS.me}/avatar`,
             body,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
         )
         return data.data
     } catch (err) {
