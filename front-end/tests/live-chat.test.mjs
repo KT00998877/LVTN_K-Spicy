@@ -186,6 +186,18 @@ test('chỉ hiện dòng "đang chờ nhân viên" khi khách đã nói', async 
 
 // ===== Phía nhân viên =====
 
+test('một phiên chat chỉ xuất hiện một thẻ sau khi mở chi tiết', async () => {
+    const session = { id: 12, status: 'accepted', customer_name: 'Chị Lan', assigned_staff_id: 3, assigned_staff_name: 'Quản lý' }
+    const { store } = managerHarness({ api: managerApi({
+        managerQueue: async () => ({ waiting: [], mine: [session] }),
+        managerShowSession: async () => ({ ...session, messages: [] }),
+    }) })
+    await store.fetchQueue()
+    await store.openSession(12)
+    assert.equal(store.waiting.length, 0)
+    assert.deepEqual(store.mine.map((item) => item.id), [12])
+})
+
 test('nhân viên nghe kênh hàng chờ và kênh từng phiên của mình', async () => {
     const { store, channels } = managerHarness({
         api: managerApi({

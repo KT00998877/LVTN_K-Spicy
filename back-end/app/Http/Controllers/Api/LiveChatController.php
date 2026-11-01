@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LiveChatMessage;
 use App\Models\LiveChatSession;
 use App\Models\User;
+use App\Services\LiveChatBroadcaster;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,20 +44,6 @@ class LiveChatController extends Controller
             ], 401);
         }
 
-        // Một khách chỉ có một phiên đang mở: tái sử dụng phiên cũ.
-        $existing = LiveChatSession::query()
-            ->where('user_id', $user->id)
-            ->active()
-            ->latest('id')
-            ->first();
-
-        if ($existing) {
-            return response()->json([
-                'success' => true,
-                'data' => $this->sessionPayload($existing),
-            ]);
-        }
-
         $request->validate([
             'subject' => 'nullable|string|max:500',
             'topic' => 'nullable|string|max:500',
@@ -64,22 +51,31 @@ class LiveChatController extends Controller
 
         $subject = $request->input('subject') ?: $request->input('topic');
 
-        $session = LiveChatSession::create([
-            'user_id' => $user->id,
-            'guest_token' => null,
-            'customer_name' => $user->full_name ?: $user->name,
-            'customer_phone' => $user->phone,
-            'status' => 'waiting',
-            'subject' => $subject,
-        ]);
+        $created = false;
+        $session = DB::transaction(function () use ($user, $subject, &$created) {
+            // Khoá khách hàng để hai yêu cầu mở chat đồng thời không cùng tạo phiên mới.
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $existing = LiveChatSession::where('user_id', $user->id)->active()->latest('id')->first();
+            if ($existing) return $existing;
+
+            $created = true;
+            return LiveChatSession::create([
+                'user_id' => $user->id,
+                'guest_token' => null,
+                'customer_name' => $user->full_name ?: $user->name,
+                'customer_phone' => $user->phone,
+                'status' => 'waiting',
+                'subject' => $subject,
+            ]);
+        });
 
         // Nhân viên cần biết có khách mới ngay, nên phát sự kiện hàng chờ.
-        LiveChatSessionUpdated::dispatch($session);
+        if ($created) app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
 
         return response()->json([
             'success' => true,
             'data' => $this->sessionPayload($session),
-        ], 201);
+        ], $created ? 201 : 200);
     }
 
     /**
@@ -145,7 +141,7 @@ class LiveChatController extends Controller
         $session->refresh();
         $message->setRelation('session', $session);
 
-        LiveChatMessageSent::dispatch($session, $message);
+        app(LiveChatBroadcaster::class)->dispatch(new LiveChatMessageSent($session, $message));
 
         return response()->json([
             'success' => true,
@@ -176,7 +172,7 @@ class LiveChatController extends Controller
                 'status' => 'closed',
                 'closed_at' => now(),
             ]);
-            LiveChatSessionUpdated::dispatch($session);
+            app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
         }
 
         return response()->json([

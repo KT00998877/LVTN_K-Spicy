@@ -9,6 +9,7 @@ use App\Models\LiveChatMessage;
 use App\Models\LiveChatSession;
 use App\Models\User;
 use App\Services\LiveChatSuggestionService;
+use App\Services\LiveChatBroadcaster;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -161,7 +162,7 @@ class LiveChatManagerController extends Controller
         }
 
         $session->load('assignedStaff');
-        LiveChatSessionUpdated::dispatch($session);
+        app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
 
         return response()->json([
             'success' => true,
@@ -223,7 +224,7 @@ class LiveChatManagerController extends Controller
         $session->load('assignedStaff');
         $message->setRelation('session', $session);
 
-        LiveChatMessageSent::dispatch($session, $message);
+        app(LiveChatBroadcaster::class)->dispatch(new LiveChatMessageSent($session, $message));
 
         return response()->json([
             'success' => true,
@@ -262,7 +263,7 @@ class LiveChatManagerController extends Controller
                 'closed_at' => now(),
             ]);
             $session->load('assignedStaff');
-            LiveChatSessionUpdated::dispatch($session);
+            app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
         }
 
         return response()->json([

@@ -45,6 +45,7 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
     const unreadSessionIds = ref<number[]>([])
 
     let echo: Echo<'reverb'> | null = null
+    let fallbackPoll: ReturnType<typeof setInterval> | undefined
     let generation = 0
     /** Kênh đã đăng ký, theo id phiên — để bỏ đăng ký khi không còn cần. */
     const sessionChannels = new Map<number, ReturnType<Echo<'reverb'>['private']>>()
@@ -62,9 +63,17 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
         loadingQueue.value = true
         try {
             const queue = await liveChatApi.managerQueue()
-            waiting.value = queue.waiting
+            const previous = new Map([...waiting.value, ...mine.value].map(session => [session.id, session.last_message_at]))
+            const mineIds = new Set(queue.mine.map((session) => session.id))
+            waiting.value = queue.waiting.filter((session) => !mineIds.has(session.id))
             mine.value = queue.mine
             error.value = null
+            if (!connected.value) {
+                for (const session of [...queue.waiting, ...queue.mine]) {
+                    if (session.id !== activeId.value && previous.has(session.id)
+                        && previous.get(session.id) !== session.last_message_at) markUnread(session.id)
+                }
+            }
 
             // Nghe kênh của MỌI phiên đang mở, không chỉ phiên của mình.
             //
@@ -221,6 +230,12 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
         stop()
         const currentGeneration = ++generation
         void fetchQueue()
+        fallbackPoll = setInterval(() => {
+            if (generation !== currentGeneration || connected.value) return
+            void fetchQueue()
+            const id = activeId.value
+            if (id) void refreshActiveSession(id)
+        }, 5000)
 
         const key = import.meta.env.VITE_REVERB_APP_KEY
         if (!key) {
@@ -263,12 +278,24 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
 
     function stop(): void {
         generation++
+        if (fallbackPoll) clearInterval(fallbackPoll)
+        fallbackPoll = undefined
         for (const id of [...sessionChannels.keys()]) {
             unsubscribeSessionChannel(id)
         }
         echo?.disconnect()
         echo = null
         connected.value = false
+    }
+
+    async function refreshActiveSession(id: number): Promise<void> {
+        try {
+            const session = await liveChatApi.managerShowSession(id)
+            if (activeId.value !== id) return
+            for (const message of session.messages ?? []) pushMessage(message)
+        } catch {
+            // HTTP tạm gián đoạn; lần kiểm tra sau sẽ thử lại.
+        }
     }
 
     /**
@@ -332,6 +359,7 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
 
     /** Cập nhật hoặc thêm phiên trong danh sách, không nhân bản. */
     function upsertSession(session: LiveChatSession): void {
+        const wasMine = mine.value.some((s) => s.id === session.id)
         const apply = (list: LiveChatSession[]): LiveChatSession[] => {
             const index = list.findIndex((s) => s.id === session.id)
             if (index === -1) return [...list, session]
@@ -339,8 +367,11 @@ export const useLiveChatManagerStore = defineStore('liveChatManager', () => {
             next[index] = session
             return next
         }
-        waiting.value = apply(waiting.value)
-        mine.value = apply(mine.value)
+        waiting.value = waiting.value.filter((s) => s.id !== session.id)
+        mine.value = mine.value.filter((s) => s.id !== session.id)
+        if (session.status === 'closed') return
+        if (session.assigned_staff_id && wasMine) mine.value = apply(mine.value)
+        else if (session.status === 'waiting') waiting.value = apply(waiting.value)
     }
 
     return {

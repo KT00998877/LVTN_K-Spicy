@@ -10,6 +10,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -139,6 +141,20 @@ class LiveChatTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('data.message.sender_type', 'customer')
             ->assertJsonPath('data.message.content', 'Cho mình hỏi giá mì cay bò');
+        $this->assertSame(1, LiveChatMessage::count());
+    }
+
+    public function test_tin_nhan_van_duoc_luu_khi_realtime_mat_ket_noi(): void
+    {
+        $customer = $this->user();
+        Sanctum::actingAs($customer);
+        $sessionId = $this->postJson('/api/live-chat/sessions')->json('data.id');
+        Event::listen(\App\Events\LiveChatMessageSent::class, function () {
+            throw new BroadcastException('Realtime offline');
+        });
+
+        $this->postJson("/api/live-chat/sessions/{$sessionId}/messages", ['content' => 'Xin chào'])
+            ->assertCreated();
         $this->assertSame(1, LiveChatMessage::count());
     }
 

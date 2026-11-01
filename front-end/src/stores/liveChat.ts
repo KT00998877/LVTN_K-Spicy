@@ -40,6 +40,7 @@ export const useLiveChatStore = defineStore('liveChat', () => {
     const requiresLogin = ref(false)
 
     let echo: Echo<'reverb'> | null = null
+    let fallbackPoll: ReturnType<typeof setInterval> | undefined
     let generation = 0
 
     /**
@@ -231,6 +232,12 @@ export const useLiveChatStore = defineStore('liveChat', () => {
         unsubscribe()
         const currentGeneration = ++generation
 
+        fallbackPoll = setInterval(() => {
+            if (generation === currentGeneration && !connected.value && sessionId.value === id) {
+                void refreshSession(id)
+            }
+        }, 5000)
+
         const key = import.meta.env.VITE_REVERB_APP_KEY
         if (!key) {
             // Không có realtime: widget vẫn dùng được qua HTTP, chỉ chậm hơn.
@@ -273,10 +280,29 @@ export const useLiveChatStore = defineStore('liveChat', () => {
                     staffName.value = event.session.assigned_staff_name ?? staffName.value
                 }
             })
+            .listen('.live-chat.session.updated', (event: { session_id: number; status: LiveChatStatus; assigned_staff_name: string | null }) => {
+                if (generation !== currentGeneration || event.session_id !== sessionId.value) return
+                status.value = event.status
+                staffName.value = event.assigned_staff_name
+            })
+    }
+
+    async function refreshSession(id: number): Promise<void> {
+        try {
+            const session = await liveChatApi.showSession(id)
+            if (sessionId.value !== id) return
+            for (const message of session.messages ?? []) pushMessage(message)
+            status.value = session.status
+            staffName.value = session.assigned_staff_name ?? null
+        } catch {
+            // Kết nối HTTP tạm gián đoạn; lần kiểm tra sau sẽ thử lại.
+        }
     }
 
     function unsubscribe(): void {
         generation++
+        if (fallbackPoll) clearInterval(fallbackPoll)
+        fallbackPoll = undefined
         echo?.disconnect()
         echo = null
         connected.value = false
