@@ -10,7 +10,6 @@ import '../../features/home/presentation/customer_home_content.dart';
 import '../../features/home/presentation/menu_navigation.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/orders/presentation/orders_list_screen.dart';
-import '../../features/reservation/presentation/my_reservations_screen.dart';
 
 /// ============================================================
 /// 🏠 CUSTOMER HOME SHELL — bottom navigation cho khách hàng
@@ -20,6 +19,7 @@ import '../../features/reservation/presentation/my_reservations_screen.dart';
 /// - Tab "Menu" dùng [MenuScreen] có sẵn (filter + search).
 /// - Tab "Giỏ" dùng [CartTabScreen] (bottom-nav friendly).
 /// - Tab "Đơn" dùng [OrdersListScreen] (filter + pull-to-refresh).
+/// - Đặt bàn từ CTA trang chủ; lịch sử đặt bàn trong Tài khoản.
 /// - Tab "Tài khoản" hiển thị thông tin user + đăng xuất.
 /// ============================================================
 
@@ -38,7 +38,6 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     _Tab(icon: Icons.restaurant_menu_rounded, label: 'Menu'),
     _Tab(icon: Icons.shopping_cart_rounded, label: 'Giỏ'),
     _Tab(icon: Icons.receipt_long_rounded, label: 'Đơn'),
-    _Tab(icon: Icons.event_seat_rounded, label: 'Đặt bàn'),
     _Tab(icon: Icons.person_rounded, label: 'Tài khoản'),
   ];
 
@@ -67,7 +66,6 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
       menuPage,
       const CartTabScreen(),
       const OrdersListScreen(),
-      const MyReservationsScreen(),
       // Đây là tab gốc (không có AppBar riêng) nên AccountScreen tự bọc
       // Scaffold cho chúng ta — mount trực tiếp để giữ trạng thái tab.
       const AccountScreen(),
@@ -79,26 +77,37 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
       // được phần lớn câu hỏi, còn tư vấn trực tiếp dành cho phần chatbot không
       // trả lời được. Cố tình không theo dõi liveChatController ở đây — chỉ cần
       // mở phiên khi khách bấm, nếu không sẽ tạo phiên ảo cho mỗi lần mở app.
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'fab-live-chat',
-            onPressed: () => context.push('/live-chat'),
-            backgroundColor: AppColors.charcoal,
-            foregroundColor: AppColors.textOnDark,
-            icon: const Icon(Icons.support_agent_rounded),
-            label: const Text('Tư vấn trực tiếp'),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-support',
+        tooltip: 'Hỗ trợ',
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (sheetContext) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.chat_bubble_outline_rounded),
+                  title: const Text('Trợ lý'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.push('/chat');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.support_agent_rounded),
+                  title: const Text('Tư vấn trực tiếp'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.push('/live-chat');
+                  },
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          FloatingActionButton.extended(
-            heroTag: 'fab-chatbot',
-            onPressed: () => context.push('/chat'),
-            icon: const Icon(Icons.chat_bubble_outline_rounded),
-            label: const Text('Trợ lý'),
-          ),
-        ],
+        ),
+        child: const Icon(Icons.support_agent_rounded),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,

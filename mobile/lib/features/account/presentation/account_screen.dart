@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -69,6 +70,13 @@ class _AccountScreenState extends ConsumerState<AccountScreen>
         title: const Text('Tài khoản'),
         backgroundColor: AppColors.cream,
         surfaceTintColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Lịch sử đặt bàn',
+            onPressed: () => context.push('/reservations/me'),
+            icon: const Icon(Icons.event_seat_rounded),
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -32,34 +32,40 @@ class SpicySelector extends StatelessWidget {
           final selected = value == level;
           return Padding(
             padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: GestureDetector(
-              onTap: () => onChanged(level),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.spicyRed : Colors.white,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: selected ? AppColors.spicyRed : AppColors.border,
-                    width: 1.5,
+            child: Semantics(
+              button: true,
+              selected: selected,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                onTap: () => onChanged(level),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  constraints: const BoxConstraints(minHeight: 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      level == 0 ? 'Không cay' : 'Cấp $level',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : AppColors.textPrimary,
-                      ),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.spicyRed : Colors.white,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(
+                      color: selected ? AppColors.spicyRed : AppColors.border,
+                      width: 1.5,
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        level == 0 ? 'Không cay' : 'Cấp $level',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -127,8 +133,9 @@ class QuantityStepper extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: enabled ? onTap : null,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xs),
+        child: SizedBox(
+          width: 48,
+          height: 48,
           child: Icon(
             icon,
             color: enabled ? AppColors.spicyRed : AppColors.textMuted,

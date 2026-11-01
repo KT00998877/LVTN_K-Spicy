@@ -14,9 +14,11 @@ class AppColors {
 
   // ── Brand colors ─────────────────────────────────────────
   /// Spicy Red — primary CTA, active nav, spicy indicator
-  static const Color spicyRed = Color(0xFFD7263D);
-  static const Color spicyRedDark = Color(0xFFA8122A);
-  static const Color spicyRedSoft = Color(0xFFFCE7EA);
+  static const Color spicyRed = Color(0xFFD71920);
+  static const Color spicyRedDark = Color(0xFFB5111B);
+  static const Color spicyRedSoft = Color(0xFFFBE9E5);
+  static const Color brandRed = Color(0xFFC81924);
+  static const Color brandDark = Color(0xFF5E0F18);
 
   /// Chili Orange — promotion, secondary action
   static const Color chiliOrange = Color(0xFFF46036);
@@ -25,31 +27,31 @@ class AppColors {
   static const Color goldenYellow = Color(0xFFF6BD60);
 
   /// Deep Charcoal — text emphasis, dark surfaces, navbar
-  static const Color charcoal = Color(0xFF1A1A1A);
-  static const Color charcoalSoft = Color(0xFF3D3D3D);
+  static const Color charcoal = Color(0xFF241516);
+  static const Color charcoalSoft = Color(0xFF351A1C);
 
   /// Warm Cream — background mặc định (không dùng #FFFFFF thuần)
-  static const Color cream = Color(0xFFFAF6EE);
-  static const Color creamSoft = Color(0xFFF3ECDD);
-  static const Color creamDark = Color(0xFFE8DFCB);
+  static const Color cream = Color(0xFFFFF7F5);
+  static const Color creamSoft = Color(0xFFFBE9E5);
+  static const Color creamDark = Color(0xFFFFE1DB);
 
   /// Muted green — freshness indicator
   static const Color mutedGreen = Color(0xFF6B8E4E);
 
   // ── Semantic colors ──────────────────────────────────────
-  static const Color success = Color(0xFF2E8B57);
-  static const Color warning = Color(0xFFD97706);
-  static const Color danger = Color(0xFFD7263D);
+  static const Color success = Color(0xFF166534);
+  static const Color warning = Color(0xFF92400E);
+  static const Color danger = Color(0xFF991B1B);
   static const Color info = Color(0xFF2563EB);
 
   // ── Neutral scale ────────────────────────────────────────
   static const Color textPrimary = charcoal;
-  static const Color textSecondary = Color(0xFF6B6B6B);
-  static const Color textMuted = Color(0xFF9A9A9A);
-  static const Color textOnDark = cream;
+  static const Color textSecondary = Color(0xFF705957);
+  static const Color textMuted = Color(0xFF705957);
+  static const Color textOnDark = Color(0xFFFFFFFF);
 
-  static const Color border = Color(0xFFE3DDD0);
-  static const Color divider = Color(0xFFEEE6D5);
+  static const Color border = Color(0xFFEACCC5);
+  static const Color divider = Color(0xFFEFDAD4);
 
   static const Color overlay = Color(0x33000000); // 20% black
 }
@@ -60,7 +62,7 @@ class AppRadius {
   static const double xs = 6;
   static const double sm = 8;     // small controls
   static const double md = 12;    // normal components
-  static const double lg = 16;    // large surfaces
+  static const double lg = 8;    // product cards, matching web
   static const double xl = 20;    // hero sections
   static const double pill = 999; // chips/categories
 }
