@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{ text: string; animate: boolean }>()
 const emit = defineEmits<{ progress: []; complete: [] }>()
 const visible = ref(props.animate ? '' : props.text)
+watch(() => props.text, text => {
+    cancelAnimationFrame(frame)
+    visible.value = text
+    emit('complete')
+})
 let frame = 0
 
 onMounted(() => {

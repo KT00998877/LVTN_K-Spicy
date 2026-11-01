@@ -51,6 +51,10 @@ const suggestedQuestions = [
     'Có khuyến mãi gì không?',
 ]
 
+function displayAssistantText(text: string): string {
+    return text.replace(/(?:mục\s+)?\/dat-?ban\b/gi, 'mục Đặt bàn')
+}
+
 async function handleSend(): Promise<void> {
     const text = draft.value
     if (!text.trim() || sending.value) return
@@ -214,7 +218,7 @@ onMounted(async () => {
                         <div class="chatbot-msg__content">
                             <ChatMessageText
                                 v-if="msg.role === 'assistant'"
-                                :text="msg.content"
+                                :text="displayAssistantText(msg.content)"
                                 :animate="animatedMessageIds.has(msg.id)"
                                 @progress="followMessage(msg.id)"
                                 @complete="finishMessage(msg.id)"

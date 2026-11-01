@@ -26,7 +26,7 @@ class ConfirmationSummaryBuilder
         $toppingIds = $args['topping_ids'] ?? [];
         
         // Calculate total price
-        $unitPrice = $menuItem ? (float) $menuItem->price : 0;
+        $unitPrice = $menuItem ? app(\App\Services\FlashSaleService::class)->priceFor($menuItem) : 0;
         $toppingPrice = 0;
         $toppings = [];
 
