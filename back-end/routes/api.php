@@ -90,6 +90,7 @@ Route::middleware(['auth:sanctum', 'staff:MANAGER'])->prefix('reviews')->group(f
 Route::prefix('vouchers')->group(function () {
     // Public + customer routes
     Route::get('/', [\App\Http\Controllers\Api\VoucherController::class, 'index']);
+    Route::middleware('auth:sanctum')->get('/me', [\App\Http\Controllers\Api\CustomerNotificationController::class, 'myVouchers']);
     Route::post('/preview', [\App\Http\Controllers\Api\VoucherController::class, 'preview'])
         ->middleware('auth:sanctum');
 
@@ -155,6 +156,9 @@ Route::middleware('auth:sanctum')->prefix('favorites')->group(function () {
 | - reset:    không cần rate limit (đã có token expire)
 */
 Route::prefix('auth')->group(function () {
+    Route::get('/google/start', [AuthController::class, 'googleStart'])->middleware('throttle:20,1');
+    Route::get('/google/callback', [AuthController::class, 'googleCallback'])->middleware('throttle:20,1');
+    Route::post('/google/exchange', [AuthController::class, 'googleExchange'])->middleware('throttle:20,1');
     Route::middleware('throttle:auth-register')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
     });
@@ -205,6 +209,7 @@ Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
 Route::middleware('auth:sanctum')->prefix('cart')->group(function () {
     Route::get('/',             [CartController::class, 'index']);
     Route::post('/',            [CartController::class, 'store']);
+    Route::post('/combo',        [CartController::class, 'storeCombo']);
     Route::delete('/',          [CartController::class, 'clear']);
     Route::get('/count',        [CartController::class, 'count']);
     Route::get('/toppings',     [CartController::class, 'toppings']);
@@ -252,9 +257,9 @@ Route::prefix('staff')->group(function () {
         Route::patch('/table-sessions/{id}/close',  [StaffTableController::class, 'closeSession'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
         Route::patch('/table-sessions/{id}/cancel', [StaffTableController::class, 'cancelSession'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
 
-        // ----- Reservations (waiter xem, xác nhận) -----
-        Route::get('/reservations',                        [StaffTableController::class, 'listReservations'])->middleware('staff:WAITER,CASHIER,MANAGER');
-        Route::patch('/reservations/{id}/status',          [StaffTableController::class, 'updateReservationStatus'])->whereNumber('id')->middleware('staff:WAITER,CASHIER,MANAGER');
+        // ----- Reservations (cashier/manager) -----
+        Route::get('/reservations',                        [StaffTableController::class, 'listReservations'])->middleware('staff:CASHIER,MANAGER');
+        Route::patch('/reservations/{id}/status',          [StaffTableController::class, 'updateReservationStatus'])->whereNumber('id')->middleware('staff:CASHIER,MANAGER');
 
         // ----- Orders + Items -----
         Route::get('/orders',                                          [StaffOrderController::class, 'index'])->middleware('staff:WAITER,CASHIER,MANAGER');
@@ -262,7 +267,7 @@ Route::prefix('staff')->group(function () {
         Route::get('/orders/{id}',                                     [StaffOrderController::class, 'show'])->whereNumber('id')->middleware('staff:WAITER,CASHIER,MANAGER');
         Route::post('/orders/{id}/items',                              [StaffOrderController::class, 'addItem'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
         Route::post('/orders/{id}/submit-items', [StaffOrderController::class, 'submitItems'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
-        Route::post('/orders/{id}/demo-pay', [StaffOrderController::class, 'demoPay'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
+        Route::post('/orders/{id}/collect-payment', [StaffOrderController::class, 'collectTablePayment'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
         Route::post('/orders/{id}/request-invoice', [StaffOrderController::class, 'requestInvoice'])->whereNumber('id')->middleware('staff:WAITER,MANAGER');
         Route::patch('/orders/{oid}/items/{iid}',                      [StaffOrderController::class, 'updateItem'])->whereNumber(['oid', 'iid'])->middleware('staff:WAITER,MANAGER');
         Route::patch('/orders/{oid}/items/{iid}/status',               [StaffOrderController::class, 'updateItemStatus'])->whereNumber(['oid', 'iid'])->middleware('staff:WAITER,MANAGER');
@@ -314,6 +319,7 @@ Route::prefix('staff')->group(function () {
         });
         // ----- Dashboard (quản lý) -----
         Route::get('/dashboard/stats',                                 [StaffDashboardController::class, 'stats'])->middleware('staff:MANAGER');
+        Route::get('/manager/sidebar-counts', [\App\Http\Controllers\Api\ManagerSidebarCountsController::class, '__invoke'])->middleware('staff:MANAGER');
 
         // ----- Manager: CRUD Ingredients (Phase 2 module) -----
         Route::middleware('staff:MANAGER')->prefix('manager/ingredients')->group(function () {
@@ -331,16 +337,16 @@ Route::prefix('staff')->group(function () {
         });
 
         // ----- Manager: Recipe (công thức món ăn) -----
-        Route::middleware('staff:MANAGER')->prefix('manager/menu-items/{menuItem}/recipe')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\ManagerRecipeController::class, 'show'])->whereNumber('menuItem');
-            Route::put('/', [\App\Http\Controllers\Api\ManagerRecipeController::class, 'replace'])->whereNumber('menuItem');
-        });
+        Route::get('/manager/menu-items/{menuItem}/recipe', [\App\Http\Controllers\Api\ManagerRecipeController::class, 'show'])
+            ->whereNumber('menuItem')->middleware('staff:KITCHEN,MANAGER');
+        Route::put('/manager/menu-items/{menuItem}/recipe', [\App\Http\Controllers\Api\ManagerRecipeController::class, 'replace'])
+            ->whereNumber('menuItem')->middleware('staff:MANAGER');
 
         // ----- Manager: Tồn dự kiến (Phase E) -----
         // GET /api/staff/manager/inventory-balance
         Route::get('/manager/inventory-balance',
                     [\App\Http\Controllers\Api\ManagerInventoryBalanceController::class, 'index'])
-            ->middleware('staff:MANAGER');
+            ->middleware('staff:KITCHEN,MANAGER');
 
         // ----- Manager: Báo cáo tiêu hao + yêu cầu nhập kho từ bếp (Phase F) -----
         Route::middleware('staff:MANAGER')->prefix('manager')->group(function () {
@@ -360,6 +366,43 @@ Route::prefix('staff')->group(function () {
             Route::patch('{id}',[\App\Http\Controllers\Api\ManagerStockImportController::class, 'update'])->whereNumber('id');
             Route::delete('{id}',[\App\Http\Controllers\Api\ManagerStockImportController::class, 'destroy'])->whereNumber('id');
             Route::post('{id}/confirm',[\App\Http\Controllers\Api\ManagerStockImportController::class, 'confirm'])->whereNumber('id');
+        });
+
+        // ----- Purchase orders: Manager lập/gửi, Supplier phản hồi/gửi hàng -----
+        Route::middleware('staff:MANAGER')->prefix('manager/purchase-orders')->group(function () {
+            $controller = \App\Http\Controllers\Api\ManagerPurchaseOrderController::class;
+            Route::get('/', [$controller, 'index']);
+            Route::post('/', [$controller, 'store']);
+            Route::get('/{id}', [$controller, 'show'])->whereNumber('id');
+            Route::patch('/{id}', [$controller, 'update'])->whereNumber('id');
+            Route::post('/{id}/send', [$controller, 'send'])->whereNumber('id');
+            Route::post('/{id}/cancel', [$controller, 'cancel'])->whereNumber('id');
+            Route::post('/{id}/receipt', [$controller, 'createReceipt'])->whereNumber('id');
+            Route::patch('/{id}/receipt', [$controller, 'updateReceipt'])->whereNumber('id');
+            Route::post('/{id}/receive', [$controller, 'receive'])->whereNumber('id');
+        });
+
+        Route::middleware('staff:SUPPLIER')->prefix('supplier/purchase-orders')->group(function () {
+            $controller = \App\Http\Controllers\Api\SupplierPurchaseOrderController::class;
+            Route::get('/', [$controller, 'index']);
+            Route::get('/{id}', [$controller, 'show'])->whereNumber('id');
+            Route::post('/{id}/accept', [$controller, 'accept'])->whereNumber('id');
+            Route::post('/{id}/reject', [$controller, 'reject'])->whereNumber('id');
+            Route::post('/{id}/ship', [$controller, 'ship'])->whereNumber('id');
+        });
+
+        Route::middleware('staff:MANAGER')->prefix('manager/return-requests')->group(function () {
+            $controller = \App\Http\Controllers\Api\SupplierReturnRequestController::class;
+            Route::get('/', [$controller, 'managerIndex']);
+            Route::post('/purchase-orders/{orderId}', [$controller, 'store'])->whereNumber('orderId');
+            Route::post('/{id}/dispatch', [$controller, 'dispatch'])->whereNumber('id');
+        });
+        Route::middleware('staff:SUPPLIER')->prefix('supplier/return-requests')->group(function () {
+            $controller = \App\Http\Controllers\Api\SupplierReturnRequestController::class;
+            Route::get('/', [$controller, 'supplierIndex']);
+            Route::post('/{id}/accept', [$controller, 'accept'])->whereNumber('id');
+            Route::post('/{id}/reject', [$controller, 'reject'])->whereNumber('id');
+            Route::post('/{id}/receive', [$controller, 'receive'])->whereNumber('id');
         });
 
         // ----- Manager: Stocktake (Phase 4) -----
@@ -475,6 +518,7 @@ Route::prefix('staff')->group(function () {
         Route::get('/dashboard/revenue',                               [StaffDashboardController::class, 'revenue'])->middleware('staff:CASHIER,MANAGER');
         Route::get('/dashboard/menu-items',                           [\App\Http\Controllers\Api\ManagerMenuController::class, 'index'])->middleware('staff:MANAGER');
         Route::patch('/dashboard/menu-items/{id}',                    [\App\Http\Controllers\Api\ManagerMenuController::class, 'save'])->whereNumber('id')->middleware('staff:MANAGER');
+        Route::patch('/dashboard/menu-items/{id}/flash-sale',         [\App\Http\Controllers\Api\ManagerMenuController::class, 'setFlashSale'])->whereNumber('id')->middleware('staff:MANAGER');
         Route::patch('/menu-items/{id}/availability',                  [\App\Http\Controllers\Api\ManagerMenuController::class, 'setAvailability'])->whereNumber('id')->middleware('staff:KITCHEN,MANAGER');
         Route::get('/menu-items/availability',                         [\App\Http\Controllers\Api\ManagerMenuController::class, 'availabilityIndex'])->middleware('staff:KITCHEN,MANAGER');
         Route::patch('/menu-items/{id}/auto-availability',             [\App\Http\Controllers\Api\ManagerMenuController::class, 'setAutoAvailability'])->whereNumber('id')->middleware('staff:MANAGER');
