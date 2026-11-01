@@ -37,7 +37,7 @@ class MenuService
             ->orderByDesc('f.created_at')
             ->get([
                 'm.id', 'm.name', 'm.slug', 'm.description', 'm.image_url',
-                'm.price', 'm.spicy_level', 'm.size', 'm.preparation_minutes',
+                'm.price', 'm.flash_sale_discount', 'm.flash_sale_starts_at', 'm.flash_sale_ends_at', 'm.spicy_level', 'm.size', 'm.preparation_minutes',
                 'm.is_available', 'm.sold_out_reason', 'm.sold_out_at',
                 'm.auto_availability_enabled',
                 'c.name as category_name', 'c.slug as category_slug',
@@ -51,8 +51,9 @@ class MenuService
                     'slug' => $row->slug,
                     'description' => $row->description,
                     'image_url' => $row->image_url ?: $this->placeholderImage($row->category_slug),
-                    'price' => (float) $row->price,
-                    'price_formatted' => number_format((float) $row->price, 0, ',', '.') . ' đ',
+                    'price' => app(FlashSaleService::class)->priceFor($row),
+                    'price_formatted' => number_format(app(FlashSaleService::class)->priceFor($row), 0, ',', '.') . ' đ',
+                    'flash_sale' => app(FlashSaleService::class)->activeFor($row),
                     'spicy_level' => (int) $row->spicy_level,
                     'size' => $row->size,
                     'preparation_minutes' => (int) $row->preparation_minutes,
@@ -91,7 +92,11 @@ class MenuService
             ->where('c.is_active', true);
 
         // Lọc theo slug danh mục
-        if ($category !== null && $category !== '' && $category !== 'all') {
+        if ($category === 'combo') {
+            $comboMainIds = collect(app(MenuSuggestionService::class)->featuredCombos(PHP_INT_MAX))
+                ->pluck('main_item.id')->unique()->all();
+            $q->whereIn('m.id', $comboMainIds);
+        } elseif ($category !== null && $category !== '' && $category !== 'all') {
             $q->where('c.slug', $category);
         }
 
@@ -122,6 +127,12 @@ class MenuService
             $q->where('m.price', '<=', (float) $maxPrice);
         }
 
+        // Ưu tiên món Flash Sale đang bán trước khi phân trang; giữ lựa chọn sắp xếp của khách.
+        if (!in_array($sort, ['price_asc', 'price_desc', 'name_asc', 'name_desc', 'newest'], true)) {
+            $now = now()->toDateTimeString();
+            $q->orderByRaw('CASE WHEN m.flash_sale_discount > 0 AND m.flash_sale_discount < m.price AND m.flash_sale_starts_at <= ? AND m.flash_sale_ends_at > ? AND m.is_available = 1 THEN 0 ELSE 1 END', [$now, $now]);
+        }
+
         // Sắp xếp — whitelist để chống SQL injection qua sort key
         match ($sort) {
             'price_asc'  => $q->orderBy('m.price', 'asc'),
@@ -147,6 +158,7 @@ class MenuService
                 'm.description',
                 'm.image_url',
                 'm.price',
+                'm.flash_sale_discount', 'm.flash_sale_starts_at', 'm.flash_sale_ends_at',
                 'm.spicy_level',
                 'm.size',
                 'm.preparation_minutes',
@@ -181,8 +193,9 @@ class MenuService
                 'slug'                => $row->slug,
                 'description'         => $row->description,
                 'image_url'           => $row->image_url ?: $this->placeholderImage($row->category_slug),
-                'price'               => (float) $row->price,
-                'price_formatted'     => number_format((float) $row->price, 0, ',', '.') . ' đ',
+                'price'               => app(FlashSaleService::class)->priceFor($row),
+                'price_formatted'     => number_format(app(FlashSaleService::class)->priceFor($row), 0, ',', '.') . ' đ',
+                'flash_sale'          => app(FlashSaleService::class)->activeFor($row),
                 'spicy_level'         => (int) $row->spicy_level,
                 'size'                => $row->size,
                 'preparation_minutes' => (int) $row->preparation_minutes,
@@ -238,7 +251,7 @@ class MenuService
             ->where('m.is_active', true)
             ->first([
                 'm.id', 'm.name', 'm.slug', 'm.description', 'm.image_url',
-                'm.price', 'm.spicy_level', 'm.size', 'm.preparation_minutes',
+                'm.price', 'm.flash_sale_discount', 'm.flash_sale_starts_at', 'm.flash_sale_ends_at', 'm.spicy_level', 'm.size', 'm.preparation_minutes',
                 'm.is_available', 'm.sold_out_reason', 'm.sold_out_at',
                 'm.auto_availability_enabled',
                 'c.name as category_name', 'c.slug as category_slug',
@@ -252,8 +265,9 @@ class MenuService
             'slug'                => $row->slug,
             'description'         => $row->description,
             'image_url'           => $row->image_url ?: $this->placeholderImage($row->category_slug),
-            'price'               => (float) $row->price,
-            'price_formatted'     => number_format((float) $row->price, 0, ',', '.') . ' đ',
+            'price'               => app(FlashSaleService::class)->priceFor($row),
+            'price_formatted'     => number_format(app(FlashSaleService::class)->priceFor($row), 0, ',', '.') . ' đ',
+            'flash_sale'          => app(FlashSaleService::class)->activeFor($row),
             'spicy_level'         => (int) $row->spicy_level,
             'size'                => $row->size,
             'preparation_minutes' => (int) $row->preparation_minutes,

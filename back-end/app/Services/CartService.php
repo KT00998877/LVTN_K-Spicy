@@ -70,7 +70,7 @@ class CartService
                 ];
             }
 
-            $unitPrice    = (float) ($menuItem->price ?? 0);
+            $unitPrice    = app(FlashSaleService::class)->priceFor($menuItem);
             $perItemPrice = $unitPrice + $toppingPrice;
             $subtotal     = $perItemPrice * (int) $ci->quantity;
 
@@ -354,7 +354,7 @@ class CartService
 
             foreach ($cart->items as $ci) {
                 $menuItem = $ci->menuItem;
-                $unitPrice    = Money::minor($menuItem->price);
+                $unitPrice    = Money::minor(app(FlashSaleService::class)->priceFor($menuItem));
                 $toppingPrice = 0;
                 $toppingData  = [];
 
@@ -418,8 +418,9 @@ class CartService
             $promotionDiscountVnd = app(PromotionService::class)->preview($promotionContext)->totalDiscountVnd;
 
             // Tiết kiệm combo (Phase 3): món chính + món gợi ý do quản lý cấu hình.
-            $comboDiscountVnd = app(MenuSuggestionService::class)
-                ->comboDiscountForCart($this->cartQuantities($cart))['discount_vnd'];
+            $comboResult = app(MenuSuggestionService::class)
+                ->comboDiscountForCart($this->cartQuantities($cart));
+            $comboDiscountVnd = $comboResult['discount_vnd'];
 
             $pricing = app(DeliveryPricingService::class)->quote($orderType,
                 isset($delivery['delivery_latitude']) ? (float) $delivery['delivery_latitude'] : null,
@@ -434,6 +435,23 @@ class CartService
                 'delivery_distance_km' => $orderType === 'ONLINE' ? $pricing['distance_km'] : null,
             ]);
             $order->save();
+
+            foreach ($comboResult['lines'] as $line) {
+                DB::table('order_combo_discounts')->insert([
+                    'order_id' => $order->id,
+                    'suggestion_id' => $line['suggestion_id'],
+                    'main_item_id' => $line['menu_item_id'],
+                    'suggested_item_id' => $line['suggested_item_id'],
+                    'main_item_name' => $line['main_item_name'],
+                    'suggested_item_name' => $line['suggested_item_name'],
+                    'quantity' => $line['quantity'],
+                    'original_unit_price' => $line['original_unit_price'],
+                    'combo_unit_price' => $line['combo_price'],
+                    'discount_amount' => $line['saving'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             // Sau khi đã có order.id → apply voucher (ghi voucher_usages + tăng used_count).
             if ($voucherCode !== null && $voucherCode !== '') {
@@ -500,7 +518,7 @@ class CartService
         foreach ($cart->items as $ci) {
             $menuItem = $ci->menuItem;
             if (!$menuItem) continue;
-            $unitPrice = Money::minor($menuItem->price); // VND major units.
+            $unitPrice = Money::minor(app(FlashSaleService::class)->priceFor($menuItem)); // VND major units.
             foreach ($ci->toppingRelations as $tr) {
                 if ($tr->topping) $unitPrice += Money::minor($tr->topping->price);
             }
@@ -533,8 +551,9 @@ class CartService
             'name'                => $m->name,
             'slug'                => $m->slug,
             'image_url'           => $m->image_url,
-            'price'               => (float) $m->price,
-            'price_formatted'     => $this->formatPrice((float) $m->price),
+            'price'               => app(FlashSaleService::class)->priceFor($m),
+            'price_formatted'     => $this->formatPrice(app(FlashSaleService::class)->priceFor($m)),
+            'flash_sale'          => app(FlashSaleService::class)->activeFor($m),
             'spicy_level'         => (int) $m->spicy_level,
             'size'                => $m->size,
             'preparation_minutes' => (int) $m->preparation_minutes,

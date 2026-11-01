@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
-import { watch, onMounted, computed } from 'vue'
+import { watch, onMounted, onUnmounted, computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -11,6 +11,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useToast } from '@/composables/useStaffUtils'
 import { parseFiltersFromQuery, serializeFiltersToQuery } from '@/api/menu'
 import type { MenuItemCard } from '@/types/home'
+import { imageUrl } from '@/utils/image'
 
 import NavbarHome from '@/components/home/NavbarHome.vue'
 import FooterHome from '@/components/home/FooterHome.vue'
@@ -34,6 +35,9 @@ const { items, loading, loadingMore, loadMoreError, hasMore, error, filters, tot
 const { modalVisible, modalMenuItem, modalItem, loadingItem } = storeToRefs(cartStore)
 
 const queryFilters = computed(() => parseFiltersFromQuery(route.query))
+const currentTime = ref(Date.now())
+let countdownTimer: ReturnType<typeof setInterval> | undefined
+const formatPrice = (price: number) => `${new Intl.NumberFormat('vi-VN').format(price)}đ`
 
 // Display count text
 const resultText = computed(() => {
@@ -42,16 +46,37 @@ const resultText = computed(() => {
     if (totalCount.value === 0) return 'Không có món nào'
     return `${totalCount.value} món ngon`
 })
+const flashSaleItems = computed(() => items.value.filter(item => item.flash_sale && Date.parse(item.flash_sale.ends_at) > currentTime.value))
+const featuredFlashSale = computed(() => flashSaleItems.value[0] ?? null)
+const saleTiming = computed(() => {
+    const sale = featuredFlashSale.value?.flash_sale
+    if (!sale) return null
+    const end = Date.parse(sale.ends_at)
+    const total = end - Date.parse(sale.starts_at)
+    const remaining = Math.max(0, end - currentTime.value)
+    const seconds = Math.floor(remaining / 1000)
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    return {
+        countdown: `${days ? `${days} ngày ` : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
+        remainingPercent: total > 0 ? Math.max(0, Math.min(100, remaining / total * 100)) : 0,
+        endsAt: new Date(end).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+    }
+})
 
 /**
  * Khởi tạo từ URL (đầu tiên) — sau đó watcher sẽ tự sync khi URL đổi.
  */
 onMounted(async () => {
+    countdownTimer = setInterval(() => { currentTime.value = Date.now() }, 1000)
     await menuStore.initFromQuery(queryFilters.value)
     // Fetch cart để biết badge count
     await cartStore.fetchCart()
     if (authStore.isAuthenticated) await favoritesStore.load()
 })
+onUnmounted(() => { if (countdownTimer) clearInterval(countdownTimer) })
 
 watch(() => authStore.isAuthenticated, async authenticated => {
     if (authenticated) await favoritesStore.load(true)
@@ -110,9 +135,11 @@ function handleAddToCart(item: MenuItemCard) {
  */
 async function handleModalAddCombo(payload: {
     main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
-    suggested_item_id: number
+    suggestion_id: number
 }) {
-    await cartStore.addCombo(payload.main, payload.suggested_item_id)
+    if (!await cartStore.addCombo(payload.main, payload.suggestion_id)) {
+        toast.error(cartStore.error ?? 'Chưa thể thêm combo. Vui lòng thử lại.')
+    }
 }
 
 /**
@@ -173,6 +200,26 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
 
                     <!-- Menu Section -->
                     <section class="menu-section" aria-label="Danh sách món">
+                        <section v-if="featuredFlashSale?.flash_sale && saleTiming" class="flash-sale-feature" aria-label="Flash Sale đang diễn ra">
+                            <img class="flash-sale-feature__image" :src="imageUrl(featuredFlashSale.image_url)" :alt="featuredFlashSale.name" @error="(e) => (e.target as HTMLImageElement).src = '/logo/logo.png'" />
+                            <div class="flash-sale-feature__content">
+                                <span class="flash-sale-feature__eyebrow">FLASH SALE ĐANG DIỄN RA</span>
+                                <h2>{{ featuredFlashSale.name }}</h2>
+                                <div class="flash-sale-feature__prices">
+                                    <span class="flash-sale-feature__price">{{ formatPrice(featuredFlashSale.flash_sale.price) }}</span>
+                                    <s>{{ formatPrice(featuredFlashSale.flash_sale.original_price) }}</s>
+                                    <span class="flash-sale-feature__discount">Giảm {{ formatPrice(featuredFlashSale.flash_sale.discount) }}</span>
+                                </div>
+                                <div class="flash-sale-feature__time">
+                                    <span>Còn <strong>{{ saleTiming.countdown }}</strong></span>
+                                    <span>Kết thúc {{ saleTiming.endsAt }}</span>
+                                </div>
+                                <div class="flash-sale-feature__track" role="progressbar" aria-label="Thời gian Flash Sale còn lại" :aria-valuenow="Math.round(saleTiming.remainingPercent)" aria-valuemin="0" aria-valuemax="100">
+                                    <span :style="{ width: `${saleTiming.remainingPercent}%` }"></span>
+                                </div>
+                                <p v-if="flashSaleItems.length > 1" class="flash-sale-feature__more">Xem thêm các món Flash Sale ngay bên dưới.</p>
+                            </div>
+                        </section>
                         <!-- Results Header -->
                         <header class="results-header">
                             <div class="results-count">
@@ -239,6 +286,7 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
                             :loading="loading"
                             :favorite-ids="favoritesStore.favoriteIds"
                             :favorite-loading-ids="favoritesStore.pendingIds"
+                            :show-combo="filters.category === 'combo'"
                             @reset="menuStore.resetFilters()"
                             @add-to-cart="handleAddToCart"
                             @toggle-favorite="handleToggleFavorite"
@@ -318,6 +366,21 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
     grid-template-columns: 260px 1fr;
     gap: 32px;
 }
+
+.flash-sale-feature { display: grid; grid-template-columns: 190px minmax(0, 1fr); overflow: hidden; margin-bottom: 28px; border-radius: 16px; background: #5b101a; color: #fff; }
+.flash-sale-feature__image { width: 100%; height: 100%; min-height: 205px; object-fit: cover; background: #240809; }
+.flash-sale-feature__content { min-width: 0; padding: 20px 24px; }
+.flash-sale-feature__eyebrow { color: #ffd19c; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.flash-sale-feature h2 { margin: 6px 0 10px; font-size: clamp(20px, 2.4vw, 26px); line-height: 1.25; overflow-wrap: anywhere; }
+.flash-sale-feature__prices { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 16px; }
+.flash-sale-feature__price { font-size: 24px; font-weight: 800; }
+.flash-sale-feature__prices s { color: #e1bfc0; font-size: 14px; }
+.flash-sale-feature__discount { padding: 4px 7px; border-radius: 5px; background: #fff; color: #aa101b; font-size: 12px; font-weight: 800; }
+.flash-sale-feature__time { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; color: #f6dfe0; font-size: 12px; }
+.flash-sale-feature__time strong { color: #fff; font-size: 16px; font-variant-numeric: tabular-nums; }
+.flash-sale-feature__track { height: 8px; overflow: hidden; margin-top: 9px; border-radius: 999px; background: #9d4b54; }
+.flash-sale-feature__track span { display: block; height: 100%; border-radius: inherit; background: #ffbe5b; transition: width .8s linear; }
+.flash-sale-feature__more { margin: 8px 0 0; color: #f6dfe0; font-size: 12px; }
 
 /* ===== RESULTS HEADER ===== */
 .results-header {
@@ -450,6 +513,14 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
         padding: 0 16px;
         margin-bottom: 16px;
     }
+    .flash-sale-feature { margin: 0 16px 20px; }
+    .flash-sale-feature { grid-template-columns: 104px minmax(0, 1fr); border-radius: 12px; }
+    .flash-sale-feature__image { min-height: 190px; }
+    .flash-sale-feature__content { padding: 12px; }
+    .flash-sale-feature h2 { font-size: 17px; }
+    .flash-sale-feature__price { font-size: 20px; }
+    .flash-sale-feature__prices { margin-bottom: 10px; }
+    .flash-sale-feature__time { font-size: 11px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,6 +24,34 @@ class MenuSuggestionService
 {
     private ?MenuAvailabilityService $availability = null;
 
+    /** Các combo có giảm giá và cả hai món còn bán để quảng bá cho khách. */
+    public function featuredCombos(int $limit = 3): array
+    {
+        $rows = MenuItemSuggestion::query()
+            ->with(['menuItem.category', 'suggestedItem.category'])
+            ->where('is_active', true)
+            ->whereNotNull('combo_price')
+            ->orderBy('sort_order')->orderBy('id')->get();
+
+        return $rows->map(fn (MenuItemSuggestion $row) => $this->promotionFor($row))
+            ->filter()->take($limit)->values()->all();
+    }
+
+    public function promotionFor(MenuItemSuggestion $row): ?array
+    {
+        $row->loadMissing(['menuItem.category', 'suggestedItem.category']);
+        if (!$row->is_active || !$row->menuItem || !$row->suggestedItem
+            || !$this->isOrderable($row->menuItem) || !$this->isOrderable($row->suggestedItem)) return null;
+        $combo = $this->format($row);
+        if (!$combo || $combo['saving'] <= 0) return null;
+
+        return [...$combo, 'main_item' => [
+            'id' => (int) $row->menuItem->id,
+            'name' => $row->menuItem->name,
+            'image_url' => $row->menuItem->image_url,
+        ]];
+    }
+
     /**
      * Gợi ý theo món chính: [menu_item_id => list<suggestion>].
      *
@@ -91,7 +119,7 @@ class MenuSuggestionService
             if (!$this->isOrderable($side)) continue;
 
             $comboPrice = (int) round((float) $row->combo_price);
-            $original = (int) round((float) $main->price) + (int) round((float) $side->price);
+            $original = app(FlashSaleService::class)->priceFor($main) + app(FlashSaleService::class)->priceFor($side);
             $saving = $original - $comboPrice;
             if ($saving <= 0) continue; // Combo không ưu đãi → bỏ qua.
 
@@ -101,6 +129,7 @@ class MenuSuggestionService
                 'side_id' => (int) $row->suggested_item_id,
                 'saving' => $saving,
                 'combo_price' => $comboPrice,
+                'original_unit_price' => $original,
             ];
         }
 
@@ -128,8 +157,11 @@ class MenuSuggestionService
                 'title'           => $this->titleFor($row),
                 'menu_item_id'    => $candidate['main_id'],
                 'suggested_item_id' => $candidate['side_id'],
+                'main_item_name' => $row->menuItem->name,
+                'suggested_item_name' => $row->suggestedItem->name,
                 'quantity'        => $count,
                 'combo_price'     => $candidate['combo_price'],
+                'original_unit_price' => $candidate['original_unit_price'],
                 'saving'          => $saving,
             ];
         }
@@ -148,7 +180,7 @@ class MenuSuggestionService
         $side = $row->suggestedItem;
         if (!$main || !$side) return null;
 
-        $original = (int) round((float) $main->price) + (int) round((float) $side->price);
+        $original = app(FlashSaleService::class)->priceFor($main) + app(FlashSaleService::class)->priceFor($side);
         $comboPrice = $row->combo_price === null ? null : (int) round((float) $row->combo_price);
         $saving = $comboPrice === null ? 0 : max(0, $original - $comboPrice);
 
@@ -165,8 +197,8 @@ class MenuSuggestionService
             'suggested_item' => [
                 'id'          => (int) $side->id,
                 'name'        => $side->name,
-                'price'       => (float) $side->price,
-                'price_formatted' => $this->formatPrice((float) $side->price),
+                'price'       => app(FlashSaleService::class)->priceFor($side),
+                'price_formatted' => $this->formatPrice(app(FlashSaleService::class)->priceFor($side)),
                 'image_url'   => $side->image_url,
                 'is_available' => $this->isOrderable($side),
             ],

@@ -47,7 +47,7 @@
                                     loading="lazy"
                                 />
                                 <div v-else class="cover-fallback">
-                                    <span>{{ initials(p.title) }}</span>
+                                    <span>K-SPICY <small>Góc chuyện món ngon</small></span>
                                 </div>
                             </div>
                             <div class="body">
@@ -87,7 +87,7 @@
                         :alt="post.title"
                     />
                     <div v-else class="hero-fallback">
-                        <span>{{ initials(post.title) }}</span>
+                        <span>Câu chuyện từ K-SPICY</span>
                     </div>
                     <div class="hero-overlay">
                         <span class="badge large" :data-section="post.news_section">{{ sectionBadge(post.news_section) }}</span>
@@ -159,7 +159,7 @@
                                     <div class="cover">
                                         <span class="badge small" :data-section="r.news_section">{{ sectionBadge(r.news_section) }}</span>
                                         <img v-if="r.cover_image" :src="imageUrl(r.cover_image)" :alt="r.title" loading="lazy" />
-                                        <div v-else class="cover-fallback"><span>{{ initials(r.title) }}</span></div>
+                                        <div v-else class="cover-fallback"><span>K-SPICY <small>Góc chuyện món ngon</small></span></div>
                                     </div>
                                     <div class="body">
                                         <h3 class="title">{{ r.title }}</h3>
@@ -582,12 +582,14 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--color-chili-red) 0%, #ff574c 100%);
+    background: var(--color-brand-dark);
     color: #fff;
-    font-size: 36px;
+    font-size: clamp(22px, 2.5vw, 32px);
     font-weight: 800;
     letter-spacing: -1px;
 }
+.cover-fallback span { display: grid; gap: 6px; text-align: center; }
+.cover-fallback small { color: var(--color-golden); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 
 .news-card .body {
     padding: 18px 20px 20px;
@@ -734,6 +736,11 @@ input:focus, select:focus, textarea:focus {
     background: rgba(26, 14, 6, 0.04);
     box-shadow: var(--shadow-md);
 }
+.article-hero.is-placeholder {
+    aspect-ratio: auto;
+    height: 180px;
+    box-shadow: none;
+}
 .article-hero img {
     width: 100%;
     height: 100%;
@@ -748,14 +755,14 @@ input:focus, select:focus, textarea:focus {
 .hero-fallback {
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, var(--color-chili-red) 0%, #ff574c 100%);
+    background: var(--color-brand-dark);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-size: 80px;
-    font-weight: 800;
-    letter-spacing: -2px;
+    font-size: clamp(22px, 3vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.5px;
 }
 .hero-overlay {
     position: absolute;

@@ -51,13 +51,13 @@ import { imageUrl } from '@/utils/image'
 .menu-hero {
     background: var(--color-brand-dark);
     color: var(--color-white);
-    padding: calc(72px + var(--space-9)) 0 var(--space-11);
+    padding: var(--space-9) 0;
     overflow: hidden;
 }
 
 .hero-grid {
     display: grid;
-    grid-template-columns: 5fr 6fr;
+    grid-template-columns: 1fr 1fr;
     gap: var(--space-9);
     align-items: center;
 }
@@ -139,12 +139,13 @@ import { imageUrl } from '@/utils/image'
 /* Visual */
 .hero-visual {
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
 }
 
 .visual-frame {
     width: 100%;
-    aspect-ratio: 4 / 3;
+    max-width: 500px;
+    aspect-ratio: 1;
     border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: var(--shadow-xl);
@@ -161,11 +162,15 @@ import { imageUrl } from '@/utils/image'
         grid-template-columns: 1fr;
         gap: var(--space-7);
     }
+
+    .hero-visual {
+        justify-content: center;
+    }
 }
 
 @media (max-width: 640px) {
     .menu-hero {
-        padding: calc(64px + var(--space-7)) 0 var(--space-9);
+        padding: var(--space-7) 0;
     }
 }
 </style>

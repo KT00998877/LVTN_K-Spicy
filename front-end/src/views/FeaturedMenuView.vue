@@ -112,9 +112,11 @@ async function handleModalSubmit(payload: {
 
 async function handleModalAddCombo(payload: {
     main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
-    suggested_item_id: number
+    suggestion_id: number
 }) {
-    await cartStore.addCombo(payload.main, payload.suggested_item_id)
+    if (!await cartStore.addCombo(payload.main, payload.suggestion_id)) {
+        toast.error(cartStore.error ?? 'Chưa thể thêm combo. Vui lòng thử lại.')
+    }
 }
 </script>
 

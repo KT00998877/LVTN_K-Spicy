@@ -101,6 +101,7 @@ class ManagerMenuSuggestionController extends Controller
     {
         $data = $this->validated($request);
         $suggestion = MenuItemSuggestion::create($data);
+        app(\App\Services\ComboNotificationService::class)->sendFor($suggestion->fresh());
 
         return response()->json([
             'success' => true,
@@ -113,6 +114,7 @@ class ManagerMenuSuggestionController extends Controller
     {
         $suggestion = MenuItemSuggestion::findOrFail($id);
         $suggestion->update($this->validated($request, $suggestion));
+        app(\App\Services\ComboNotificationService::class)->sendFor($suggestion);
 
         return response()->json([
             'success' => true,

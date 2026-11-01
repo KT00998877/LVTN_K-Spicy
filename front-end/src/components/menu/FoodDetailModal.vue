@@ -58,7 +58,7 @@ const emit = defineEmits<{
     /** Thêm nhanh combo: món chính (theo tùy chỉnh) + món gợi ý. */
     'add-combo': [payload: {
         main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
-        suggested_item_id: number
+        suggestion_id: number
     }]
 }>()
 
@@ -242,7 +242,7 @@ function handleAddCombo(suggestion: MenuSuggestion) {
             note: note.value.trim(),
             topping_ids: [...selectedToppingIds.value],
         },
-        suggested_item_id: suggestion.suggested_item.id,
+        suggestion_id: suggestion.id,
     })
 }
 
@@ -253,6 +253,9 @@ watch(() => props.visible, (val) => {
     } else {
         addingComboId.value = null
     }
+})
+watch(() => props.loading, (loading, wasLoading) => {
+    if (wasLoading && !loading) addingComboId.value = null
 })
 useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () => props.visible && !props.loading && !loadingToppings.value)
 </script>

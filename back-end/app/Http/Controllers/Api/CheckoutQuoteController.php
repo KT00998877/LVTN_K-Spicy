@@ -28,7 +28,7 @@ class CheckoutQuoteController extends Controller
         $subtotal = 0;
         $lines = [];
         foreach ($cart?->items ?? [] as $item) {
-            $unit = Money::minor($item->menuItem->price);
+            $unit = Money::minor(app(\App\Services\FlashSaleService::class)->priceFor($item->menuItem));
             foreach ($item->toppingRelations as $topping) $unit += Money::minor($topping->topping->price);
             $subtotal += $unit * $item->quantity;
             $lines[] = new CartLine(

@@ -11,26 +11,6 @@ class CategoriesAndMenuItemsSeeder extends Seeder
     public function run(): void
     {
        
-        $slugsToDelete = [
-            'cha-gio-re-han-quoc',
-            'banh-mochi',
-            'banh-bong-lan-trung-muoi',
-            'sua-chua-dau-han-quoc',
-            'che-sam-bo-luong',
-            'patbingsu-da-bao-han-quoc',
-            'nuoc-gao-han-quoc-makkoli',
-            'soda-dau',             
-            'soda-viet-quat',
-            'nuoc-suoi',
-            'sua-hop-nho',
-        ];
-
-        $deletedCount = DB::table('menu_items')
-            ->whereIn('slug', $slugsToDelete)
-            ->delete();
-        $this->command?->info("Đã xoá {$deletedCount} món không có ảnh.");
-
-        // ===== BƯỚC 2: Đảm bảo categories tồn tại =====
         $categories = [
             ['name' => 'Mì cay Hàn Quốc', 'description' => 'Mì cay chuẩn vị Hàn Quốc — chọn cấp độ cay 1-5 khi đặt', 'sort_order' => 1],
             ['name' => 'Topping thêm',    'description' => 'Topping thêm theo yêu cầu',                       'sort_order' => 2],
@@ -139,12 +119,20 @@ class CategoriesAndMenuItemsSeeder extends Seeder
         ];
         $this->insertItemsByCategory($sides, $categoryIds['mon-phu']);
 
+        // ===== Tráng miệng (mỗi công thức tính cho một phần) =====
+        $desserts = [
+            ['name' => 'Bingsu sữa dâu', 'price' => 49000, 'preparation_minutes' => 7, 'image_key' => 'bingsu-sua-dau'],
+            ['name' => 'Hotteok bánh kếp ngọt', 'price' => 39000, 'preparation_minutes' => 10, 'image_key' => 'hotteok-banh-kep-ngot'],
+            ['name' => 'Patbingsu đậu đỏ', 'price' => 59000, 'preparation_minutes' => 7, 'image_key' => 'patbingsu-dau-do'],
+        ];
+        $this->insertItemsByCategory($desserts, $categoryIds['trang-mieng']);
+
         // ===== BƯỚC 6: Đồ uống =====
         $drinks = [
             // Trà
             ['name' => 'Trà sữa trân châu',                'price' => 45000, 'preparation_minutes' => 5, 'image_key' => 'tra-sua'],
             ['name' => 'Trà sữa Hàn Quốc (Chuseok)',       'price' => 49000, 'preparation_minutes' => 5, 'image_key' => 'tra-sua-han-quoc'],
-            ['name' => 'Trà xanh đào',                     'price' => 35000, 'preparation_minutes' => 4, 'image_key' => 'tra-dao'],
+            ['name' => 'Trà đào',                     'price' => 35000, 'preparation_minutes' => 4, 'image_key' => 'tra-dao'],
             // Soju
             ['name' => 'Soju Hàn Quốc (vị táo)',           'price' => 85000, 'preparation_minutes' => 1, 'image_key' => 'soju-tao'],
             ['name' => 'Soju vị đào',                      'price' => 95000, 'preparation_minutes' => 1, 'image_key' => 'soju-dao'],
@@ -158,6 +146,7 @@ class CategoriesAndMenuItemsSeeder extends Seeder
             ['name' => 'Soda dâu',                          'price' => 25000, 'preparation_minutes' => 2, 'image_key' => 'soda-dau'],
         ];
         $this->insertItemsByCategory($drinks, $categoryIds['do-uong']);
+
     }
 
     /**

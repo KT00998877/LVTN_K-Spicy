@@ -12,6 +12,31 @@ use App\Services\MenuAvailabilityService;
 
 class ManagerMenuController extends Controller
 {
+    public function setFlashSale(Request $request, int $id)
+    {
+        $item = MenuItem::findOrFail($id);
+        $data = $request->validate([
+            'flash_sale_discount' => ['nullable', 'integer', 'min:1000'],
+            'flash_sale_starts_at' => ['required_with:flash_sale_discount', 'nullable', 'date'],
+            'flash_sale_ends_at' => ['required_with:flash_sale_discount', 'nullable', 'date', 'after:flash_sale_starts_at', 'after:now'],
+        ]);
+        $discount = $data['flash_sale_discount'] ?? null;
+        if ($discount !== null && $discount >= (float) $item->price) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'flash_sale_discount' => 'Mức giảm phải nhỏ hơn giá gốc của món.',
+            ]);
+        }
+        $item->update([
+            'flash_sale_discount' => $discount,
+            'flash_sale_starts_at' => $discount === null ? null : $data['flash_sale_starts_at'],
+            'flash_sale_ends_at' => $discount === null ? null : $data['flash_sale_ends_at'],
+        ]);
+        if (app(\App\Services\FlashSaleService::class)->activeFor($item)) {
+            app(\App\Services\FlashSaleNotificationService::class)->sendDue($item);
+        }
+        return response()->json(['data' => $this->item($item->fresh('category'))]);
+    }
+
     private function item(MenuItem $item): array
     {
         return array_merge($item->toArray(), ['price' => (float) $item->price, 'cost_price' => (float) $item->cost_price,
@@ -103,7 +128,7 @@ class ManagerMenuController extends Controller
     {
         if ($item->exists && (bool) $item->is_available === $available) return;
         $item->is_available = $available;
-        $item->sold_out_reason = $available ? null : (trim((string) $reason) ?: 'Báo hết thủ công');
+        $item->sold_out_reason = $available ? null : (trim((string) $reason) ?: 'hết món');
         $item->sold_out_at = $available ? null : now();
         $item->sold_out_by = $available ? null : $request->user()?->id;
     }

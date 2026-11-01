@@ -6,6 +6,10 @@ use App\Models\MenuItem;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\HomeService;
+use App\Services\FlashSaleService;
+use App\Services\MenuService;
+use App\Services\FlashSaleNotificationService;
+use Illuminate\Http\Request;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +64,9 @@ class MenuCurationAndFavoritesTest extends TestCase
             $table->text('description')->nullable();
             $table->string('image_url')->nullable();
             $table->decimal('price', 12, 2);
+            $table->unsignedInteger('flash_sale_discount')->nullable();
+            $table->timestamp('flash_sale_starts_at')->nullable();
+            $table->timestamp('flash_sale_ends_at')->nullable();
             $table->decimal('cost_price', 12, 2)->default(0);
             $table->boolean('is_available')->default(true);
             $table->boolean('is_active')->default(true);
@@ -87,6 +94,29 @@ class MenuCurationAndFavoritesTest extends TestCase
             $table->foreignId('menu_item_id');
             $table->unsignedInteger('quantity');
         });
+        Schema::create('reviews', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('menu_item_id');
+            $table->boolean('is_approved');
+            $table->boolean('is_hidden');
+            $table->unsignedInteger('rating');
+        });
+        Schema::create('menu_item_suggestions', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('menu_item_id');
+            $table->boolean('is_active');
+            $table->unsignedInteger('sort_order');
+        });
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->string('notifiable_type');
+            $table->unsignedBigInteger('notifiable_id');
+            $table->text('data');
+            $table->string('deduplication_key')->unique();
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+        });
     }
 
     public function test_manager_can_toggle_featured_and_best_seller_flags(): void
@@ -109,6 +139,80 @@ class MenuCurationAndFavoritesTest extends TestCase
             'is_featured' => true,
             'is_best_seller' => true,
         ]);
+    }
+
+    public function test_manager_schedules_flash_sale_and_price_changes_only_inside_window(): void
+    {
+        $manager = $this->user('flash-manager@example.com');
+        $role = Role::create(['code' => 'MANAGER', 'name' => 'Quản lý']);
+        $manager->roles()->attach($role->id);
+        Sanctum::actingAs($manager);
+        $item = $this->menuItem('Mì cay bò nhỏ', ['price' => 69000]);
+        $start = now()->addHour();
+        $end = now()->addHours(3);
+
+        $this->patchJson("/api/staff/dashboard/menu-items/{$item->id}/flash-sale", [
+            'flash_sale_discount' => 10000,
+            'flash_sale_starts_at' => $start->toIso8601String(),
+            'flash_sale_ends_at' => $end->toIso8601String(),
+        ])->assertOk();
+
+        $item->refresh();
+        $pricing = app(FlashSaleService::class);
+        $this->assertSame(69000, $pricing->priceFor($item, $start->copy()->subSecond()));
+        $this->assertSame(59000, $pricing->priceFor($item, $start));
+        $this->assertSame($start->timestamp, \Carbon\Carbon::parse($pricing->activeFor($item, $start)['starts_at'])->timestamp);
+        $this->assertSame(59000, $pricing->priceFor($item, $end->copy()->subSecond()));
+        $this->assertSame(69000, $pricing->priceFor($item, $end));
+
+        $this->patchJson("/api/staff/dashboard/menu-items/{$item->id}/flash-sale", [
+            'flash_sale_discount' => 69000,
+            'flash_sale_starts_at' => $start->toIso8601String(),
+            'flash_sale_ends_at' => $end->toIso8601String(),
+        ])->assertUnprocessable();
+    }
+
+    public function test_active_flash_sale_appears_on_first_menu_page_before_pagination(): void
+    {
+        $regular = $this->menuItem('Mì cay thường', ['price' => 50000]);
+        $sale = $this->menuItem('Mì cay bò', [
+            'price' => 69000,
+            'flash_sale_discount' => 10000,
+            'flash_sale_starts_at' => now()->subMinute(),
+            'flash_sale_ends_at' => now()->addHour(),
+        ]);
+        $menu = app(MenuService::class);
+
+        $firstPage = $menu->listItems(Request::create('/api/menu?per_page=1&page=1'));
+        $this->assertSame($sale->id, $firstPage['items'][0]['id']);
+        $this->assertSame(59000, $firstPage['items'][0]['price']);
+        $this->assertSame(2, $firstPage['pagination']['total']);
+        $this->assertSame($regular->id, $menu->listItems(Request::create('/api/menu?per_page=1&page=2'))['items'][0]['id']);
+        $this->assertSame($regular->id, $menu->listItems(Request::create('/api/menu?per_page=1&sort=price_asc'))['items'][0]['id']);
+
+        $this->travelTo(now()->addHours(2));
+        $this->assertSame($regular->id, $menu->listItems(Request::create('/api/menu?per_page=1'))['items'][0]['id']);
+    }
+
+    public function test_active_flash_sale_notifies_each_customer_once(): void
+    {
+        $customer = $this->user('flash-customer@example.com');
+        $role = Role::create(['code' => 'CUSTOMER', 'name' => 'Khách hàng']);
+        $customer->roles()->attach($role->id);
+        $this->menuItem('Mì cay bò', [
+            'price' => 69000,
+            'flash_sale_discount' => 10000,
+            'flash_sale_starts_at' => now()->subMinute(),
+            'flash_sale_ends_at' => now()->addHour(),
+        ]);
+
+        $notifications = app(FlashSaleNotificationService::class);
+        $this->assertSame(1, $notifications->sendDue());
+        $this->assertSame(0, $notifications->sendDue());
+        $this->assertDatabaseCount('notifications', 1);
+        $data = json_decode(DB::table('notifications')->value('data'), true);
+        $this->assertSame('FLASH_SALE', $data['event']);
+        $this->assertStringContainsString('59.000đ', $data['message']);
     }
 
     public function test_home_lists_only_items_enabled_by_manager(): void

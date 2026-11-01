@@ -23,8 +23,26 @@ class HomeService
             'categories'   => $this->getCategoriesWithCount(),
             'featured'     => $this->getFeaturedItems(),
             'best_sellers' => $this->getBestSellers(),
+            'combo_promotion' => $this->getComboPromotion(),
             'tables'       => $this->getTableOverview(),
             'blogs'        => $this->getLatestBlogs(),
+        ];
+    }
+
+    private function getComboPromotion(): ?array
+    {
+        $combo = app(MenuSuggestionService::class)->featuredCombos(1)[0] ?? null;
+        if (!$combo) return null;
+
+        return [
+            'id' => $combo['id'],
+            'title' => $combo['title'],
+            'subtitle' => 'Mua cùng '.$combo['suggested_item']['name'].' · tiết kiệm '.$combo['saving_formatted'],
+            'description' => 'Giá combo '.$combo['combo_price_formatted'].' thay vì '.$combo['original_price_formatted'].'.',
+            'image_url' => $combo['main_item']['image_url'],
+            'suggested_image_url' => $combo['suggested_item']['image_url'],
+            'suggested_item_name' => $combo['suggested_item']['name'],
+            'menu_item_name' => $combo['main_item']['name'],
         ];
     }
 
@@ -75,7 +93,7 @@ class HomeService
      */
     public function getCategoriesWithCount(): array
     {
-        return DB::table('categories as c')
+        $categories = DB::table('categories as c')
             ->leftJoin('menu_items as m', function ($join) {
                 $join->on('m.category_id', '=', 'c.id')
                     ->where('m.is_active', true);
@@ -99,6 +117,20 @@ class HomeService
                 'items_count' => (int) $row->items_count,
             ])
             ->all();
+
+        $comboCount = collect(app(MenuSuggestionService::class)->featuredCombos(PHP_INT_MAX))
+            ->pluck('main_item.id')->unique()->count();
+        if ($comboCount > 0) {
+            array_unshift($categories, [
+                'id' => -1,
+                'name' => 'Combo món và nước',
+                'slug' => 'combo',
+                'description' => 'Mua món chính cùng nước uống với giá ưu đãi',
+                'items_count' => $comboCount,
+            ]);
+        }
+
+        return $categories;
     }
 
     /**

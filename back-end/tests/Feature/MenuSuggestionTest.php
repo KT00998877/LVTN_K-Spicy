@@ -71,6 +71,9 @@ class MenuSuggestionTest extends TestCase
             $table->text('description')->nullable();
             $table->string('image_url', 255)->nullable();
             $table->decimal('price', 12, 2);
+            $table->unsignedInteger('flash_sale_discount')->nullable();
+            $table->timestamp('flash_sale_starts_at')->nullable();
+            $table->timestamp('flash_sale_ends_at')->nullable();
             $table->decimal('cost_price', 12, 2)->default(0);
             $table->boolean('is_available')->default(true);
             $table->boolean('is_active')->default(true);
@@ -97,6 +100,29 @@ class MenuSuggestionTest extends TestCase
             $table->unique(['menu_item_id', 'suggested_item_id']);
         });
 
+        Schema::create('carts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users');
+            $table->unsignedBigInteger('version')->default(0);
+            $table->timestamps();
+        });
+        Schema::create('cart_items', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('cart_id')->constrained('carts');
+            $table->foreignId('menu_item_id')->constrained('menu_items');
+            $table->unsignedSmallInteger('quantity');
+            $table->unsignedTinyInteger('spicy_level');
+            $table->text('note')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('cart_item_toppings', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('cart_item_id')->constrained('cart_items');
+            $table->foreignId('topping_menu_item_id')->constrained('menu_items');
+            $table->unsignedSmallInteger('quantity');
+            $table->timestamps();
+        });
+
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
@@ -104,6 +130,15 @@ class MenuSuggestionTest extends TestCase
             $table->unsignedTinyInteger('rating');
             $table->boolean('is_approved')->default(true);
             $table->boolean('is_hidden')->default(false);
+            $table->timestamps();
+        });
+        Schema::create('notifications', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->morphs('notifiable');
+            $table->text('data');
+            $table->string('deduplication_key')->unique();
+            $table->timestamp('read_at')->nullable();
             $table->timestamps();
         });
 
@@ -180,6 +215,84 @@ class MenuSuggestionTest extends TestCase
             'suggested_item_id' => $drink->id,
             'combo_price' => 55000,
         ]);
+    }
+
+    public function test_combo_duoc_quang_ba_va_thong_bao_mot_lan_cho_khach(): void
+    {
+        $customer = User::create(['name' => 'Khách', 'email' => 'combo@example.com', 'password' => 'secret123', 'is_active' => true]);
+        $role = \App\Models\Role::firstOrCreate(['code' => 'CUSTOMER'], ['name' => 'Khách hàng']);
+        $customer->roles()->attach($role->id);
+        Sanctum::actingAs($this->manager());
+        $main = $this->menuItem('Mì cay bạch tuộc', 109000);
+        $drink = $this->menuItem('7-Up', 20000);
+        $payload = ['menu_item_id' => $main->id, 'suggested_item_id' => $drink->id, 'combo_price' => 120000];
+
+        $this->postJson('/api/staff/manager/menu-suggestions', $payload)->assertCreated();
+        $combo = app(MenuSuggestionService::class)->featuredCombos(1)[0];
+        $this->assertSame(9000, $combo['saving']);
+        $this->assertSame($main->id, $combo['main_item']['id']);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertSame('COMBO_PROMOTION', json_decode(\DB::table('notifications')->value('data'), true)['event']);
+
+        $suggestion = MenuItemSuggestion::first();
+        app(\App\Services\ComboNotificationService::class)->sendFor($suggestion);
+        $this->assertDatabaseCount('notifications', 1);
+
+        $laterCustomer = User::create(['name' => 'Khách mới', 'email' => 'later@example.com', 'password' => 'secret123', 'is_active' => true]);
+        $laterCustomer->roles()->attach($role->id);
+        Sanctum::actingAs($laterCustomer);
+        $this->getJson('/api/notifications')->assertOk()->assertJsonPath('unread_count', 1);
+        $this->getJson('/api/notifications')->assertOk()->assertJsonPath('unread_count', 1);
+        $this->assertDatabaseCount('notifications', 2);
+    }
+
+    public function test_danh_muc_combo_chi_hien_khi_co_combo_dang_ban(): void
+    {
+        $main = $this->menuItem('Mì cay bò', 69000);
+        $drink = $this->menuItem('7-Up', 20000);
+        $this->assertNotContains('combo', array_column($this->getJson('/api/home/categories')->assertOk()->json('data'), 'slug'));
+
+        $suggestion = MenuItemSuggestion::create([
+            'menu_item_id' => $main->id,
+            'suggested_item_id' => $drink->id,
+            'combo_price' => 80000,
+        ]);
+        $this->getJson('/api/home/categories')->assertOk()->assertJsonPath('data.0.slug', 'combo')->assertJsonPath('data.0.items_count', 1);
+        $this->getJson('/api/menu?category=combo')->assertOk()->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $main->id)
+            ->assertJsonPath('data.0.suggestions.0.suggested_item.id', $drink->id);
+
+        $suggestion->update(['is_active' => false]);
+        $this->assertNotContains('combo', array_column($this->getJson('/api/home/categories')->assertOk()->json('data'), 'slug'));
+        $this->getJson('/api/menu?category=combo')->assertOk()->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_them_combo_vao_gio_la_mot_thao_tac_nguyen_tu(): void
+    {
+        $customer = User::create(['name' => 'Khách', 'email' => 'atomic@example.com', 'password' => 'secret123', 'is_active' => true]);
+        Sanctum::actingAs($customer);
+        $main = $this->menuItem('Mì cay bò', 69000);
+        $drink = $this->menuItem('7-Up', 20000);
+        $suggestion = MenuItemSuggestion::create([
+            'menu_item_id' => $main->id,
+            'suggested_item_id' => $drink->id,
+            'combo_price' => 80000,
+        ]);
+        $payload = ['suggestion_id' => $suggestion->id, 'main' => [
+            'menu_item_id' => $main->id, 'quantity' => 1, 'spicy_level' => 0, 'topping_ids' => [],
+        ]];
+
+        \DB::statement("CREATE TRIGGER reject_combo_drink BEFORE INSERT ON cart_items WHEN NEW.menu_item_id = {$drink->id} BEGIN SELECT RAISE(ABORT, 'blocked'); END");
+        $this->postJson('/api/cart/combo', $payload)->assertStatus(500);
+        $this->assertDatabaseCount('cart_items', 0);
+        \DB::statement('DROP TRIGGER reject_combo_drink');
+
+        $this->postJson('/api/cart/combo', $payload)->assertCreated();
+        $this->assertDatabaseCount('cart_items', 2);
+
+        $drink->update(['is_available' => false]);
+        $this->postJson('/api/cart/combo', $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('cart_items', 2);
     }
 
     public function test_quan_ly_xem_danh_sach_goi_y(): void
@@ -345,6 +458,9 @@ class MenuSuggestionTest extends TestCase
 
         $this->assertSame(10000, $result['discount_vnd']);
         $this->assertCount(1, $result['lines']);
+        $this->assertSame(65000, $result['lines'][0]['original_unit_price']);
+        $this->assertSame(55000, $result['lines'][0]['combo_price']);
+        $this->assertSame('Trà đào', $result['lines'][0]['suggested_item_name']);
     }
 
     public function test_khong_co_tiet_kiem_khi_thieu_mon_goi_y(): void

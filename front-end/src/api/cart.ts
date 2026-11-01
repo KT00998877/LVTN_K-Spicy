@@ -16,6 +16,7 @@ import type {
 
 const ENDPOINTS = {
     cart:          '/cart',
+    combo:         '/cart/combo',
     cartItem:      (id: number) => `/cart/items/${id}`,
     toppings:      '/cart/toppings',
     checkout:      '/cart/checkout',
@@ -58,6 +59,10 @@ export async function fetchCartCount(): Promise<number> {
 export async function addToCart(payload: CartAddPayload): Promise<CartItem> {
     const { data } = await apiClient.post<CartItemResponse>(ENDPOINTS.cart, payload)
     return data.data
+}
+
+export async function addComboToCart(suggestionId: number, main: CartAddPayload): Promise<void> {
+    await apiClient.post(ENDPOINTS.combo, { suggestion_id: suggestionId, main })
 }
 
 /**

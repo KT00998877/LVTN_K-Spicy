@@ -8,6 +8,7 @@ const props = defineProps<{
     item: MenuItemCard
     isFavorite?: boolean
     favoriteLoading?: boolean
+    showCombo?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,9 @@ const spicyInfo = computed(() => {
 
 const hasSpicy = computed(() => props.item.spicy_level > 0)
 const hasSize = computed(() => props.item.size !== null && props.item.size !== undefined)
+const flashSale = computed(() => props.item.flash_sale && Date.parse(props.item.flash_sale.ends_at) > Date.now() ? props.item.flash_sale : null)
+const combo = computed(() => props.item.suggestions?.find(suggestion => suggestion.combo_price !== null && suggestion.saving > 0 && suggestion.suggested_item.is_available))
+const formatPrice = (price: number) => `${new Intl.NumberFormat('vi-VN').format(price)} đ`
 
 const prepTime = computed(() => {
     if (!props.item.preparation_minutes) return null
@@ -85,7 +89,7 @@ function handleFavorite(e: Event) {
         @keydown.space.prevent="handleAdd"
     >
         <!-- Image -->
-        <div class="card-image-wrap">
+        <div class="card-image-wrap" :class="{ 'card-image-wrap--combo': showCombo && combo }">
             <button
                 type="button"
                 class="favorite-btn"
@@ -114,6 +118,15 @@ function handleFavorite(e: Event) {
                 loading="lazy"
                 @error="(e) => (e.target as HTMLImageElement).src = 'https://placehold.co/400x300/FFF8EF/D71920?text=K-SPICY'"
             />
+            <img
+                v-if="showCombo && combo && combo.suggested_item.image_url"
+                :src="imageUrl(combo.suggested_item.image_url)"
+                :alt="combo.suggested_item.name"
+                class="card-image card-drink-image"
+                loading="lazy"
+            />
+            <div v-else-if="showCombo && combo" class="card-drink-placeholder">{{ combo.suggested_item.name }}</div>
+            <span v-if="showCombo && combo" class="card-combo-plus" aria-hidden="true">+</span>
 
             <!-- Single contextual indicator: spicy OR size, not both -->
             <span v-if="hasSpicy" class="card-spicy" :style="{ '--c': spicyInfo.color }">
@@ -137,14 +150,23 @@ function handleFavorite(e: Event) {
 
         <!-- Body -->
         <div class="card-body">
-            <span class="card-category">{{ item.category_name }}</span>
-            <h3 class="card-title">{{ item.name }}</h3>
-            <p v-if="item.description" class="card-desc">{{ item.description }}</p>
+            <span class="card-category">{{ showCombo && combo ? 'Combo món và nước' : item.category_name }}</span>
+            <h3 class="card-title">{{ showCombo && combo ? combo.title : item.name }}</h3>
+            <p v-if="showCombo && combo" class="card-desc">{{ item.name }} + {{ combo.suggested_item.name }}</p>
+            <p v-else-if="item.description" class="card-desc">{{ item.description }}</p>
+            <p v-if="combo && !showCombo && item.is_available !== false" class="card-combo">
+                <strong>Combo + {{ combo.suggested_item.name }}</strong>
+                <span>{{ combo.combo_price_formatted }} · tiết kiệm {{ combo.saving_formatted }}</span>
+            </p>
 
             <div class="card-footer">
                 <div class="price-block">
-                    <span class="card-price">{{ item.price_formatted }}</span>
-                    <span v-if="prepTime" class="card-prep">
+                    <span v-if="showCombo && combo" class="flash-badge">TIẾT KIỆM {{ combo.saving_formatted }}</span>
+                    <span v-if="showCombo && combo" class="card-original-price">{{ combo.original_price_formatted }}</span>
+                    <span v-if="!showCombo && flashSale" class="flash-badge">FLASH SALE</span>
+                    <span v-if="!showCombo && flashSale" class="card-original-price">{{ formatPrice(flashSale.original_price) }}</span>
+                    <span class="card-price">{{ showCombo && combo ? combo.combo_price_formatted : flashSale ? formatPrice(flashSale.price) : item.price_formatted }}</span>
+                    <span v-if="prepTime && !showCombo" class="card-prep">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                         {{ prepTime }}
                     </span>
@@ -157,7 +179,7 @@ function handleFavorite(e: Event) {
                 <button
                     type="button"
                     class="add-btn"
-                    :aria-label="item.is_available === false ? `${item.name} đã ${soldOutState?.label.toLowerCase() ?? 'hết món'}` : `Thêm ${item.name} vào giỏ`"
+                    :aria-label="item.is_available === false ? `${item.name} đã ${soldOutState?.label.toLowerCase() ?? 'hết món'}` : showCombo && combo ? `Xem combo ${combo.title}` : `Thêm ${item.name} vào giỏ`"
                     :disabled="item.is_available === false"
                     @click.stop="handleAdd"
                 >
@@ -270,6 +292,11 @@ function handleFavorite(e: Event) {
     background: var(--color-cream-deep);
 }
 
+.card-image-wrap--combo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.card-image-wrap--combo .card-image { min-width: 0; min-height: 0; }
+.card-drink-placeholder { display: grid; place-items: center; padding: 12px; background: #fff1e7; color: #8f2318; font-weight: 700; text-align: center; }
+.card-combo-plus { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--color-chili-red); font-size: 22px; font-weight: 800; box-shadow: var(--shadow-sm); }
+
 .card-image {
     width: 100%;
     height: 100%;
@@ -340,6 +367,9 @@ function handleFavorite(e: Event) {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
+.flash-badge { align-self: flex-start; padding: 4px 7px; border-radius: 5px; background: #d71920; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .4px; }
+.card-original-price { color: var(--color-gray-500); font-size: 12px; text-decoration: line-through; }
+
 /* Rating badge (góc dưới trái ảnh) */
 .card-rating {
     position: absolute;
@@ -385,6 +415,20 @@ function handleFavorite(e: Event) {
     overflow: hidden;
     flex: 1;
 }
+
+.card-combo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 8px;
+    margin: var(--space-3) 0 0;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: #fff1e7;
+    color: #8f2318;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.card-combo span { color: #6f433a; }
 
 .card-footer {
     display: flex;

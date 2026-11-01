@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\CartService;
+use App\Models\MenuItemSuggestion;
+use App\Services\MenuSuggestionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -76,6 +78,43 @@ class CartController extends Controller
                 'message' => 'Đã thêm món vào giỏ hàng',
                 'data'    => $newItem,
             ], 201);
+        });
+    }
+
+    public function storeCombo(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'suggestion_id' => ['required', 'integer', 'exists:menu_item_suggestions,id'],
+            'main' => ['required', 'array'],
+            'main.menu_item_id' => ['required', 'integer', 'exists:menu_items,id'],
+            'main.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+            'main.spicy_level' => ['required', 'integer', 'min:0', 'max:7'],
+            'main.note' => ['nullable', 'string', 'max:200'],
+            'main.topping_ids' => ['nullable', 'array'],
+            'main.topping_ids.*' => ['integer', 'exists:menu_items,id'],
+        ]);
+
+        return DB::transaction(function () use ($request, $data) {
+            $suggestion = MenuItemSuggestion::findOrFail($data['suggestion_id']);
+            if ((int) $suggestion->menu_item_id !== (int) $data['main']['menu_item_id']
+                || !app(MenuSuggestionService::class)->promotionFor($suggestion)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'suggestion_id' => 'Combo không còn khả dụng. Vui lòng tải lại thực đơn.',
+                ]);
+            }
+
+            /** @var User $user */
+            $user = $request->user();
+            $this->cartService->addItem($user, $data['main']);
+            $this->cartService->addItem($user, [
+                'menu_item_id' => (int) $suggestion->suggested_item_id,
+                'quantity' => 1,
+                'spicy_level' => 0,
+                'note' => '',
+                'topping_ids' => [],
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Đã thêm combo vào giỏ hàng'], 201);
         });
     }
 

@@ -31,6 +31,7 @@ class MenuItem extends Model
         'preparation_minutes',
         'spicy_level',
         'size',
+        'flash_sale_discount', 'flash_sale_starts_at', 'flash_sale_ends_at',
     ];
 
     protected function casts(): array
@@ -45,6 +46,9 @@ class MenuItem extends Model
             'is_active'    => 'boolean',
             'is_featured'  => 'boolean',
             'is_best_seller' => 'boolean',
+            'flash_sale_discount' => 'integer',
+            'flash_sale_starts_at' => 'datetime',
+            'flash_sale_ends_at' => 'datetime',
         ];
     }
 

@@ -35,7 +35,7 @@ final class CartContext
         foreach ($cart->items as $ci) {
             $menuItem = $ci->menuItem;
             if (!$menuItem) continue;
-            $unitPrice = Money::minor($menuItem->price);
+            $unitPrice = Money::minor(app(FlashSaleService::class)->priceFor($menuItem));
             foreach ($ci->toppingRelations as $tr) {
                 $unitPrice += $tr->topping ? Money::minor($tr->topping->price) : 0;
             }

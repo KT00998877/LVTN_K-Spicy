@@ -1,37 +1,8 @@
 <script setup lang="ts">
-/**
- * ComboPromotionSection → Spicy Campaign Poster (Phase 5)
- *
- * Phase 5 Correction §3 — campaign data source RE-VERIFIED.
- *
- * Verified (this correction pass):
- *  - HomePayload (src/types/home.ts) does NOT contain a
- *    `combo_promotion` / `comboPromotion` / `campaign` field.
- *  - useHomeStore (src/stores/home.ts) has no such getter.
- *  - fetchHomePayload (src/api/home.ts) returns the typed payload
- *    directly — backend has no slot for it.
- *
- *   Conclusion: there is no real promotion data on /api/home.
- *   Per Phase 5 §3 + §66 we MUST hide the section gracefully
- *   instead of faking promotion content from `featured[0]`.
- *
- *   This component reads an OPTIONAL `payload?.combo_promotion`
- *   field via a typed extension. If backend later ships a real
- *   promotion endpoint, the component will render automatically
- *   without changes.
- *
- * Design goals:
- *  - ONE featured campaign, no carousel / no slider / no fake claims
- *  - Spicy red / chili orange poster surface
- *  - One-shot reveal animation (700–1100ms), then STATIC
- *  - No new dependencies — pure CSS + Vue transition
- *
- * Reuses: UiSection bg="chili", UiContainer, UiEyebrow tone="gold",
- *         UiButton variant="white", imageUrl util.
- */
 import { computed, ref } from 'vue'
 import { imageUrl } from '@/utils/image'
 import { useHomeStore } from '@/stores/home'
+import type { ComboPromotionPayload } from '@/types/home'
 import UiSection from '@/components/ui/UiSection.vue'
 import UiContainer from '@/components/ui/UiContainer.vue'
 import UiEyebrow from '@/components/ui/UiEyebrow.vue'
@@ -39,31 +10,8 @@ import UiButton from '@/components/ui/UiButton.vue'
 
 const store = useHomeStore()
 
-// =========================================================
-// REAL CAMPAIGN DATA (Phase 5 Correction §3 + §4)
-//
-// We read an OPTIONAL field on the home payload. If backend
-// later ships it, the section renders. If absent, we hide
-// gracefully — no fake promotion content from featured items.
-// =========================================================
-interface ComboPromotionPayload {
-    id: number
-    title: string
-    subtitle: string | null
-    description: string | null
-    image_url: string | null
-    menu_item_slug: string | null
-    // No fake fields here — discount / voucher / expiry / VAT
-    // must come from a real backend schema when shipped.
-}
-
 function readCampaign(): ComboPromotionPayload | null {
-    // Opt-in: backend may extend HomePayload later.
-    const p = store.payload as unknown as
-        { combo_promotion?: ComboPromotionPayload | null } | null
-    if (!p || !p.combo_promotion) return null
-    if (!p.combo_promotion.title) return null
-    return p.combo_promotion
+    return store.payload?.combo_promotion ?? null
 }
 
 const campaign = computed<ComboPromotionPayload | null>(() => readCampaign())
@@ -82,6 +30,8 @@ const campaignImage = computed(() => {
     const url = campaign.value?.image_url
     return url ? imageUrl(url) : ''
 })
+const drinkImage = computed(() => campaign.value?.suggested_image_url ? imageUrl(campaign.value.suggested_image_url) : '')
+const drinkImgFailed = ref(false)
 
 const imgFailed = ref(false)
 const visibleImgSrc = computed(() => {
@@ -94,16 +44,10 @@ function onImgError() { imgFailed.value = true }
 // =========================================================
 // CTA — single primary, routes to existing /thuc-don (no fake route)
 // =========================================================
-const ctaHref = '/thuc-don'
+const ctaHref = computed(() => `/thuc-don?search=${encodeURIComponent(campaign.value?.menu_item_name ?? '')}`)
 </script>
 
 <template>
-    <!--
-        Phase 5 Correction §3 + §66: hide section gracefully when no
-        real promotion data exists. Backend has no combo_promotion
-        field yet, so this currently never renders. Backend enhancement
-        will activate this section without code changes here.
-    -->
     <UiSection
         v-if="hasCampaign"
         id="campaign"
@@ -123,7 +67,7 @@ const ctaHref = '/thuc-don'
 
                 <!-- ===== LEFT — copy ===== -->
                 <div class="campaign-copy">
-                    <UiEyebrow tone="gold">Spicy campaign</UiEyebrow>
+                    <UiEyebrow tone="gold">Combo món và nước</UiEyebrow>
 
                     <h2
                         id="campaign-title"
@@ -148,7 +92,7 @@ const ctaHref = '/thuc-don'
                             size="lg"
                             class="campaign-cta"
                         >
-                            Xem thực đơn
+                            Xem combo trong thực đơn
                             <svg width="16" height="16" viewBox="0 0 24 24"
                                 fill="none" stroke="currentColor"
                                 stroke-width="2.5"
@@ -184,6 +128,8 @@ const ctaHref = '/thuc-don'
                             </span>
                         </div>
                     </div>
+                    <img v-if="drinkImage && !drinkImgFailed" class="campaign-drink" :src="drinkImage" :alt="campaign?.suggested_item_name ?? 'Đồ uống trong combo'" loading="lazy" @error="drinkImgFailed = true" />
+                    <div v-else class="campaign-drink campaign-drink--fallback">{{ campaign?.suggested_item_name }}</div>
                 </div>
             </div>
         </UiContainer>
@@ -245,7 +191,7 @@ const ctaHref = '/thuc-don'
     align-items: center;
     position: relative;
     z-index: 1;
-    min-height: 70vh;
+    min-height: 390px;
 }
 
 /* ===== One-shot reveal sequence (Phase 5 Correction §5)
@@ -275,7 +221,7 @@ const ctaHref = '/thuc-don'
 
 .campaign-title {
     font-family: var(--font-display);
-    font-size: clamp(48px, 7vw, 104px);
+    font-size: clamp(34px, 4vw, 58px);
     font-weight: var(--weight-black);
     line-height: 0.95;
     letter-spacing: -0.04em;
@@ -320,12 +266,13 @@ const ctaHref = '/thuc-don'
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 16px;
 }
 
 .visual-frame {
     position: relative;
-    width: 100%;
-    max-width: 560px;
+    width: 62%;
+    max-width: 330px;
     aspect-ratio: 1;
     border-radius: 50%;
     overflow: hidden;
@@ -333,6 +280,8 @@ const ctaHref = '/thuc-don'
     box-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
     border: 2px solid rgba(255, 255, 255, 0.10);
 }
+.campaign-drink { width: 34%; aspect-ratio: 1; object-fit: cover; border: 4px solid var(--color-golden); border-radius: 24px; background: #fff; box-shadow: var(--shadow-md); }
+.campaign-drink--fallback { display: grid; place-items: center; padding: 12px; box-sizing: border-box; color: var(--color-dark-red); font-weight: 700; text-align: center; }
 
 .campaign-img {
     width: 100%;

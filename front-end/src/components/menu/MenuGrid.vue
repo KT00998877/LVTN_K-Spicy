@@ -7,6 +7,7 @@ defineProps<{
     loading: boolean
     favoriteIds?: number[]
     favoriteLoadingIds?: number[]
+    showCombo?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -67,6 +68,7 @@ function handleReset() {
                 :item="item"
                 :is-favorite="favoriteIds?.includes(item.id)"
                 :favorite-loading="favoriteLoadingIds?.includes(item.id)"
+                :show-combo="showCombo"
                 @add-to-cart="emit('addToCart', item)"
                 @toggle-favorite="emit('toggleFavorite', item)"
             />

@@ -45,6 +45,7 @@ export interface MenuItemCard {
     image_url: string
     price: number
     price_formatted: string
+    flash_sale?: { original_price: number; discount: number; price: number; starts_at: string; ends_at: string } | null
     spicy_level: number
     size: 'SMALL' | 'LARGE' | null
     preparation_minutes: number
@@ -100,12 +101,24 @@ export interface BlogCard {
 }
 
 /** Payload trả về từ GET /api/home */
+export interface ComboPromotionPayload {
+    id: number
+    title: string
+    subtitle: string
+    description: string
+    image_url: string | null
+    suggested_image_url: string | null
+    suggested_item_name: string
+    menu_item_name: string
+}
+
 export interface HomePayload {
     restaurant: RestaurantInfo
     stats: HomeStats
     categories: CategoryItem[]
     featured: MenuItemCard[]
     best_sellers: MenuItemCard[]
+    combo_promotion?: ComboPromotionPayload | null
     tables: TableOverview
     blogs: BlogCard[]
 }
