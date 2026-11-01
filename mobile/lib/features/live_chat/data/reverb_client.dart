@@ -133,14 +133,18 @@ class ReverbClient {
 
     switch (event) {
       case 'pusher:connection_established':
-        final data = frame['data'];
-        if (data is Map) {
+        final data = _decodeData(frame['data']);
+        if (data != null) {
           _socketId = data['socket_id'] as String?;
         }
         // Có socket_id rồi thì ký được các kênh đang chờ.
         unawaited(_subscribePendingChannels());
 
       case 'pusher_internal:subscription_succeeded':
+        break;
+
+      case 'pusher:ping':
+        unawaited(_send({'event': 'pusher:pong', 'data': {}}));
         break;
 
       case 'pusher:error':
@@ -153,11 +157,24 @@ class ReverbClient {
       default:
         // Event của ứng dụng: `live-chat.message.sent` (đã bỏ dấu chấm dẫn).
         if (!event.startsWith('live-chat')) return;
-        final data = frame['data'];
-        if (data is Map) {
-          _events.add(Map<String, dynamic>.from(data));
+        final data = _decodeData(frame['data']);
+        if (data != null) {
+          _events.add(data);
         }
     }
+  }
+
+  Map<String, dynamic>? _decodeData(dynamic data) {
+    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data is String) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 
   /// Ký và subscribe từng kênh đang chờ bằng `socket_id` thật.
@@ -169,7 +186,7 @@ class ReverbClient {
       try {
         final auth = await _repo.authenticateChannel(
           socketId: socketId,
-          channelName: channelName,
+          channelName: 'private-$channelName',
         );
         await _send({
           'event': 'pusher:subscribe',

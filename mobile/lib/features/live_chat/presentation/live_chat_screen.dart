@@ -153,16 +153,11 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = state.sessionStatus;
-    if (status == null) return const SizedBox.shrink();
+    if (status == null || status == LiveChatStatus.accepted) return const SizedBox.shrink();
 
     final (text, color) = switch (status) {
       LiveChatStatus.waiting => ('Đang chờ nhân viên nhận cuộc tư vấn', AppColors.warning),
-      LiveChatStatus.accepted => (
-          state.staffName != null && state.staffName!.isNotEmpty
-              ? '${state.staffName} đang phục vụ bạn'
-              : 'Nhân viên đang phục vụ bạn',
-          AppColors.success,
-        ),
+      LiveChatStatus.accepted => ('', AppColors.success),
       LiveChatStatus.closed => ('Cuộc tư vấn đã kết thúc', AppColors.textMuted),
     };
 

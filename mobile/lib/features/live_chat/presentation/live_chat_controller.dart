@@ -260,6 +260,7 @@ class LiveChatController extends StateNotifier<LiveChatState> {
   }
 
   void _handleEvent(Map<String, dynamic> data) {
+    if (data['session_id'] != state.sessionId) return;
     // Chỉ quan tâm tin nhắn mới.
     final message = data['message'];
     if (message is Map) {
@@ -275,6 +276,12 @@ class LiveChatController extends StateNotifier<LiveChatState> {
       state = state.copyWith(
         sessionStatus: parsed.status,
         staffName: parsed.assignedStaffName ?? state.staffName,
+        isConnected: true,
+      );
+    } else if (data['status'] is String) {
+      state = state.copyWith(
+        sessionStatus: LiveChatStatusX.parse(data['status'] as String),
+        staffName: data['assigned_staff_name'] as String? ?? state.staffName,
         isConnected: true,
       );
     }
