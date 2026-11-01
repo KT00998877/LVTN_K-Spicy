@@ -44,7 +44,7 @@ def normalize_diacritics(text: str) -> str:
     import unicodedata
     decomposed = unicodedata.normalize("NFD", text.lower())
     stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return stripped
+    return stripped.replace("đ", "d")
 
 
 def tokenize(msg: str) -> list[str]:

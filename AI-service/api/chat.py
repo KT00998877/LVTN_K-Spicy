@@ -4,6 +4,7 @@ Chat API endpoints.
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from datetime import datetime
 
@@ -83,7 +84,7 @@ async def chat(
             request_id=request_id,
             session_id=request.session_id,
             intent=result.get("intent", "unknown"),
-            reply=result.get("reply", ""),
+            reply=re.sub(r"(?i)(?:mục\s+)?/dat-?ban\b", "mục Đặt bàn", result.get("reply", "")),
             provider="gemini",
             model=result.get("model", "gemini-2.5-flash"),
             latency_ms=result.get("latency_ms", 0),

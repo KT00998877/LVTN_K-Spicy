@@ -85,13 +85,35 @@ class RestaurantInfo:
 class KnowledgeBaseLoader:
     """
     Loads knowledge base from JSONL files.
-    
+
+    Only chunk types that are NOT served by live business tools are included
+    in the RAG retrieval index. Types such as ``menu_item``, ``category``,
+    ``voucher`` and ``campaign`` are excluded because the tool-calling path
+    fetches them in real-time from the Laravel API, so stale KB copies would
+    cause the bot to quote incorrect prices or unavailable items.
+
+    Retained types (static / no API equivalent):
+        - faq            – general Q&A, spicy-level guide, tips
+        - restaurant_info – address, phone, opening hours
+        - policy         – cancellation / refund rules
+        - loyalty_tier   – membership tier details
+
     Usage:
         loader = KnowledgeBaseLoader()
-        chunks = loader.load_chunks()
-        faq = loader.load_faq()
-        menu = loader.load_menu()
+        chunks = loader.load_chunks()   # only static types
+        faq    = loader.load_faq()
     """
+
+    # Chunk types that are covered by live business tools and must NOT be
+    # indexed in the RAG retrieval store.
+    TOOL_SERVED_TYPES: frozenset[str] = frozenset({
+        "menu_item",
+        "category",
+        "voucher",
+        "campaign",
+        "ingredient",
+        "review",
+    })
     
     def __init__(self, kb_path: Optional[str] = None):
         """
@@ -136,45 +158,58 @@ class KnowledgeBaseLoader:
     
     def load_chunks(self, force_reload: bool = False) -> list[Chunk]:
         """
-        Load all chunks from chunks.jsonl.
-        
+        Load static chunks from chunks.jsonl, excluding types served by live tools.
+
+        Chunk types listed in ``TOOL_SERVED_TYPES`` (menu_item, category,
+        voucher, campaign, ...) are silently dropped so the RAG retriever only
+        indexes static knowledge (faq, restaurant_info, policy, loyalty_tier).
+
         Args:
             force_reload: Force reload even if already loaded.
-            
+
         Returns:
-            List of Chunk objects.
+            List of Chunk objects (static types only).
         """
         if self._chunks is not None and not force_reload:
             return self._chunks
-        
+
         if not self.chunks_path.exists():
             logger.warning(f"Chunks file not found: {self.chunks_path}")
             return []
-        
-        chunks = []
+
+        chunks: list[Chunk] = []
+        skipped = 0
         try:
             with open(self.chunks_path, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         data = json.loads(line)
+                        chunk_type = data.get("type", "")
+                        # Skip types that are served by live business tools.
+                        if chunk_type in self.TOOL_SERVED_TYPES:
+                            skipped += 1
+                            continue
                         chunk = Chunk(
                             chunk_id=data.get("chunk_id", ""),
                             text=data.get("text", ""),
-                            type=data.get("type", ""),
+                            type=chunk_type,
                             source=data.get("source", ""),
                             source_id=data.get("source_id"),
                             parent_id=data.get("parent_id"),
                             metadata=data.get("metadata", {}),
                         )
                         chunks.append(chunk)
-            
+
             self._chunks = chunks
-            logger.info(f"Loaded {len(chunks)} chunks from {self.chunks_path}")
-            
+            logger.info(
+                "Loaded {} static chunks ({} tool-served excluded) from {}",
+                len(chunks), skipped, self.chunks_path,
+            )
+
         except Exception as e:
             logger.error(f"Error loading chunks: {e}")
             return []
-        
+
         return chunks
     
     def load_faq(self, force_reload: bool = False) -> list[FAQData]:
