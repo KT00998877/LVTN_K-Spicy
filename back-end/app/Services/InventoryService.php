@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{Ingredient, InventoryTransaction, StockImport, Stocktake};
+use App\Models\{Ingredient, InventoryTransaction, PurchaseOrder, StockImport, Stocktake};
 use App\Models\StockImportItem;
 use App\Models\StocktakeItem;
 use Carbon\Carbon;
@@ -41,7 +41,7 @@ class InventoryService
      *
      * @param array{
      *   ingredient_id:int,
-     *   quantity:float,
+     *   quantity:int,
      *   unit_price:float,
      *   note?:string,
      *   reference_type?:string,
@@ -56,10 +56,8 @@ class InventoryService
         return DB::transaction(function () use ($payload, $performedBy) {
             $this->assertStockKeys($payload, ['ingredient_id', 'quantity', 'unit_price']);
             $ingredient = $this->lockIngredient((int) $payload['ingredient_id']);
-            $cents = fn (float $n): int => (int) round($n * 100);
-
-            $before = $cents((float) $ingredient->quantity_in_stock);
-            $qty    = $cents((float) $payload['quantity']);
+            $before = (int) $ingredient->quantity_in_stock;
+            $qty = $this->integerQuantity($payload['quantity'], 'quantity');
             if ($qty <= 0) {
                 throw ValidationException::withMessages(['quantity' => 'Số lượng nhập phải > 0.']);
             }
@@ -75,7 +73,7 @@ class InventoryService
             }
 
             $ingredient->update([
-                'quantity_in_stock' => $after / 100,
+                'quantity_in_stock' => $after,
                 'import_price'      => (float) $payload['unit_price'],
                 'import_date'       => Carbon::now('Asia/Ho_Chi_Minh')->toDateString(),
                 'updated_at'        => now(),
@@ -84,10 +82,10 @@ class InventoryService
             return $this->writeTransaction([
                 'ingredient_id' => $ingredient->id,
                 'type'          => 'IMPORT',
-                'quantity'      => $qty / 100,
+                'quantity'      => $qty,
                 'unit_price'    => (float) $payload['unit_price'],
-                'stock_before'  => $before / 100,
-                'stock_after'   => $after / 100,
+                'stock_before'  => $before,
+                'stock_after'   => $after,
                 'reference_type'=> $payload['reference_type'] ?? null,
                 'reference_id'  => $payload['reference_id']   ?? null,
                 'performed_by'  => $performedBy,
@@ -125,10 +123,8 @@ class InventoryService
                 throw ValidationException::withMessages(['type' => 'Loại xuất kho không hợp lệ.']);
             }
             $ingredient = $this->lockIngredient((int) $payload['ingredient_id']);
-            $cents = fn (float $n): int => (int) round($n * 100);
-
-            $before = $cents((float) $ingredient->quantity_in_stock);
-            $qty    = $cents((float) $payload['quantity']);
+            $before = (int) $ingredient->quantity_in_stock;
+            $qty = $this->integerQuantity($payload['quantity'], 'quantity');
             if ($qty <= 0) {
                 throw ValidationException::withMessages(['quantity' => 'Số lượng xuất phải > 0.']);
             }
@@ -142,23 +138,23 @@ class InventoryService
             $after = $before - $qty;
             if ($after < 0) {
                 throw ValidationException::withMessages([
-                    'quantity' => sprintf('Không đủ tồn kho (hiện có %.2f %s).', $before / 100, $ingredient->unit),
+                    'quantity' => sprintf('Không đủ tồn kho (hiện có %d %s).', $before, $ingredient->unit),
                 ]);
             }
 
             $ingredient->update([
-                'quantity_in_stock' => $after / 100,
+                'quantity_in_stock' => $after,
                 'updated_at'        => now(),
             ]);
 
             return $this->writeTransaction([
                 'ingredient_id' => $ingredient->id,
                 'type'          => $type,
-                'quantity'      => -($qty / 100),                  // âm để phản ánh chiều biến động
+                'quantity'      => -$qty,
                 'reason_code'   => $payload['reason_code'] ?? null,
                 'unit_price'    => (float) $ingredient->import_price,
-                'stock_before'  => $before / 100,
-                'stock_after'   => $after / 100,
+                'stock_before'  => $before,
+                'stock_after'   => $after,
                 'reference_type'=> $payload['reference_type'] ?? null,
                 'reference_id'  => $payload['reference_id']   ?? null,
                 'performed_by'  => $performedBy,
@@ -190,10 +186,8 @@ class InventoryService
         return DB::transaction(function () use ($payload, $performedBy) {
             $this->assertStockKeys($payload, ['ingredient_id', 'expected_stock']);
             $ingredient = $this->lockIngredient((int) $payload['ingredient_id']);
-            $cents = fn (float $n): int => (int) round($n * 100);
-
-            $before = $cents((float) $ingredient->quantity_in_stock);
-            $after  = $cents((float) $payload['expected_stock']);
+            $before = (int) $ingredient->quantity_in_stock;
+            $after = $this->integerQuantity($payload['expected_stock'], 'expected_stock');
             if ($after < 0) {
                 throw ValidationException::withMessages(['expected_stock' => 'Tồn kho sau điều chỉnh không được âm.']);
             }
@@ -205,7 +199,7 @@ class InventoryService
             // (số tồn họ đọc trước khi gửi), phải khớp DB. Mặc định KHÔNG check
             // (cho service nội bộ như stocktake).
             if (isset($payload['current_stock_check'])) {
-                $expectedBefore = $cents((float) $payload['current_stock_check']);
+                $expectedBefore = $this->integerQuantity($payload['current_stock_check'], 'current_stock_check');
                 if ($before !== $expectedBefore) {
                     throw ValidationException::withMessages([
                         'expected_stock' => 'Tồn kho đã thay đổi. Hãy làm mới và kiểm kê lại.',
@@ -216,17 +210,17 @@ class InventoryService
             $change = $after - $before;
 
             $ingredient->update([
-                'quantity_in_stock' => $after / 100,
+                'quantity_in_stock' => $after,
                 'updated_at'        => now(),
             ]);
 
             return $this->writeTransaction([
                 'ingredient_id' => $ingredient->id,
                 'type'          => 'ADJUSTMENT',
-                'quantity'      => $change / 100,
+                'quantity'      => $change,
                 'unit_price'    => (float) $ingredient->import_price,
-                'stock_before'  => $before / 100,
-                'stock_after'   => $after / 100,
+                'stock_before'  => $before,
+                'stock_after'   => $after,
                 'reference_type'=> $payload['reference_type'] ?? null,
                 'reference_id'  => $payload['reference_id']   ?? null,
                 'performed_by'  => $performedBy,
@@ -259,6 +253,12 @@ class InventoryService
             if ($latestCount && $receivedAt->lessThanOrEqualTo(Carbon::parse($latestCount))) {
                 throw ValidationException::withMessages(['received_at' => 'Hàng nhận trước hoặc đúng lần đếm đã chốt. Cần đối chiếu sổ trước khi ghi nhập.']);
             }
+            $purchaseOrder = null;
+            if ($import->purchase_order_id) {
+                /** @var PurchaseOrder $purchaseOrder */
+                $purchaseOrder = PurchaseOrder::lockForUpdate()->findOrFail($import->purchase_order_id);
+            }
+
             /** @var StockImport $locked */
             $locked = StockImport::lockForUpdate()->findOrFail($import->id);
             if ($locked->status === StockImport::STATUS_CONFIRMED) {
@@ -269,15 +269,23 @@ class InventoryService
                     'status' => 'Phiếu nhập đã bị huỷ, không thể xác nhận.',
                 ]);
             }
+            if ($purchaseOrder && $purchaseOrder->status !== PurchaseOrder::STATUS_SHIPPED) {
+                throw ValidationException::withMessages([
+                    'status' => 'Yêu cầu nhập phải ở trạng thái SHIPPED trước khi xác nhận kho.',
+                ]);
+            }
 
             // Chốt từng item → gọi increaseStock với reference_type='stock_import'.
             // Lưu ý: increaseStock tự lockForUpdate, nên ta phải chấp nhận nested lockForUpdate
             // (Postgres/MySQL đều cho phép nested locks cùng transaction).
-            foreach ($locked->items()->lockForUpdate()->get() as $item) {
+            foreach ($locked->items()->orderBy('ingredient_id')->lockForUpdate()->get() as $item) {
                 /** @var StockImportItem $item */
+                if ((int) $item->quantity === 0) {
+                    continue;
+                }
                 $this->increaseStock([
                     'ingredient_id'   => $item->ingredient_id,
-                    'quantity'        => (float) $item->quantity,
+                    'quantity'        => (int) $item->quantity,
                     'unit_price'      => (float) $item->unit_price,
                     'note'            => sprintf('Phiếu nhập %s', $locked->code),
                     'reference_type'  => 'stock_import',
@@ -292,6 +300,14 @@ class InventoryService
                 'confirmed_at' => now(),
                 'received_at' => $receivedAt,
             ]);
+
+            if ($purchaseOrder) {
+                $purchaseOrder->update([
+                    'status' => PurchaseOrder::STATUS_RECEIVED,
+                    'received_by' => $performedBy,
+                    'received_at' => $receivedAt,
+                ]);
+            }
 
             Log::info('stock_import.confirmed', [
                 'code' => $locked->code, 'by' => $performedBy,
@@ -333,10 +349,10 @@ class InventoryService
             foreach ($locked->items()->lockForUpdate()->get() as $row) {
                 /** @var StocktakeItem $row */
                 $ingredient = $this->lockIngredient((int) $row->ingredient_id);
-                $difference = round((float) $row->actual_qty - (float) $ingredient->quantity_in_stock, 2);
+                $difference = (int) $row->actual_qty - (int) $ingredient->quantity_in_stock;
                 $value = round($difference * (float) $ingredient->import_price, 2);
                 $row->update([
-                    'system_qty' => (float) $ingredient->quantity_in_stock,
+                    'system_qty' => (int) $ingredient->quantity_in_stock,
                     'difference_qty' => $difference,
                     'unit_cost' => (float) $ingredient->import_price,
                     'difference_value' => $value,
@@ -376,12 +392,12 @@ class InventoryService
         return $i;
     }
 
-    private function guardOverflow(int $afterCents): int
+    private function guardOverflow(int $quantity): int
     {
-        if ($afterCents > 9_999_999_999_99) {
-            throw ValidationException::withMessages(['quantity' => 'Vượt giới hạn lưu trữ (12 chữ số thập phân).']);
+        if ($quantity > 9_999_999_999) {
+            throw ValidationException::withMessages(['quantity' => 'Vượt giới hạn lưu trữ.']);
         }
-        return $afterCents;
+        return $quantity;
     }
 
     /** Ghi 1 row inventory_transactions. */
@@ -413,15 +429,24 @@ class InventoryService
             && (string) ($existing->note ?? '') === (string) ($payload['note'] ?? '');
         if (isset($payload['expected_stock'])) {
             $matches = $matches && $existing->type === 'ADJUSTMENT'
-                && round((float) $existing->stock_after, 2) === round((float) $payload['expected_stock'], 2);
+                && (int) $existing->stock_after === (int) $payload['expected_stock'];
         } else {
             $matches = $matches && $existing->type === ($payload['type'] ?? 'IMPORT')
-                && round(abs((float) $existing->quantity), 2) === round((float) $payload['quantity'], 2);
+                && abs((int) $existing->quantity) === (int) $payload['quantity'];
         }
 
         if (!$matches) {
             // 409 Conflict: cùng request_key nhưng payload khác → client phải đổi key.
             abort(409, 'Mã yêu cầu đã được sử dụng. Hãy đóng và lập phiếu mới.');
         }
+    }
+
+    private function integerQuantity(mixed $value, string $field): int
+    {
+        if (! is_numeric($value) || (float) $value !== (float) (int) $value) {
+            throw ValidationException::withMessages([$field => 'Số lượng phải là số nguyên.']);
+        }
+
+        return (int) $value;
     }
 }

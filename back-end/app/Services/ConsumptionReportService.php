@@ -32,7 +32,7 @@ class ConsumptionReportService
      * @return array<int, array{
      *   menu_item_id:int, menu_item_name:string, order_count:int, total_quantity:int,
      *   ingredients:array<int, array{ingredient_id:int, ingredient_name:string, unit:string,
-     *     quantity_required:float, quantity_deducted:float, shortage_qty:float}>
+     *     quantity_required:int, quantity_deducted:int, shortage_qty:int}>
      * }>
      */
     public function byMenuItem(string $from, string $to): array
@@ -57,9 +57,9 @@ class ConsumptionReportService
                     'ingredient_id'      => (int) $ingredientId,
                     'ingredient_name'    => $line['name'],
                     'unit'               => $line['unit'],
-                    'quantity_required'  => 0.0,
-                    'quantity_deducted'  => 0.0,
-                    'shortage_qty'       => 0.0,
+                    'quantity_required'  => 0,
+                    'quantity_deducted'  => 0,
+                    'shortage_qty'       => 0,
                 ];
                 $grouped[$menuId]['ingredients'][$ingredientId]['quantity_required'] += $line['required'];
                 $grouped[$menuId]['ingredients'][$ingredientId]['quantity_deducted'] += $line['deducted'];
@@ -70,11 +70,6 @@ class ConsumptionReportService
         foreach ($grouped as &$menu) {
             $menu['ingredients'] = array_values($menu['ingredients']);
             usort($menu['ingredients'], fn ($a, $b) => $b['quantity_required'] <=> $a['quantity_required']);
-            foreach ($menu['ingredients'] as &$line) {
-                $line['quantity_required'] = round($line['quantity_required'], 3);
-                $line['quantity_deducted'] = round($line['quantity_deducted'], 3);
-                $line['shortage_qty'] = round($line['shortage_qty'], 3);
-            }
         }
 
         usort($grouped, fn ($a, $b) => $b['total_quantity'] <=> $a['total_quantity']);
@@ -87,8 +82,8 @@ class ConsumptionReportService
      *
      * @return array<int, array{
      *   ingredient_id:int, code:string, name:string, unit:string,
-     *   current_stock:float, min_stock_level:float, is_low:bool,
-     *   consumed_qty:float, required_qty:float, shortage_qty:float,
+     *   current_stock:int, min_stock_level:int, is_low:bool,
+     *   consumed_qty:int, required_qty:int, shortage_qty:int,
      *   estimated_days_left:?float
      * }>
      */
@@ -99,7 +94,7 @@ class ConsumptionReportService
         $totals = [];
         foreach ($rows as $row) {
             foreach ($row['ingredients'] as $ingredientId => $line) {
-                $totals[$ingredientId] ??= ['required' => 0.0, 'deducted' => 0.0];
+                $totals[$ingredientId] ??= ['required' => 0, 'deducted' => 0];
                 $totals[$ingredientId]['required'] += $line['required'];
                 $totals[$ingredientId]['deducted'] += $line['deducted'];
             }
@@ -107,12 +102,12 @@ class ConsumptionReportService
 
         $ingredients = Ingredient::where('is_active', true)->orderBy('name')->get();
         if ($totals === []) {
-            return $ingredients->map(fn ($i) => $this->ingredientRow($i, ['required' => 0.0, 'deducted' => 0.0], $from, $to))->all();
+            return $ingredients->map(fn ($i) => $this->ingredientRow($i, ['required' => 0, 'deducted' => 0], $from, $to))->all();
         }
 
         return $ingredients->map(fn ($i) => $this->ingredientRow(
             $i,
-            $totals[$i->id] ?? ['required' => 0.0, 'deducted' => 0.0],
+            $totals[$i->id] ?? ['required' => 0, 'deducted' => 0],
             $from,
             $to,
         ))->all();
@@ -120,10 +115,10 @@ class ConsumptionReportService
 
     private function ingredientRow(Ingredient $ingredient, array $total, string $from, string $to): array
     {
-        $required = round($total['required'], 3);
-        $deducted = round($total['deducted'], 3);
-        $stock = (float) $ingredient->quantity_in_stock;
-        $min = (float) $ingredient->min_stock_level;
+        $required = (int) $total['required'];
+        $deducted = (int) $total['deducted'];
+        $stock = (int) $ingredient->quantity_in_stock;
+        $min = (int) $ingredient->min_stock_level;
 
         // Ước lượng số ngày còn đủ: dựa trên lượng tiêu hao trung bình mỗi ngày trong kỳ.
         $days = max(1, (int) ((strtotime($to) - strtotime($from)) / 86400) + 1);
@@ -135,12 +130,12 @@ class ConsumptionReportService
             'code'              => (string) $ingredient->code,
             'name'              => (string) $ingredient->name,
             'unit'              => (string) $ingredient->unit,
-            'current_stock'     => round($stock, 3),
-            'min_stock_level'   => round($min, 3),
+            'current_stock'     => $stock,
+            'min_stock_level'   => $min,
             'is_low'            => $stock <= $min,
             'consumed_qty'      => $deducted,
             'required_qty'      => $required,
-            'shortage_qty'      => round($required - $deducted, 3),
+            'shortage_qty'      => $required - $deducted,
             'estimated_days_left' => $estimatedDaysLeft,
         ];
     }
@@ -150,7 +145,7 @@ class ConsumptionReportService
      *
      * @return array<int, array{
      *   order_item_id:int, menu_item_id:int, menu_item_name:string, quantity:int,
-     *   ingredients:array<int, array{name:string, unit:string, required:float, deducted:float}>
+     *   ingredients:array<int, array{name:string, unit:string, required:int, deducted:int}>
      * }>
      */
     private function deductionRows(string $from, string $to): array
@@ -183,7 +178,7 @@ class ConsumptionReportService
             foreach ($txs as $tx) {
                 $ingredientId = (int) $tx->ingredient_id;
                 $deductedByIngredient[$ingredientId] =
-                    ($deductedByIngredient[$ingredientId] ?? 0) + abs((float) $tx->quantity);
+                    ($deductedByIngredient[$ingredientId] ?? 0) + abs((int) $tx->quantity);
             }
 
             $requiredByIngredient = $this->requiredFromSnapshot($item);
@@ -194,8 +189,8 @@ class ConsumptionReportService
                 $ingredients[$ingredientId] = [
                     'name'     => (string) ($meta->name ?? 'Nguyên liệu #'.$ingredientId),
                     'unit'     => (string) ($meta->unit ?? ''),
-                    'required' => (float) ($requiredByIngredient[$ingredientId] ?? 0),
-                    'deducted' => (float) ($deductedByIngredient[$ingredientId] ?? 0),
+                    'required' => (int) ($requiredByIngredient[$ingredientId] ?? 0),
+                    'deducted' => (int) ($deductedByIngredient[$ingredientId] ?? 0),
                 ];
             }
 
@@ -221,7 +216,7 @@ class ConsumptionReportService
         foreach ($snapshot as $line) {
             if (empty($line['ingredient_id'])) continue;
             $id = (int) $line['ingredient_id'];
-            $required[$id] = ($required[$id] ?? 0) + (float) ($line['quantity'] ?? 0);
+            $required[$id] = ($required[$id] ?? 0) + (int) ceil((float) ($line['quantity'] ?? 0));
         }
         return $required;
     }

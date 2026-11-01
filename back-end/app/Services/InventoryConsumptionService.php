@@ -49,15 +49,15 @@ class InventoryConsumptionService
         foreach ($required as $ingredientId => $need) {
             $ingredient = Ingredient::find($ingredientId);
             if (!$ingredient) continue;
-            $available = (float) $ingredient->quantity_in_stock;
-            if ($available + 0.0001 < $need) {
+            $available = (int) $ingredient->quantity_in_stock;
+            if ($available < $need) {
                 $shortages[] = [
                     'ingredient_id' => (int) $ingredientId,
                     'ingredient'    => (string) $ingredient->name,
                     'unit'          => (string) $ingredient->unit,
-                    'required'      => round($need, 3),
-                    'available'     => round($available, 3),
-                    'shortage'      => round($need - $available, 3),
+                    'required'      => $need,
+                    'available'     => $available,
+                    'shortage'      => $need - $available,
                 ];
             }
         }
@@ -106,15 +106,15 @@ class InventoryConsumptionService
             foreach ($required as $ingredientId => $need) {
                 $ingredient = $ingredients->get($ingredientId);
                 if (!$ingredient) continue;
-                $available = (float) $ingredient->quantity_in_stock;
-                if ($available + 0.0001 < $need) {
+                $available = (int) $ingredient->quantity_in_stock;
+                if ($available < $need) {
                     $shortages[] = [
                         'ingredient_id' => (int) $ingredientId,
                         'ingredient'    => (string) $ingredient->name,
                         'unit'          => (string) $ingredient->unit,
-                        'required'      => round($need, 3),
-                        'available'     => round($available, 3),
-                        'shortage'      => round($need - $available, 3),
+                        'required'      => $need,
+                        'available'     => $available,
+                        'shortage'      => $need - $available,
                     ];
                 }
             }
@@ -129,7 +129,7 @@ class InventoryConsumptionService
                 if (!$ingredient) continue;
 
                 // Clamp: trừ tối đa tới 0 — tồn không bao giờ âm.
-                $deducted = min($need, (float) $ingredient->quantity_in_stock);
+                $deducted = min($need, (int) $ingredient->quantity_in_stock);
                 if ($deducted <= 0) continue;
 
                 $this->inventory->decreaseStock([
@@ -183,14 +183,14 @@ class InventoryConsumptionService
             foreach ($transactions as $tx) {
                 $ingredient = Ingredient::lockForUpdate()->find($tx->ingredient_id);
                 if (!$ingredient) continue;
-                $qty = abs((float) $tx->quantity);
+                $qty = abs((int) $tx->quantity);
                 if ($qty <= 0) continue;
 
                 // Hoàn kho qua cổng ADJUSTMENT, không phải increaseStock (IMPORT):
                 // increaseStock sẽ ghi type=IMPORT và ghi đè import_price/import_date
                 // của nguyên liệu — sai về nghiệp vụ khi chỉ hoàn lại lượng đã lấy.
-                $before = (float) $ingredient->quantity_in_stock;
-                $after = round($before + $qty, 2);
+                $before = (int) $ingredient->quantity_in_stock;
+                $after = $before + $qty;
 
                 $this->inventory->adjustStock([
                     'ingredient_id'   => $ingredient->id,
@@ -273,7 +273,7 @@ class InventoryConsumptionService
                     }
                     $id = (int) $line->ingredient_id;
                     $required[$id] = ($required[$id] ?? 0)
-                        + (float) $line->quantity_required * (float) $line->waste_factor * $part['multiplier'];
+                        + (int) ceil((int) $line->quantity_required * (float) $line->waste_factor * $part['multiplier']);
                 }
             }
 
@@ -283,16 +283,16 @@ class InventoryConsumptionService
 
             $shortages = [];
             foreach ($required as $ingredientId => $need) {
-                $available = (float) ($stock[$ingredientId] ?? 0);
-                if ($available + 0.0001 >= $need) continue;
+                $available = (int) ($stock[$ingredientId] ?? 0);
+                if ($available >= $need) continue;
                 $line = collect($recipes->flatten(1))->firstWhere('ingredient_id', $ingredientId);
                 $shortages[] = [
                     'ingredient_id' => (int) $ingredientId,
                     'ingredient'    => (string) ($line->name ?? 'Nguyên liệu #'.$ingredientId),
                     'unit'          => (string) ($line->unit ?? ''),
-                    'required'      => round($need, 3),
-                    'available'     => round($available, 3),
-                    'shortage'      => round($need - $available, 3),
+                    'required'      => $need,
+                    'available'     => $available,
+                    'shortage'      => $need - $available,
                 ];
             }
             if ($shortages !== []) {
@@ -351,7 +351,7 @@ class InventoryConsumptionService
      *  1. recipe_snapshot (đã chụp lúc bếp bắt đầu nấu) — nguồn chính xác nhất.
      *  2. Công thức hiện tại trong menu_item_ingredient — fallback khi chưa chụp snapshot.
      *
-     * @return array<int, float>|null  null = không xác định được (thiếu công thức / lệch đơn vị)
+     * @return array<int, int>|null  null = không xác định được (thiếu công thức / lệch đơn vị)
      */
     private function requiredQuantity(OrderItem $item): ?array
     {
@@ -362,7 +362,7 @@ class InventoryConsumptionService
                 if (empty($line['ingredient_id'])) continue;
                 if (($line['comparable'] ?? true) === false) return null; // lệch đơn vị → không so được
                 $id = (int) $line['ingredient_id'];
-                $required[$id] = ($required[$id] ?? 0) + (float) $line['quantity'];
+                $required[$id] = ($required[$id] ?? 0) + (int) ceil((float) $line['quantity']);
             }
             return $required === [] ? null : $required;
         }
@@ -390,7 +390,7 @@ class InventoryConsumptionService
                 if ($row->unit_override !== null && $row->unit_override !== $row->unit) return null;
                 $id = (int) $row->ingredient_id;
                 $required[$id] = ($required[$id] ?? 0)
-                    + (float) $row->quantity_required * (float) $row->waste_factor * $part['multiplier'];
+                    + (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']);
             }
         }
 
@@ -432,7 +432,7 @@ class InventoryConsumptionService
     private function notifyManagers(StockRequest $request, array $shortages, User $actor): void
     {
         $summary = collect($shortages)
-            ->map(fn ($s) => sprintf('%s thiếu %s %s', $s['ingredient'], number_format($s['shortage'], 2, ',', '.'), $s['unit']))
+            ->map(fn ($s) => sprintf('%s thiếu %s %s', $s['ingredient'], number_format($s['shortage'], 0, ',', '.'), $s['unit']))
             ->implode('; ');
 
         $this->sendManagerNotification(

@@ -36,12 +36,12 @@ class RecipeService
                 'ingredient_name'    => $ing?->name,
                 'ingredient_unit'    => $ing?->unit,
                 'ingredient_active'  => $ing ? (bool) $ing->is_active : false,
-                'ingredient_in_stock'=> $ing ? (float) $ing->quantity_in_stock : 0,
-                'quantity_required'  => (float) $r->quantity_required,
+                'ingredient_in_stock'=> $ing ? (int) $ing->quantity_in_stock : 0,
+                'quantity_required'  => (int) $r->quantity_required,
                 'waste_factor'       => (float) $r->waste_factor,
                 'unit_override'      => $r->unit_override,
                 'availability_required' => (bool) $r->availability_required,
-                'effective_quantity' => round((float) $r->quantity_required * (float) $r->waste_factor, 3),
+                'effective_quantity' => (int) ceil((int) $r->quantity_required * (float) $r->waste_factor),
                 'display_unit'       => (string) ($r->unit_override ?: ($ing?->unit ?? '')),
                 'line_cost'          => $ing ? round((float) $r->quantity_required * (float) $ing->import_price, 2) : 0,
             ];
@@ -89,7 +89,7 @@ class RecipeService
                 $rows[] = [
                     'menu_item_id'      => $menuItemId,
                     'ingredient_id'     => (int) $line['ingredient_id'],
-                    'quantity_required' => (float) $line['quantity_required'],
+                    'quantity_required' => (int) $line['quantity_required'],
                     'waste_factor'      => (float) ($line['waste_factor'] ?? 1.000),
                     'unit_override'     => isset($line['unit_override']) && $line['unit_override'] !== ''
                         ? (string) $line['unit_override']

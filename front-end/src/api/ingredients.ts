@@ -109,7 +109,7 @@ export interface RecipeResponse {
 
 /** Unit options enforced by backend. Keep in sync with UpsertIngredientRequest. */
 export const ALLOWED_UNITS = [
-    'kg', 'g', 'mg', 'l', 'ml', 'chai', 'lon', 'gói', 'hộp', 'quả', 'cái', 'cục', 'cây', 'phần',
+    'gram', 'ml', 'chai', 'lon', 'gói', 'hộp', 'quả', 'cái', 'cục', 'cây', 'phần',
 ] as const
 export type IngredientUnit = typeof ALLOWED_UNITS[number]
 
@@ -125,7 +125,11 @@ export const ingredientsApi = {
     } = {}): Promise<IngredientListResponse> {
         const res = await apiClient.get<{ success: boolean; data: Ingredient[]; meta: IngredientListResponse['meta'] }>(
             '/staff/manager/ingredients',
-            { params },
+            { params: {
+                ...params,
+                is_active: params.is_active === undefined ? undefined : Number(params.is_active),
+                low_stock: params.low_stock === undefined ? undefined : Number(params.low_stock),
+            } },
         )
         return { data: res.data.data, meta: res.data.meta }
     },

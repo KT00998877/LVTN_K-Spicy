@@ -19,9 +19,9 @@ class StocktakeItem extends Model
     protected function casts(): array
     {
         return [
-            'system_qty'       => 'decimal:2',
-            'actual_qty'       => 'decimal:2',
-            'difference_qty'   => 'decimal:2',
+            'system_qty'       => 'integer',
+            'actual_qty'       => 'integer',
+            'difference_qty'   => 'integer',
             'unit_cost'        => 'decimal:2',
             'difference_value' => 'decimal:2',
         ];

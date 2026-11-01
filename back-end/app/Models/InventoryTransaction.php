@@ -26,10 +26,10 @@ class InventoryTransaction extends Model
     protected function casts(): array
     {
         return [
-            'quantity'      => 'decimal:2',
+            'quantity'      => 'integer',
             'unit_price'    => 'decimal:2',
-            'stock_before'  => 'decimal:2',
-            'stock_after'   => 'decimal:2',
+            'stock_before'  => 'integer',
+            'stock_after'   => 'integer',
             'transacted_at' => 'datetime',
         ];
     }

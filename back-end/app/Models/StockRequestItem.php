@@ -26,9 +26,9 @@ class StockRequestItem extends Model
     protected function casts(): array
     {
         return [
-            'required_qty'  => 'decimal:3',
-            'available_qty' => 'decimal:3',
-            'shortage_qty'  => 'decimal:3',
+            'required_qty'  => 'integer',
+            'available_qty' => 'integer',
+            'shortage_qty'  => 'integer',
         ];
     }
 

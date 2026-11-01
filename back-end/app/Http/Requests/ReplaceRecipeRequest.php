@@ -38,7 +38,7 @@ class ReplaceRecipeRequest extends FormRequest
         return [
             'lines' => ['bail', 'required', 'array', 'min:1', 'max:50'],
             'lines.*.ingredient_id' => ['bail', 'required', 'integer', 'exists:ingredients,id'],
-            'lines.*.quantity_required' => ['bail', 'required', 'numeric', 'min:0.001', 'max:99999.999'],
+            'lines.*.quantity_required' => ['bail', 'required', 'integer', 'min:1', 'max:9999999999'],
             'lines.*.waste_factor' => ['bail', 'required', 'numeric', 'min:1', 'max:9.999'],
             'lines.*.unit_override' => ['nullable', 'string', 'max:20'],
             'lines.*.availability_required' => ['sometimes', 'boolean'],

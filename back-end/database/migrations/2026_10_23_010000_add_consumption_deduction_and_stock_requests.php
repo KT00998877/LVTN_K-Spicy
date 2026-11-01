@@ -60,9 +60,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('stock_request_id')->constrained('stock_requests')->cascadeOnDelete();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
-            $table->decimal('required_qty', 12, 3)->comment('Lượng cần cho món này');
-            $table->decimal('available_qty', 12, 3)->comment('Tồn còn lại lúc bếp phát hiện');
-            $table->decimal('shortage_qty', 12, 3)->comment('Phần thiếu = required - available');
+            $table->unsignedBigInteger('required_qty')->comment('Lượng cần cho món này');
+            $table->unsignedBigInteger('available_qty')->comment('Tồn còn lại lúc bếp phát hiện');
+            $table->unsignedBigInteger('shortage_qty')->comment('Phần thiếu = required - available');
             $table->string('unit', 20);
             $table->timestamps();
             $table->unique(['stock_request_id', 'ingredient_id'], 'stock_request_ingredient_unique');
@@ -70,7 +70,7 @@ return new class extends Migration
 
         Schema::table('daily_stock_sheet_items', function (Blueprint $table) {
             if (!Schema::hasColumn('daily_stock_sheet_items', 'consumption_qty')) {
-                $table->decimal('consumption_qty', 12, 2)->default(0)->after('outgoing_qty')
+                $table->unsignedBigInteger('consumption_qty')->default(0)->after('outgoing_qty')
                     ->comment('Lượng trừ do món bán trong kỳ (tách khỏi xuất/hủy thủ công)');
             }
         });

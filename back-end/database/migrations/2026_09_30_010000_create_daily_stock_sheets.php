@@ -26,12 +26,12 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('daily_stock_sheet_id')->constrained('daily_stock_sheets')->cascadeOnDelete();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
-            $table->decimal('opening_qty', 12, 2)->nullable();
-            $table->decimal('incoming_qty', 12, 2)->default(0);
-            $table->decimal('outgoing_qty', 12, 2)->default(0);
-            $table->decimal('correction_qty', 12, 2)->default(0);
-            $table->decimal('counted_qty', 12, 2)->nullable();
-            $table->decimal('used_qty', 12, 2)->nullable();
+            $table->unsignedBigInteger('opening_qty')->nullable();
+            $table->unsignedBigInteger('incoming_qty')->default(0);
+            $table->unsignedBigInteger('outgoing_qty')->default(0);
+            $table->bigInteger('correction_qty')->default(0);
+            $table->unsignedBigInteger('counted_qty')->nullable();
+            $table->bigInteger('used_qty')->nullable();
             $table->foreignId('inventory_transaction_id')->nullable()->constrained('inventory_transactions')->nullOnDelete();
             $table->timestamps();
             $table->unique(['daily_stock_sheet_id', 'ingredient_id'], 'daily_sheet_ingredient_unique');

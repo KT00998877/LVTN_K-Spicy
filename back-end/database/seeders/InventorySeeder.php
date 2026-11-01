@@ -19,27 +19,28 @@ class InventorySeeder extends Seeder
             ]);
             $categoryMap[$name] = DB::table('ingredient_categories')->where('name', $name)->value('id');
         }
-        $suppliers = [
-            ['name' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food', 'contact_name' => 'Lee Min Ho',   'phone' => '0901111111', 'email' => 'sales@kfood.vn'],
-            ['name' => 'Chợ đầu mối Bình Điền',                  'contact_name' => 'Trần Thị B',   'phone' => '0912222222', 'email' => 'binhdien@example.com'],
-            ['name' => 'Công ty CP Rau sạch Đà Lạt',             'contact_name' => 'Nguyễn Văn D', 'phone' => '0923333333', 'email' => 'info@raudalat.vn'],
-            ['name' => 'Công ty TNHH Đồ uống Sài Gòn',           'contact_name' => 'Phạm Văn E',   'phone' => '0934444444', 'email' => 'order@douongsg.vn'],
-        ];
+        DB::table('suppliers')->updateOrInsert(['code' => 'SUPPLIER_K'], [
+            'name' => 'Nhà cung cấp K',
+            'contact_name' => 'Đại diện Nhà cung cấp K',
+            'phone' => '0901111111',
+            'email' => 'supplier.k@micay.local',
+            'address' => null,
+            'is_active' => true,
+            'updated_at' => now(),
+        ]);
+        DB::table('suppliers')->where('code', '!=', 'SUPPLIER_K')->update([
+            'is_active' => false,
+            'updated_at' => now(),
+        ]);
+        $supplierId = (int) DB::table('suppliers')->where('code', 'SUPPLIER_K')->value('id');
 
-        $supplierIds = [];
-        foreach ($suppliers as $s) {
-            $existing = DB::table('suppliers')->where('name', $s['name'])->first();
-            if ($existing) {
-                $supplierIds[$s['name']] = $existing->id;
-                continue;
-            }
-            $supplierIds[$s['name']] = DB::table('suppliers')->insertGetId($s + [
-                'address' => null,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
+        $scaledIngredientCodes = [
+            'NL003', 'NL004', 'NL006', 'NL010', 'NL011', 'NL012', 'NL013', 'NL014',
+            'NL016', 'NL017', 'NL019', 'NL026', 'NL027', 'NL028', 'NL029', 'NL034',
+            'NL035', 'NL036', 'NL037', 'NL038', 'NL039', 'NL040', 'NL041',
+            'NL008', 'NL009', 'NL018', 'NL024', 'NL025', 'NL030', 'NL031', 'NL032',
+        ];
+        $volumeIngredientCodes = ['NL024', 'NL031', 'NL032'];
 
         $ingredients = [
             // Mì và gạo
@@ -109,6 +110,17 @@ class InventorySeeder extends Seeder
             ['code' => 'NL047', 'name' => 'Soju vị đào',               'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL048', 'name' => 'Soju vị dâu',               'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL049', 'name' => 'Soju vị việt quất',         'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            // Nguyên liệu tráng miệng: lưu trực tiếp theo gram/ml.
+            ['code' => 'NL050', 'name' => 'Dâu tây tươi',              'unit' => 'gram', 'quantity_in_stock' => 5000, 'min_stock_level' => 1000, 'import_price' => 0.12],
+            ['code' => 'NL051', 'name' => 'Đậu đỏ ngọt',               'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.08],
+            ['code' => 'NL052', 'name' => 'Sữa đặc',                   'unit' => 'ml',   'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.07],
+            ['code' => 'NL053', 'name' => 'Đường nâu',                 'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.04],
+            ['code' => 'NL054', 'name' => 'Bột quế',                   'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.20],
+            ['code' => 'NL055', 'name' => 'Men nở',                    'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.10],
+            ['code' => 'NL056', 'name' => 'Dầu ăn',                    'unit' => 'ml',   'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.05],
+            ['code' => 'NL057', 'name' => 'Óc chó',                    'unit' => 'gram', 'quantity_in_stock' => 1000, 'min_stock_level' => 200, 'import_price' => 0.30],
+            ['code' => 'NL058', 'name' => 'Xoài tươi',                 'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.05],
+            ['code' => 'NL059', 'name' => 'Bánh gạo ngọt',             'unit' => 'gram', 'quantity_in_stock' => 1500, 'min_stock_level' => 300, 'import_price' => 0.12],
         ];
 
         $ingredientIds = [];
@@ -121,13 +133,21 @@ class InventorySeeder extends Seeder
             $ingredientIds[$i['code']] = DB::table('ingredients')->insertGetId([
                 'code' => $i['code'],
                 'name' => $i['name'],
-                'unit' => $i['unit'],
-                'quantity_in_stock' => $i['quantity_in_stock'],
-                'min_stock_level' => $i['min_stock_level'],
-                'import_price' => $i['import_price'],
+                'unit' => in_array($i['code'], $scaledIngredientCodes, true)
+                    ? (in_array($i['code'], $volumeIngredientCodes, true) ? 'ml' : 'gram')
+                    : $i['unit'],
+                'quantity_in_stock' => in_array($i['code'], $scaledIngredientCodes, true)
+                    ? (int) round($i['quantity_in_stock'] * 1000)
+                    : (int) $i['quantity_in_stock'],
+                'min_stock_level' => in_array($i['code'], $scaledIngredientCodes, true)
+                    ? (int) round($i['min_stock_level'] * 1000)
+                    : (int) $i['min_stock_level'],
+                'import_price' => in_array($i['code'], $scaledIngredientCodes, true)
+                    ? round($i['import_price'] / 1000, 2)
+                    : $i['import_price'],
                 'import_date' => now()->toDateString(),
                 'expiry_date' => now()->addMonths(3)->toDateString(),
-                'supplier_id' => $supplierIds[$i['supplier']] ?? null,
+                'supplier_id' => $supplierId,
                 'ingredient_category_id' => $categoryMap[$this->categoryFor($i['code'])],
                 'is_active' => true,
                 'created_at' => now(),
@@ -137,6 +157,9 @@ class InventorySeeder extends Seeder
 
         // Map code -> id helper
         $id = fn (string $code) => $ingredientIds[$code] ?? null;
+        $stockQuantity = static fn (string $code, float|int $quantity): int => in_array($code, $scaledIngredientCodes, true)
+            ? (int) round($quantity * 1000)
+            : (int) round($quantity);
         /** Theo plan mục 4: NL trọng yếu để tự báo hết món (mì, thịt/hải sản, chả/viên, bánh gạo, phô mai, đồ uống đóng chai/lon).
          *  Rau/gia vị có lượng linh hoạt KHÔNG tự làm món hết. */
         $criticalCodes = [
@@ -157,6 +180,7 @@ class InventorySeeder extends Seeder
             'NL040', // Bạch tuộc viên thành phẩm
             'NL041', // Bò viên thành phẩm
             'NL042', // Mandu thành phẩm
+            'NL050', 'NL051', 'NL057', 'NL058', 'NL059', // Nguyên liệu chính của món tráng miệng
             // Đồ uống đóng chai/lon (bị thiếu thì món "Hết đồ uống" hợp lý).
             'NL020', 'NL021', 'NL022', 'NL023', 'NL024',
             'NL043', 'NL044', 'NL025', 'NL045',
@@ -169,7 +193,7 @@ class InventorySeeder extends Seeder
             ['code' => 'NL007', 'unit' => 'bịch', 'conversion' => 5],
         ] as $package) {
             DB::table('ingredient_packagings')->updateOrInsert([
-                'ingredient_id' => $id($package['code']), 'supplier_id' => null,
+                'ingredient_id' => $id($package['code']), 'supplier_id' => $supplierId,
                 'purchase_unit' => $package['unit'],
             ], [
                 'conversion_quantity' => $package['conversion'],
@@ -221,13 +245,13 @@ class InventorySeeder extends Seeder
 
                 $ingredients = [];
                 foreach ($baseCommonSmall as $code => $qty) {
-                    $ingredients[$code] = round($qty * $multiplier, 3);
+                    $ingredients[$code] = $stockQuantity($code, $qty * $multiplier);
                 }
                 foreach ($proteinMap as $code => $qty) {
-                    $ingredients[$code] = round($qty * $multiplier, 3);
+                    $ingredients[$code] = $stockQuantity($code, $qty * $multiplier);
                 }
                 foreach ($countableRecipes[$proteinSlug][$sizeLabel] ?? [] as $code => $qty) {
-                    $ingredients[$code] = $qty;
+                    $ingredients[$code] = $stockQuantity($code, $qty);
                 }
 
                 foreach ($ingredients as $code => $qty) {
@@ -272,7 +296,9 @@ class InventorySeeder extends Seeder
             'bap-xao-pho-mai-han-quoc' => [$id('NL029') => 0.30, $id('NL016') => 0.05],
 
             // Tráng miệng
-            'patbingsu-da-bao-han-quoc' => [$id('NL034') => 0.40, $id('NL024') => 0.20, $id('NL031') => 0.03],
+            'bingsu-sua-dau' => [$id('NL034') => 0.30, $id('NL024') => 0.15, $id('NL050') => 80, $id('NL031') => 0.025],
+            'hotteok-banh-kep-ngot' => [$id('NL019') => 0.08, $id('NL053') => 25, $id('NL054') => 2, $id('NL055') => 2, $id('NL056') => 10, $id('NL057') => 15],
+            'patbingsu-dau-do' => [$id('NL034') => 0.30, $id('NL024') => 0.10, $id('NL051') => 100, $id('NL052') => 30, $id('NL058') => 30, $id('NL059') => 30],
 
             // Đồ uống
             'tra-sua-tran-chau'        => [$id('NL024') => 0.5, $id('NL025') => 0.01, $id('NL026') => 0.05],
@@ -305,7 +331,7 @@ class InventorySeeder extends Seeder
                 DB::table('menu_item_ingredient')->insertOrIgnore([
                     'menu_item_id'        => $menuItem->id,
                     'ingredient_id'       => $ingredientId,
-                    'quantity_required'   => $qty,
+                    'quantity_required'   => $stockQuantity((string) $code, $qty),
                     'waste_factor'        => 1.000,
                     'availability_required' => $code !== false && $isCritical($code),
                     'created_at'          => now(),
@@ -319,12 +345,12 @@ class InventorySeeder extends Seeder
     {
         $number = (int) substr($code, 2);
         return match (true) {
-            in_array($number, [1, 2, 17, 18, 19, 35], true) => 'Mì và tinh bột',
+            in_array($number, [1, 2, 17, 18, 19, 35, 59], true) => 'Mì và tinh bột',
             in_array($number, [3, 4], true) => 'Thịt tươi',
             in_array($number, [6, 27, 28], true) => 'Hải sản tươi',
             in_array($number, [5, 7, 15, 37, 38, 39, 40, 41, 42], true) => 'Hàng chế biến sẵn',
-            in_array($number, [12, 13, 14, 29, 36], true) => 'Rau củ',
-            in_array($number, [8, 9, 10, 11, 16], true) => 'Sốt và gia vị',
+            in_array($number, [12, 13, 14, 29, 36, 50, 58], true) => 'Rau củ',
+            in_array($number, [8, 9, 10, 11, 16, 53, 54, 55, 56, 57], true) => 'Sốt và gia vị',
             in_array($number, [20, 21, 22, 23, 43, 44, 46, 47, 48, 49], true) => 'Đồ uống',
             default => 'Nguyên liệu pha chế',
         };

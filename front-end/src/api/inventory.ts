@@ -104,7 +104,7 @@ export const inventoryAlerts = {
     /** GET /api/staff/manager/ingredients — lấy từ ManagerIngredients (Phase 2). */
     async list(): Promise<IngredientAlert[]> {
         const res = await apiClient.get<IngredientListResponse>('/staff/manager/ingredients', {
-            params: { per_page: 100, is_active: true },
+            params: { per_page: 100, is_active: 1 },
         })
         const list = (res.data.data || []).filter((i) => i.is_active)
         const today = new Date()

@@ -30,7 +30,7 @@ class ExpectedUsageService
             foreach ($recipe as $row) {
                 $lines[] = [
                     'ingredient_id' => (int) $row->ingredient_id,
-                    'quantity' => round((float) $row->quantity_required * (float) $row->waste_factor * $part['multiplier'], 3),
+                    'quantity' => (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']),
                     'unit' => $row->unit,
                     'comparable' => $row->unit !== null && ($row->unit_override === null || $row->unit_override === $row->unit),
                 ];
@@ -75,12 +75,12 @@ class ExpectedUsageService
                 if (empty($line['ingredient_id'])) continue;
                 $id = (int) $line['ingredient_id'];
                 $result[$id] ??= ['quantity' => 0, 'uncomparable_items' => 0];
-                if ($line['comparable'] ?? true) $result[$id]['quantity'] += (float) $line['quantity'];
+                if ($line['comparable'] ?? true) $result[$id]['quantity'] += (int) $line['quantity'];
                 else $result[$id]['uncomparable_items']++;
             }
             if ($hasMissingRecipe) $missing++;
         }
-        foreach ($result as &$row) $row['quantity'] = round($row['quantity'], 3);
+        foreach ($result as &$row) $row['quantity'] = (int) $row['quantity'];
 
         // Món đã bắt đầu nấu nhưng không có ảnh chụp công thức → không biết đã trừ bao nhiêu.
         $legacyQuery = OrderItem::whereNull('recipe_captured_at')->where('started_at', '>', $since)
@@ -113,12 +113,12 @@ class ExpectedUsageService
                 if (!empty($line['missing_recipe'])) { $hasMissingRecipe = true; continue; }
                 $id = (int) $line['ingredient_id'];
                 $result[$id] ??= ['quantity' => 0, 'uncomparable_items' => 0];
-                if ($line['comparable']) $result[$id]['quantity'] += (float) $line['quantity'];
+                if ($line['comparable']) $result[$id]['quantity'] += (int) $line['quantity'];
                 else $result[$id]['uncomparable_items']++;
             }
             if ($hasMissingRecipe) $missing++;
         }
-        foreach ($result as &$row) $row['quantity'] = round($row['quantity'], 3);
+        foreach ($result as &$row) $row['quantity'] = (int) $row['quantity'];
         $legacyQuery = OrderItem::whereNull('recipe_captured_at')->where('started_at', '>', $since)
             ->where('started_at', '<=', $until);
         if ($lock) $legacyQuery->lockForUpdate();

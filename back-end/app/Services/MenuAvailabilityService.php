@@ -20,7 +20,7 @@ class MenuAvailabilityService
             return ['is_available' => true, 'reason' => 'insufficient_data'];
         }
         foreach ($required as $ingredientId => $amount) {
-            if (($this->balance[$ingredientId] ?? -1) + 0.0001 < $amount) {
+            if (($this->balance[$ingredientId] ?? -1) < $amount) {
                 return ['is_available' => false, 'reason' => 'ingredient'];
             }
         }
@@ -50,7 +50,7 @@ class MenuAvailabilityService
         }
         if (!$requiredTotal || !$this->loadBalance($excludeOrderItemId)) return;
         foreach ($requiredTotal as $ingredientId => $amount) {
-            if (($this->balance[$ingredientId] ?? -1) + 0.0001 < $amount) {
+            if (($this->balance[$ingredientId] ?? -1) < $amount) {
                 throw ValidationException::withMessages(['cart' => 'Không đủ nguyên liệu cho số phần đã chọn. Vui lòng cập nhật giỏ hàng.']);
             }
         }
@@ -67,7 +67,7 @@ class MenuAvailabilityService
         $required = [];
         foreach ($rows as $row) {
             if (!$row->is_active || ($row->unit_override !== null && $row->unit_override !== $row->unit)) return null;
-            $required[(int) $row->ingredient_id] = (float) $row->quantity_required * (float) $row->waste_factor * $quantity;
+            $required[(int) $row->ingredient_id] = (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $quantity);
         }
         return $required;
     }
@@ -88,8 +88,8 @@ class MenuAvailabilityService
         if ($used['missing_recipe_items'] > 0 || $used['legacy_items'] > 0
             || collect($used['by_ingredient'])->contains(fn ($row) => $row['uncomparable_items'] > 0)) return false;
         foreach ($ingredients as $ingredient) {
-            $this->balance[(int) $ingredient->id] = (float) $ingredient->quantity_in_stock
-                - (float) ($used['by_ingredient'][$ingredient->id]['quantity'] ?? 0);
+            $this->balance[(int) $ingredient->id] = (int) $ingredient->quantity_in_stock
+                - (int) ($used['by_ingredient'][$ingredient->id]['quantity'] ?? 0);
         }
         $reserved = $this->pendingUsage($excludeOrderItemId);
         if ($reserved === null) return false;
@@ -131,7 +131,7 @@ class MenuAvailabilityService
                     if ($line->unit_override !== null && $line->unit_override !== $line->unit) return null;
                     $ingredientId = (int) $line->ingredient_id;
                     $reserved[$ingredientId] = ($reserved[$ingredientId] ?? 0)
-                        + (float) $line->quantity_required * (float) $line->waste_factor * $quantity;
+                        + (int) ceil((int) $line->quantity_required * (float) $line->waste_factor * $quantity);
                 }
             }
         }

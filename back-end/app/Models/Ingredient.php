@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string          $code
  * @property string          $name
  * @property string          $unit                 // kg, g, l, ml, gói, chai, lon, hộp, cái, quả
- * @property float           $quantity_in_stock
- * @property float           $min_stock_level
+ * @property int             $quantity_in_stock
+ * @property int             $min_stock_level
  * @property float           $import_price
  * @property \Carbon\Carbon|null $import_date
  * @property \Carbon\Carbon|null $expiry_date
@@ -49,8 +49,8 @@ class Ingredient extends Model
     protected function casts(): array
     {
         return [
-            'quantity_in_stock' => 'decimal:2',
-            'min_stock_level'   => 'decimal:2',
+            'quantity_in_stock' => 'integer',
+            'min_stock_level'   => 'integer',
             'import_price'      => 'decimal:2',
             'import_date'       => 'date',
             'expiry_date'       => 'date',

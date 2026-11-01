@@ -105,6 +105,20 @@ class InventoryConsumptionTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('order_cancellation_requests', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('order_id')->unique();
+            $table->foreignId('requested_by');
+            $table->string('reason', 500);
+            $table->string('status')->default('PENDING');
+            $table->timestamp('requested_at')->useCurrent();
+            $table->foreignId('approved_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->foreignId('refunded_by')->nullable();
+            $table->timestamp('refunded_at')->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('order_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id');
@@ -245,9 +259,9 @@ class InventoryConsumptionTest extends TestCase
 
         $this->assertFalse($result['deducted']);
         $this->assertCount(1, $result['shortages']);
-        $this->assertSame(50.0, $result['shortages'][0]['required']);
-        $this->assertSame(30.0, $result['shortages'][0]['available']);
-        $this->assertSame(20.0, $result['shortages'][0]['shortage']);
+        $this->assertSame(50, $result['shortages'][0]['required']);
+        $this->assertSame(30, $result['shortages'][0]['available']);
+        $this->assertSame(20, $result['shortages'][0]['shortage']);
         // Chưa đồng ý nấu tiếp → KHÔNG đụng tồn kho.
         $this->assertSame(30.0, (float) Ingredient::find($noodles->id)->quantity_in_stock);
     }
@@ -462,8 +476,8 @@ class InventoryConsumptionTest extends TestCase
         $this->assertCount(1, $report);
         $this->assertSame($menu->name, $report[0]['menu_item_name']);
         $this->assertSame(2, $report[0]['total_quantity']);
-        $this->assertSame(100.0, $report[0]['ingredients'][0]['quantity_required']);
-        $this->assertSame(100.0, $report[0]['ingredients'][0]['quantity_deducted']);
+        $this->assertSame(100, $report[0]['ingredients'][0]['quantity_required']);
+        $this->assertSame(100, $report[0]['ingredients'][0]['quantity_deducted']);
     }
 
     public function test_bao_cao_tieu_hao_theo_nguyen_lieu_co_ton_hien_tai(): void
@@ -477,8 +491,8 @@ class InventoryConsumptionTest extends TestCase
             ->byIngredient(now()->toDateString(), now()->toDateString());
 
         $this->assertCount(1, $report);
-        $this->assertSame(400.0, $report[0]['current_stock']);
-        $this->assertSame(100.0, $report[0]['consumed_qty']);
+        $this->assertSame(400, $report[0]['current_stock']);
+        $this->assertSame(100, $report[0]['consumed_qty']);
     }
 
     // ====== Helpers ======

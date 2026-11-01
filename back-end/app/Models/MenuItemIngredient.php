@@ -9,14 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * MenuItemIngredient — một dòng công thức (recipe) của 1 món ăn.
  *
  *  Quan hệ N-N giữa menu_items và ingredients qua bảng này.
- *  - quantity_required: lượng nguyên liệu cần cho 1 phần món (decimal 12,3 cho phép gram chính xác).
+ *  - quantity_required: lượng nguyên liệu nguyên theo đơn vị tồn kho nhỏ nhất.
  *  - waste_factor: hệ số hao hụt, mặc định 1.000. Lượng thực trừ kho = quantity_required * waste_factor.
  *  - unit_override: nếu không null thì công thức dùng đơn vị này thay vì đơn vị gốc.
  *
  * @property int    $id
  * @property int    $menu_item_id
  * @property int    $ingredient_id
- * @property float  $quantity_required
+ * @property int    $quantity_required
  * @property float  $waste_factor
  * @property string|null $unit_override
  */
@@ -38,7 +38,7 @@ class MenuItemIngredient extends Model
     protected function casts(): array
     {
         return [
-            'quantity_required' => 'decimal:3',
+            'quantity_required' => 'integer',
             'waste_factor'      => 'decimal:3',
             'availability_required' => 'boolean',
         ];
@@ -55,9 +55,9 @@ class MenuItemIngredient extends Model
     }
 
     /** Lượng thực tế tính theo waste_factor. */
-    public function getEffectiveQuantityAttribute(): float
+    public function getEffectiveQuantityAttribute(): int
     {
-        return (float) $this->quantity_required * (float) $this->waste_factor;
+        return (int) ceil((int) $this->quantity_required * (float) $this->waste_factor);
     }
 
     /** Đơn vị hiển thị (override hoặc của ingredient). */

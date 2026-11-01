@@ -26,7 +26,7 @@ return new class extends Migration
             $table->foreignId('ingredient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained()->nullOnDelete();
             $table->string('purchase_unit', 30);
-            $table->decimal('conversion_quantity', 12, 3);
+            $table->unsignedBigInteger('conversion_quantity');
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -36,9 +36,9 @@ return new class extends Migration
         Schema::table('stock_import_items', function (Blueprint $table) {
             $table->foreignId('ingredient_packaging_id')->nullable()->after('ingredient_id')
                 ->constrained('ingredient_packagings')->nullOnDelete();
-            $table->decimal('purchase_quantity', 12, 3)->nullable()->after('quantity');
+            $table->unsignedBigInteger('purchase_quantity')->nullable()->after('quantity');
             $table->string('purchase_unit', 30)->nullable()->after('purchase_quantity');
-            $table->decimal('conversion_quantity', 12, 3)->nullable()->after('purchase_unit');
+            $table->unsignedBigInteger('conversion_quantity')->nullable()->after('purchase_unit');
             $table->decimal('purchase_unit_price', 14, 2)->nullable()->after('unit_price');
         });
     }

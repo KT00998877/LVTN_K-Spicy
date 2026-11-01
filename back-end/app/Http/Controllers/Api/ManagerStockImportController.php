@@ -95,7 +95,7 @@ class ManagerStockImportController extends Controller
                     'stock_import_id'   => $header->id,
                     'ingredient_id'     => $ingredient->id,
                     'ingredient_packaging_id' => $it['ingredient_packaging_id'],
-                    'quantity'          => (float) $it['quantity'],
+                    'quantity'          => (int) $it['quantity'],
                     'purchase_quantity' => $it['purchase_quantity'],
                     'purchase_unit'     => $it['purchase_unit'],
                     'conversion_quantity' => $it['conversion_quantity'],
@@ -134,6 +134,11 @@ class ManagerStockImportController extends Controller
                     'status' => 'Chỉ phiếu DRAFT mới được chỉnh sửa.',
                 ]);
             }
+            if ($imp->purchase_order_id) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'Phiếu kiểm nhận liên kết phải được sửa từ yêu cầu nhập hàng.',
+                ]);
+            }
             $imp->update([
                 'supplier_id' => $data['supplier_id'] ?? null,
                 'supplier_document_code' => $data['supplier_document_code'] ?? null,
@@ -149,7 +154,7 @@ class ManagerStockImportController extends Controller
                     'stock_import_id'   => $imp->id,
                     'ingredient_id'     => $ingredient->id,
                     'ingredient_packaging_id' => $it['ingredient_packaging_id'],
-                    'quantity'          => (float) $it['quantity'],
+                    'quantity'          => (int) $it['quantity'],
                     'purchase_quantity' => $it['purchase_quantity'],
                     'purchase_unit'     => $it['purchase_unit'],
                     'conversion_quantity' => $it['conversion_quantity'],
@@ -197,6 +202,11 @@ class ManagerStockImportController extends Controller
                     'status' => 'Chỉ có thể huỷ phiếu DRAFT. Phiếu đã CONFIRMED cần quy trình hoàn kho riêng.',
                 ]);
             }
+            if ($imp->purchase_order_id) {
+                throw ValidationException::withMessages([
+                    'purchase_order_id' => 'Không thể hủy riêng phiếu kiểm nhận đang liên kết với yêu cầu nhập hàng.',
+                ]);
+            }
             $imp->update([
                 'status'             => StockImport::STATUS_CANCELLED,
                 'cancelled_by'       => $request->user()->id,
@@ -236,14 +246,14 @@ class ManagerStockImportController extends Controller
             if ($packaging->supplier_id && (int) $packaging->supplier_id !== (int) $supplierId) {
                 throw ValidationException::withMessages(['items' => 'Quy cách nhập không thuộc nhà cung cấp đã chọn.']);
             }
-            $purchaseQuantity = (float) ($enteredPurchaseQuantity ?? $item['quantity']);
+            $purchaseQuantity = (int) ($enteredPurchaseQuantity ?? $item['quantity']);
             $purchasePrice = (float) ($enteredPurchasePrice ?? $item['unit_price']);
-            $conversion = (float) $packaging->conversion_quantity;
+            $conversion = (int) $packaging->conversion_quantity;
             $item['purchase_quantity'] = $purchaseQuantity;
             $item['purchase_unit'] = $packaging->purchase_unit;
             $item['conversion_quantity'] = $conversion;
             $item['purchase_unit_price'] = $purchasePrice;
-            $item['quantity'] = round($purchaseQuantity * $conversion, 3);
+            $item['quantity'] = $purchaseQuantity * $conversion;
             $item['unit_price'] = round($purchasePrice / $conversion, 2);
             return $item;
         })->all();
@@ -254,6 +264,7 @@ class ManagerStockImportController extends Controller
         return [
             'id'                => (int) $imp->id,
             'code'              => $imp->code,
+            'purchase_order_id' => $imp->purchase_order_id ? (int) $imp->purchase_order_id : null,
             'supplier_id'       => $imp->supplier_id ? (int) $imp->supplier_id : null,
             'supplier_name'     => $imp->supplier?->name,
             'imported_by'       => $imp->imported_by ? (int) $imp->imported_by : null,
@@ -278,13 +289,17 @@ class ManagerStockImportController extends Controller
                 'ingredient_name'  => $it->ingredient?->name,
                 'ingredient_category_id' => $it->ingredient?->ingredient_category_id ? (int) $it->ingredient->ingredient_category_id : null,
                 'category_name'    => $it->ingredient?->category?->name,
-                'quantity'         => (float) $it->quantity,
-                'purchase_quantity'=> $it->purchase_quantity === null ? null : (float) $it->purchase_quantity,
+                'quantity'         => (int) $it->quantity,
+                'purchase_quantity'=> $it->purchase_quantity === null ? null : (int) $it->purchase_quantity,
                 'purchase_unit'    => $it->purchase_unit,
-                'conversion_quantity' => $it->conversion_quantity === null ? null : (float) $it->conversion_quantity,
+                'conversion_quantity' => $it->conversion_quantity === null ? null : (int) $it->conversion_quantity,
                 'unit'             => $it->unit,
                 'unit_price'       => (float) $it->unit_price,
                 'purchase_unit_price' => $it->purchase_unit_price === null ? null : (float) $it->purchase_unit_price,
+                'delivered_purchase_quantity' => $it->delivered_purchase_quantity === null ? null : (int) $it->delivered_purchase_quantity,
+                'accepted_purchase_quantity' => $it->accepted_purchase_quantity === null ? null : (int) $it->accepted_purchase_quantity,
+                'rejected_purchase_quantity' => $it->rejected_purchase_quantity === null ? null : (int) $it->rejected_purchase_quantity,
+                'rejection_reason' => $it->rejection_reason,
                 'subtotal'         => (float) $it->subtotal,
                 'expiry_date'      => $it->expiry_date?->toDateString(),
                 'supplier_lot_code'=> $it->supplier_lot_code,

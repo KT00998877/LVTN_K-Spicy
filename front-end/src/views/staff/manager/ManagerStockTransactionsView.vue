@@ -26,6 +26,10 @@
       <button class="manager-button" :disabled="loading" @click="reset">Đặt lại</button>
     </div>
 
+    <p v-if="filters.reference_type && filters.reference_id" class="manager-notice" role="status">
+      Đang lọc giao dịch của {{ filters.reference_type }}#{{ filters.reference_id }}. Chọn “Đặt lại” để xem toàn bộ lịch sử.
+    </p>
+
     <p v-if="error" class="manager-notice error" role="alert">{{ error }}</p>
     <p v-if="loading" class="manager-notice" role="status">Đang tải lịch sử…</p>
     <template v-else-if="!error">
@@ -83,6 +87,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '@/api/client'
 import { ingredientsApi } from '@/api/ingredients'
 
@@ -95,11 +100,16 @@ interface Transaction {
 interface IngredientRow { id: number; code: string; name: string }
 
 const rows = ref<Transaction[]>([])
+const route = useRoute()
 const ingredients = ref<IngredientRow[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filters = reactive({ ingredient_id: '' as number | '', type: '', from: '', to: '' })
+const filters = reactive({
+  ingredient_id: '' as number | '', type: '', from: '', to: '',
+  reference_type: typeof route.query.reference_type === 'string' ? route.query.reference_type : '',
+  reference_id: typeof route.query.reference_id === 'string' ? Number(route.query.reference_id) : 0,
+})
 const page = ref(1), lastPage = ref(1)
 
 const fmtNumber = (n: number | string | null) =>
@@ -123,6 +133,8 @@ async function refresh() {
     if (filters.type) params.type = filters.type
     if (filters.from) params.from = filters.from
     if (filters.to) params.to = filters.to
+    if (filters.reference_type) params.reference_type = filters.reference_type
+    if (filters.reference_id) params.reference_id = filters.reference_id
     const r = await api.get<{ data: Transaction[]; current_page: number; last_page: number }>(
       '/staff/dashboard/inventory-transactions', { params }
     )
@@ -137,7 +149,7 @@ async function refresh() {
 }
 
 function reset() {
-  filters.ingredient_id = ''; filters.type = ''; filters.from = ''; filters.to = ''
+  filters.ingredient_id = ''; filters.type = ''; filters.from = ''; filters.to = ''; filters.reference_type = ''; filters.reference_id = 0
   page.value = 1; void refresh()
 }
 function changePage(p: number) { page.value = p; void refresh() }

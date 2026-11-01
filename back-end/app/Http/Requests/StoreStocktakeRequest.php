@@ -17,7 +17,7 @@ class StoreStocktakeRequest extends FormRequest
 
             'items'                       => ['required', 'array', 'min:1', 'max:500'],
             'items.*.ingredient_id'       => ['required', 'integer', 'exists:ingredients,id'],
-            'items.*.actual_qty'          => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'items.*.actual_qty'          => ['required', 'integer', 'min:0', 'max:9999999999'],
             'items.*.reason'              => ['nullable', 'string', 'max:500'],
         ];
     }

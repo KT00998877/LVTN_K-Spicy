@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 30)->unique();
             $table->string('name', 150);
             $table->string('contact_name', 100)->nullable();
             $table->string('phone', 20)->nullable();
@@ -24,8 +25,8 @@ return new class extends Migration
             $table->string('code', 30)->unique();
             $table->string('name', 150);
             $table->string('unit', 20);
-            $table->decimal('quantity_in_stock', 12, 2)->default(0);
-            $table->decimal('min_stock_level', 12, 2)->default(0);
+            $table->unsignedBigInteger('quantity_in_stock')->default(0);
+            $table->unsignedBigInteger('min_stock_level')->default(0);
             $table->decimal('import_price', 12, 2)->default(0);
             $table->date('import_date')->nullable();
             $table->date('expiry_date')->nullable();
@@ -40,7 +41,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('menu_item_id')->constrained('menu_items')->cascadeOnDelete();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
-            $table->decimal('quantity_required', 12, 2);
+            $table->unsignedBigInteger('quantity_required');
             $table->timestamps();
             $table->unique(['menu_item_id', 'ingredient_id']);
         });
@@ -49,7 +50,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
             $table->enum('type', ['IMPORT', 'EXPORT', 'ADJUSTMENT', 'WASTE']);
-            $table->decimal('quantity', 12, 2);
+            $table->bigInteger('quantity');
             $table->decimal('unit_price', 12, 2)->default(0);
             $table->string('reference_type', 50)->nullable();
             $table->unsignedBigInteger('reference_id')->nullable();

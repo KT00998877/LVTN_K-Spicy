@@ -89,7 +89,7 @@ class InventoryDeductionService
         }
 
         // Bước 1: tính tổng lượng cần theo ingredient_id (gom các món dùng chung).
-        $required = [];   // [ingredient_id => total_qty_in_cents]
+        $required = [];   // [ingredient_id => total quantity in smallest stock unit]
         $recipesByIngredient = []; // [ingredient_id => ['unit' => ..., 'name' => ...]]
 
         foreach ($items as $item) {
@@ -111,11 +111,8 @@ class InventoryDeductionService
                     continue;
                 }
                 $key = (int) $ingredient->id;
-                $effectiveQty = ((float) $row->quantity_required) * ((float) $row->waste_factor);
-                // DB schema: quantity_required decimal(12,2); ingredient.quantity_in_stock decimal(12,2).
-                // Lưu theo cents (nhân 100) để cộng dồn chính xác.
-                $cents = (int) round($effectiveQty * 100) * (int) $item->quantity;
-                $required[$key] = ($required[$key] ?? 0) + $cents;
+                $effectiveQty = (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * (int) $item->quantity);
+                $required[$key] = ($required[$key] ?? 0) + $effectiveQty;
                 $recipesByIngredient[$key] = [
                     'name' => $ingredient->name,
                     'unit' => $row->unit_override ?: $ingredient->unit,
@@ -142,19 +139,19 @@ class InventoryDeductionService
             ->keyBy('id');
 
         $insufficient = [];
-        foreach ($required as $ingredientId => $needCents) {
+        foreach ($required as $ingredientId => $needed) {
             $ingredient = $ingredients[$ingredientId] ?? null;
             if (!$ingredient) {
                 throw ValidationException::withMessages([
                     'ingredient_id' => ["Nguyên liệu #{$ingredientId} không tồn tại."],
                 ]);
             }
-            $stockCents = (int) round(((float) $ingredient->quantity_in_stock) * 100);
-            if ($stockCents < $needCents) {
+            $stock = (int) $ingredient->quantity_in_stock;
+            if ($stock < $needed) {
                 $insufficient[] = [
                     'ingredient' => $recipesByIngredient[$ingredientId]['name'] ?? $ingredient->name,
-                    'required'   => round($needCents / 100, 2),
-                    'available'  => round($stockCents / 100, 2),
+                    'required'   => $needed,
+                    'available'  => $stock,
                     'unit'       => $recipesByIngredient[$ingredientId]['unit'] ?? $ingredient->unit,
                 ];
             }
@@ -169,12 +166,11 @@ class InventoryDeductionService
 
         // Bước 3: trừ từng ingredient + ghi transaction.
         $transactions = [];
-        foreach ($required as $ingredientId => $needCents) {
+        foreach ($required as $ingredientId => $needed) {
             $ingredient = $ingredients[$ingredientId];
-            $before = (float) $ingredient->quantity_in_stock;
-            $decrement = round($needCents / 100, 2);
-            $after = round($before - $decrement, 2);
-            // Lưu lại trên DB với decimal:2 (precision đã đảm bảo bằng tính toán cents).
+            $before = (int) $ingredient->quantity_in_stock;
+            $decrement = $needed;
+            $after = $before - $decrement;
             $ingredient->quantity_in_stock = $after;
             $ingredient->save();
 
@@ -265,7 +261,7 @@ class InventoryDeductionService
         $restoreByIngredient = []; // [ingredient_id => qty_to_restore]
         foreach ($sales as $tx) {
             $restoreByIngredient[(int) $tx->ingredient_id] =
-                ($restoreByIngredient[(int) $tx->ingredient_id] ?? 0) + abs((float) $tx->quantity);
+                ($restoreByIngredient[(int) $tx->ingredient_id] ?? 0) + abs((int) $tx->quantity);
         }
 
         ksort($restoreByIngredient);
@@ -282,8 +278,8 @@ class InventoryDeductionService
             if (!$ingredient) {
                 continue; // ingredient đã bị xoá: bỏ qua (không gây lỗi đóng đơn).
             }
-            $before = (float) $ingredient->quantity_in_stock;
-            $after = round($before + $qty, 2);
+            $before = (int) $ingredient->quantity_in_stock;
+            $after = $before + $qty;
             $ingredient->quantity_in_stock = $after;
             $ingredient->save();
 
@@ -332,13 +328,13 @@ class InventoryDeductionService
             /** @var MenuItemIngredient $row */
             $ingredient = $row->ingredient;
             if (!$ingredient) continue;
-            $effective = (float) $row->quantity_required * (float) $row->waste_factor;
-            $stock = (float) $ingredient->quantity_in_stock;
-            if ($stock + 1e-9 < $effective) {
+            $effective = (int) ceil((int) $row->quantity_required * (float) $row->waste_factor);
+            $stock = (int) $ingredient->quantity_in_stock;
+            if ($stock < $effective) {
                 $missing[] = [
                     'ingredient' => $ingredient->name,
-                    'required'   => round($effective, 2),
-                    'available'  => round($stock, 2),
+                    'required'   => $effective,
+                    'available'  => $stock,
                     'unit'       => $row->unit_override ?: $ingredient->unit,
                 ];
             }

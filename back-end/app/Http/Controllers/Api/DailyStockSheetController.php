@@ -53,7 +53,7 @@ class DailyStockSheetController extends Controller
             : $ingredients->map(function ($ingredient) use ($saved, $opening, $changes, $previous, $expected, $comparisonComplete) {
                 $id = $ingredient->id;
                 $counted = $saved->get($id)?->counted_qty;
-                $start = $previous ? (float) ($opening->get($id) ?? 0) : null;
+                $start = $previous ? (int) ($opening->get($id) ?? 0) : null;
                 $movement = $changes[$id] ?? ['incoming' => 0, 'outgoing' => 0, 'consumption' => 0, 'correction' => 0];
                 return $this->withExpected([
                     'ingredient_id' => $id, 'code' => $ingredient->code, 'name' => $ingredient->name,
@@ -64,10 +64,10 @@ class DailyStockSheetController extends Controller
                     'correction_qty' => $movement['correction'],
                     'sources' => $movement['sources'] ?? [],
                     'explanation' => $saved->get($id)?->explanation,
-                    'counted_qty' => $counted === null ? null : (float) $counted,
+                    'counted_qty' => $counted === null ? null : (int) $counted,
                     'used_qty' => $previous && $counted !== null
-                        ? round($start + $movement['incoming'] - $movement['outgoing']
-                            + $movement['correction'] - (float) $counted, 2)
+                        ? $start + $movement['incoming'] - $movement['outgoing']
+                            + $movement['correction'] - (int) $counted
                         : null,
                 ], $expected, $comparisonComplete, (bool) $previous);
             })->all();
@@ -75,9 +75,9 @@ class DailyStockSheetController extends Controller
         $reserved = $date === Carbon::now('Asia/Ho_Chi_Minh')->toDateString() && $sheet?->status !== 'CLOSED'
             ? app(MenuAvailabilityService::class)->pendingUsage() : null;
         $items = array_map(function (array $item) use ($reserved) {
-            $item['reserved_qty'] = $reserved === null ? null : round($reserved[$item['ingredient_id']] ?? 0, 3);
+            $item['reserved_qty'] = $reserved === null ? null : (int) ($reserved[$item['ingredient_id']] ?? 0);
             $item['available_estimate_qty'] = $item['expected_balance_qty'] !== null && $item['reserved_qty'] !== null
-                ? round($item['expected_balance_qty'] - $item['reserved_qty'], 3) : null;
+                ? $item['expected_balance_qty'] - $item['reserved_qty'] : null;
             return $item;
         }, $items);
 
@@ -98,7 +98,7 @@ class DailyStockSheetController extends Controller
             'items' => ['required', 'array'],
             'movement_version' => ['required', 'integer', 'min:0'],
             'items.*.ingredient_id' => ['required', 'integer', 'distinct', 'exists:ingredients,id'],
-            'items.*.counted_qty' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'items.*.counted_qty' => ['nullable', 'integer', 'min:0', 'max:9999999999'],
             'items.*.explanation' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -187,16 +187,16 @@ class DailyStockSheetController extends Controller
                 if (!$row || $row->counted_qty === null) {
                     throw ValidationException::withMessages(['items' => "Chưa đếm nguyên liệu {$ingredient->name}."]);
                 }
-                $counted = (float) $row->counted_qty;
-                $start = $previous ? (float) ($opening->get($ingredient->id) ?? 0) : null;
+                $counted = (int) $row->counted_qty;
+                $start = $previous ? (int) ($opening->get($ingredient->id) ?? 0) : null;
                 $movement = $changes[$ingredient->id] ?? ['incoming' => 0, 'outgoing' => 0, 'consumption' => 0, 'correction' => 0];
-                $used = $previous ? round($start + $movement['incoming'] - $movement['outgoing']
-                    + $movement['correction'] - $counted, 2) : null;
+                $used = $previous ? $start + $movement['incoming'] - $movement['outgoing']
+                    + $movement['correction'] - $counted : null;
                 if ($used !== null && $used < 0) {
                     throw ValidationException::withMessages(['items' => "Lượng dùng của {$ingredient->name} đang âm. Kiểm tra số đếm và phiếu nhập trước khi chốt."]);
                 }
                 $txId = null;
-                if (round((float) $ingredient->quantity_in_stock, 2) !== round($counted, 2)) {
+                if ((int) $ingredient->quantity_in_stock !== $counted) {
                     $txId = $inventory->adjustStock([
                         'ingredient_id' => $ingredient->id, 'expected_stock' => $counted,
                         'reference_type' => 'daily_stock_sheet', 'reference_id' => $sheet->id,
@@ -259,11 +259,11 @@ class DailyStockSheetController extends Controller
             };
             // consumption và outgoing đều là lượng đi ra → lấy trị tuyệt đối.
             $isOutflow = in_array($field, ['outgoing', 'consumption'], true);
-            $result[$id][$field] += $isOutflow ? abs((float) $tx->quantity) : (float) $tx->quantity;
+            $result[$id][$field] += $isOutflow ? abs((int) $tx->quantity) : (int) $tx->quantity;
             $result[$id]['sources'][] = [
                 'transaction_id' => (int) $tx->id,
                 'type' => $tx->type,
-                'quantity' => (float) $tx->quantity,
+                'quantity' => (int) $tx->quantity,
                 'reference_type' => $tx->reference_type,
                 'reference_id' => $tx->reference_id === null ? null : (int) $tx->reference_id,
                 'reference_code' => $tx->reference_type === 'stock_import' ? $importCodes->get($tx->reference_id) : null,
@@ -279,12 +279,12 @@ class DailyStockSheetController extends Controller
             'ingredient_id' => (int) $row->ingredient_id, 'code' => $row->code,
             'name' => $row->name, 'unit' => $row->unit,
             'category_name' => $row->category_name ?? null,
-            'opening_qty' => $row->opening_qty === null ? null : (float) $row->opening_qty,
-            'incoming_qty' => (float) $row->incoming_qty, 'outgoing_qty' => (float) $row->outgoing_qty,
-            'consumption_qty' => (float) ($row->consumption_qty ?? 0),
-            'correction_qty' => (float) $row->correction_qty,
-            'counted_qty' => $row->counted_qty === null ? null : (float) $row->counted_qty,
-            'used_qty' => $row->used_qty === null ? null : (float) $row->used_qty,
+            'opening_qty' => $row->opening_qty === null ? null : (int) $row->opening_qty,
+            'incoming_qty' => (int) $row->incoming_qty, 'outgoing_qty' => (int) $row->outgoing_qty,
+            'consumption_qty' => (int) ($row->consumption_qty ?? 0),
+            'correction_qty' => (int) $row->correction_qty,
+            'counted_qty' => $row->counted_qty === null ? null : (int) $row->counted_qty,
+            'used_qty' => $row->used_qty === null ? null : (int) $row->used_qty,
             'explanation' => $row->explanation,
         ];
     }
@@ -300,13 +300,13 @@ class DailyStockSheetController extends Controller
         // `usage['quantity']` (cùng nguồn công thức). Trừ cả hai → tồn dự kiến bị
         // trừ 2 lần, lệch với tồn hệ thống.
         $item['expected_balance_qty'] = $comparable
-            ? round($item['opening_qty'] + $item['incoming_qty'] - $item['outgoing_qty']
-                + $item['correction_qty'] - $usage['quantity'], 3)
+            ? $item['opening_qty'] + $item['incoming_qty'] - $item['outgoing_qty']
+                + $item['correction_qty'] - $usage['quantity']
             : null;
         $item['comparison_complete'] = $comparable;
         $item['uncomparable_items'] = $usage['uncomparable_items'];
         $item['variance_qty'] = $comparable && $item['used_qty'] !== null
-            ? round($item['used_qty'] - $usage['quantity'], 3) : null;
+            ? $item['used_qty'] - $usage['quantity'] : null;
         return $item;
     }
 }

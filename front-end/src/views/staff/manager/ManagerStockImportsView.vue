@@ -60,11 +60,12 @@
               <td>
                 <div class="actions">
                   <button class="manager-button" @click="openDetail(i)">Xem</button>
-                  <button v-if="i.status === 'DRAFT'" class="manager-button" @click="openEdit(i)">Sửa</button>
-                  <button v-if="i.status === 'DRAFT'" class="manager-button primary" :disabled="busyId === i.id" @click="openReceive(i)">
+                  <RouterLink v-if="i.purchase_order_id" class="manager-button linked-button" :to="{ name: 'manager-purchase-orders', query: { q: i.code } }">Mở yêu cầu</RouterLink>
+                  <button v-if="i.status === 'DRAFT' && !i.purchase_order_id" class="manager-button" @click="openEdit(i)">Sửa</button>
+                  <button v-if="i.status === 'DRAFT' && !i.purchase_order_id" class="manager-button primary" :disabled="busyId === i.id" @click="openReceive(i)">
                     {{ busyId === i.id ? 'Đang xử lý…' : 'Xác nhận nhập' }}
                   </button>
-                  <button v-if="i.status === 'DRAFT'" class="manager-button danger" :disabled="busyId === i.id" @click="cancelImport(i)">
+                  <button v-if="i.status === 'DRAFT' && !i.purchase_order_id" class="manager-button danger" :disabled="busyId === i.id" @click="cancelImport(i)">
                     Huỷ
                   </button>
                 </div>
@@ -192,6 +193,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '@/api/client'
 import { ingredientsApi, type Ingredient } from '@/api/ingredients'
 import { useStockFlowStore } from '@/stores/managerStockFlow'
@@ -200,6 +202,7 @@ import { useToast } from '@/composables/useStaffUtils'
 import type { StockImport, StockImportItemPayload, StockImportPayload } from '@/api/stockFlow'
 
 const store = useStockFlowStore()
+const route = useRoute()
 const appDialog = useAppDialog()
 const toast = useToast()
 
@@ -218,7 +221,7 @@ const ingredients = ref<Ingredient[]>([])
 const suppliers = ref<{ id: number; name: string }[]>([])
 const categoryOptions = ref<{ id: number; name: string }[]>([])
 
-const filters = reactive({ q: '', status: '', from: '', to: '', ingredient_category_id: 0 })
+const filters = reactive({ q: typeof route.query.q === 'string' ? route.query.q : '', status: '', from: '', to: '', ingredient_category_id: 0 })
 const page = ref(1), lastPage = ref(1)
 const total = computed(() => store.importsTotal)
 const rows = computed(() => store.imports)
@@ -510,5 +513,6 @@ input, select, textarea { border: 1px solid var(--color-border-strong); border-r
 .danger { color: #b42318; border-color: #f3c6c6; }
 button { cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+.linked-button { display: inline-flex; align-items: center; text-decoration: none; }
 @media (max-width: 880px) { .metrics { grid-template-columns: 1fr 1fr; } fieldset .row { grid-template-columns: 1fr; } }
 </style>

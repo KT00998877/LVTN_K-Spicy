@@ -23,7 +23,7 @@ class StockImport extends Model
     protected $table = 'stock_imports';
 
     protected $fillable = [
-        'code', 'supplier_id', 'imported_by', 'imported_at', 'supplier_document_code', 'received_at',
+        'code', 'purchase_order_id', 'supplier_id', 'imported_by', 'imported_at', 'supplier_document_code', 'received_at',
         'status', 'total_cost', 'note',
         'confirmed_by', 'confirmed_at',
         'cancelled_by', 'cancelled_at', 'cancellation_reason',
@@ -62,6 +62,16 @@ class StockImport extends Model
     public function items(): HasMany
     {
         return $this->hasMany(StockImportItem::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function supplierReturns(): HasMany
+    {
+        return $this->hasMany(SupplierReturn::class);
     }
 
     public function getStatusAttribute(string $value): string

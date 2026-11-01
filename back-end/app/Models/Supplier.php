@@ -16,6 +16,7 @@ class Supplier extends Model
     protected $table = 'suppliers';
 
     protected $fillable = [
+        'code',
         'name',
         'contact_name',
         'phone',
@@ -34,5 +35,10 @@ class Supplier extends Model
     public function ingredients(): HasMany
     {
         return $this->hasMany(Ingredient::class);
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
     }
 }

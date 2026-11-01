@@ -34,9 +34,9 @@ class ManagerInventoryController extends Controller
                 ->leftJoin('suppliers as s', 's.id', '=', 'i.supplier_id')
                 ->select('i.*', 's.name as supplier_name')
                 ->orderBy('i.name')->get()->map(function ($row) {
-                    foreach (['quantity_in_stock', 'min_stock_level', 'import_price'] as $k) {
-                        $row->$k = (float) $row->$k;
-                    }
+                    $row->quantity_in_stock = (int) $row->quantity_in_stock;
+                    $row->min_stock_level = (int) $row->min_stock_level;
+                    $row->import_price = (float) $row->import_price;
                     $row->is_active = (bool) $row->is_active;
                     return $row;
                 }),
@@ -51,7 +51,7 @@ class ManagerInventoryController extends Controller
             'code' => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9_-]+$/', Rule::unique('ingredients')->ignore($id)],
             'name' => ['required', 'string', 'max:150'],
             'unit' => ['required', 'string', 'max:20'],
-            'min_stock_level' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'min_stock_level' => ['required', 'integer', 'min:0', 'max:9999999999'],
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'is_active' => ['required', 'boolean'],
         ]);
@@ -83,7 +83,7 @@ class ManagerInventoryController extends Controller
         $data = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'type'          => ['required', Rule::in(['EXPORT', 'WASTE'])],
-            'quantity'      => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'quantity'      => ['required', 'integer', 'min:1', 'max:9999999999'],
             'reason_code'   => ['required', Rule::in(['SUPPLIER_RETURN', 'OTHER_OUT', 'DAMAGED', 'EXPIRED', 'OTHER_WASTE'])],
             'note'          => ['required', 'string', 'max:2000'],
             'request_key'   => ['required', 'uuid'],
@@ -91,6 +91,11 @@ class ManagerInventoryController extends Controller
         if (($data['type'] === 'EXPORT' && !in_array($data['reason_code'], ['SUPPLIER_RETURN', 'OTHER_OUT'], true))
             || ($data['type'] === 'WASTE' && !in_array($data['reason_code'], ['DAMAGED', 'EXPIRED', 'OTHER_WASTE'], true))) {
             throw ValidationException::withMessages(['reason_code' => 'Lý do không phù hợp với loại phiếu.']);
+        }
+        if ($data['reason_code'] === 'SUPPLIER_RETURN') {
+            throw ValidationException::withMessages([
+                'reason_code' => 'Trả nhà cung cấp phải được lập từ chi tiết yêu cầu nhập đã nhận.',
+            ]);
         }
 
         // Idempotent replay: nếu request_key đã tồn tại TRƯỚC khi xử lý → trả 200.
@@ -110,6 +115,8 @@ class ManagerInventoryController extends Controller
             'type'          => ['nullable', Rule::in(['IMPORT', 'EXPORT', 'WASTE', 'ADJUSTMENT'])],
             'from'          => ['nullable', 'date_format:Y-m-d'],
             'to'            => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'reference_type' => ['nullable', 'string', 'max:50'],
+            'reference_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $q = DB::table('inventory_transactions as t')
@@ -119,6 +126,8 @@ class ManagerInventoryController extends Controller
         if (!empty($data['type'])) $q->where('t.type', $data['type']);
         if (!empty($data['from'])) $q->where('t.transacted_at', '>=', Carbon::parse($data['from'], 'Asia/Ho_Chi_Minh')->setTimezone(config('app.timezone')));
         if (!empty($data['to'])) $q->where('t.transacted_at', '<', Carbon::parse($data['to'], 'Asia/Ho_Chi_Minh')->addDay()->setTimezone(config('app.timezone')));
+        if (!empty($data['reference_type'])) $q->where('t.reference_type', $data['reference_type']);
+        if (!empty($data['reference_id'])) $q->where('t.reference_id', $data['reference_id']);
 
         $rows = $q->select('t.*', 'i.code', 'i.name', 'i.unit', 'u.name as performed_name')
                   ->orderByDesc('t.id')->paginate(20);

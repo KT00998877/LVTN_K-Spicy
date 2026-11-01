@@ -68,7 +68,7 @@ class ManagerIngredientController extends Controller
         $data = $request->validate([
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'purchase_unit' => ['required', 'string', 'max:30'],
-            'conversion_quantity' => ['required', 'numeric', 'min:0.001', 'max:999999999.999'],
+            'conversion_quantity' => ['required', 'integer', 'min:1', 'max:9999999999'],
             'is_default' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

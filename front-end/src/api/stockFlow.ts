@@ -4,6 +4,7 @@ import api from './client'
 
 export interface StockImportItem {
   id: number
+  purchase_order_item_id: number | null
   ingredient_id: number
   ingredient_code?: string | null
   ingredient_name?: string | null
@@ -15,6 +16,10 @@ export interface StockImportItem {
   unit: string
   unit_price: number
   purchase_unit_price: number | null
+  delivered_purchase_quantity: number | null
+  accepted_purchase_quantity: number | null
+  rejected_purchase_quantity: number | null
+  rejection_reason: string | null
   subtotal: number
   expiry_date: string | null
   supplier_lot_code: string | null
@@ -24,6 +29,7 @@ export interface StockImportItem {
 
 export interface StockImport {
   id: number
+  purchase_order_id: number | null
   code: string
   supplier_id: number | null
   supplier_name: string | null

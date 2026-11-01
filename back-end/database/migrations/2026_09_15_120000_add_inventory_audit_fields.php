@@ -6,8 +6,8 @@ return new class extends Migration {
     public function up(): void {
         Schema::table('inventory_transactions', function (Blueprint $table) {
             $table->uuid('request_key')->nullable()->unique();
-            $table->decimal('stock_before', 12, 2)->nullable();
-            $table->decimal('stock_after', 12, 2)->nullable();
+            $table->unsignedBigInteger('stock_before')->nullable();
+            $table->unsignedBigInteger('stock_after')->nullable();
         });
     }
     public function down(): void {

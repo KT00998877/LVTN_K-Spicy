@@ -40,9 +40,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('stocktake_id')->constrained('stocktakes')->cascadeOnDelete();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
-            $table->decimal('system_qty', 12, 2)->comment('Số lượng hệ thống tại thời điểm chốt');
-            $table->decimal('actual_qty', 12, 2)->comment('Số lượng thực tế kiểm đếm');
-            $table->decimal('difference_qty', 12, 2)->comment('Dương = thừa; Âm = thiếu');
+            $table->unsignedBigInteger('system_qty')->comment('Số lượng hệ thống tại thời điểm chốt');
+            $table->unsignedBigInteger('actual_qty')->comment('Số lượng thực tế kiểm đếm');
+            $table->bigInteger('difference_qty')->comment('Dương = thừa; Âm = thiếu');
             $table->decimal('unit_cost', 12, 2)->default(0)->comment('Giá vốn đơn vị tại thời điểm kiểm kê');
             $table->decimal('difference_value', 14, 2)->default(0)->comment('= difference_qty * unit_cost');
             $table->text('reason')->nullable()->comment('Lý do chênh lệch (vd: hao hụt, ghi sai)');

@@ -87,9 +87,9 @@ class ManagerConsumptionController extends Controller
                     'ingredient_id'    => (int) $i->ingredient_id,
                     'ingredient_name'  => $i->ingredient?->name,
                     'unit'             => $i->unit,
-                    'required_qty'     => (float) $i->required_qty,
-                    'available_qty'    => (float) $i->available_qty,
-                    'shortage_qty'     => (float) $i->shortage_qty,
+                    'required_qty'     => (int) $i->required_qty,
+                    'available_qty'    => (int) $i->available_qty,
+                    'shortage_qty'     => (int) $i->shortage_qty,
                 ])->values()->all(),
             ])->values()->all(),
         ]);

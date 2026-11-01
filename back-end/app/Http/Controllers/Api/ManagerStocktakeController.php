@@ -64,9 +64,9 @@ class ManagerStocktakeController extends Controller
                 StocktakeItem::create([
                     'stocktake_id'    => $header->id,
                     'ingredient_id'   => $ing->id,
-                    'system_qty'      => (float) $ing->quantity_in_stock, // snapshot khi mở phiên
-                    'actual_qty'      => (float) $it['actual_qty'],
-                    'difference_qty'  => round(((float) $it['actual_qty']) - ((float) $ing->quantity_in_stock), 2),
+                    'system_qty'      => (int) $ing->quantity_in_stock, // snapshot khi mở phiên
+                    'actual_qty'      => (int) $it['actual_qty'],
+                    'difference_qty'  => (int) $it['actual_qty'] - (int) $ing->quantity_in_stock,
                     'unit_cost'       => (float) $ing->import_price,
                     'difference_value'=> round((((float) $it['actual_qty']) - ((float) $ing->quantity_in_stock)) * (float) $ing->import_price, 2),
                     'reason'          => $it['reason'] ?? null,
@@ -143,9 +143,9 @@ class ManagerStocktakeController extends Controller
                 'ingredient_code'       => $it->ingredient?->code,
                 'ingredient_name'       => $it->ingredient?->name,
                 'unit'                  => $it->ingredient?->unit,
-                'system_qty'            => (float) $it->system_qty,
-                'actual_qty'            => (float) $it->actual_qty,
-                'difference_qty'        => (float) $it->difference_qty,
+                'system_qty'            => (int) $it->system_qty,
+                'actual_qty'            => (int) $it->actual_qty,
+                'difference_qty'        => (int) $it->difference_qty,
                 'unit_cost'             => (float) $it->unit_cost,
                 'difference_value'      => (float) $it->difference_value,
                 'reason'                => $it->reason,

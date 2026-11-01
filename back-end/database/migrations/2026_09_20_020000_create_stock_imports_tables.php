@@ -46,7 +46,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('stock_import_id')->constrained('stock_imports')->cascadeOnDelete();
             $table->foreignId('ingredient_id')->constrained('ingredients')->restrictOnDelete();
-            $table->decimal('quantity', 12, 2)->comment('Số lượng nhập');
+            $table->unsignedBigInteger('quantity')->comment('Số lượng nhập theo đơn vị tồn kho nhỏ nhất');
             $table->string('unit', 20)->comment('Đơn vị tại thời điểm nhập (copy từ ingredient.unit)');
             $table->decimal('unit_price', 12, 2)->comment('Đơn giá nhập');
             $table->decimal('subtotal', 14, 2)->comment('= quantity * unit_price');
