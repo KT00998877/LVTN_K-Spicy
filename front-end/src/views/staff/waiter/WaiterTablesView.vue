@@ -191,7 +191,7 @@
                     <div class="wt-form-group">
                         <label class="wt-label" :for="'gc-' + openDialogTable.id">Số lượng khách</label>
                         <div class="wt-qty">
-                            <button class="wt-qty-btn" @click="newSession.guest_count = Math.max(1, newSession.guest_count - 1)">−</button>
+                            <button type="button" class="wt-qty-btn" aria-label="Giảm số khách" :disabled="newSession.guest_count <= 1" @click="newSession.guest_count = Math.max(1, newSession.guest_count - 1)">−</button>
                             <input
                                 :id="'gc-' + openDialogTable.id"
                                 v-model.number="newSession.guest_count"
@@ -200,7 +200,7 @@
                                 :max="openDialogTable.capacity"
                                 class="wt-qty-val"
                             />
-                            <button class="wt-qty-btn" @click="newSession.guest_count = Math.min(openDialogTable.capacity, newSession.guest_count + 1)">+</button>
+                            <button type="button" class="wt-qty-btn" aria-label="Tăng số khách" :disabled="newSession.guest_count >= openDialogTable.capacity" @click="newSession.guest_count = Math.min(openDialogTable.capacity, newSession.guest_count + 1)">+</button>
                         </div>
                         <p class="wt-hint">Sức chứa tối đa: {{ openDialogTable.capacity }} người</p>
                     </div>
@@ -1080,6 +1080,18 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 }
 
 .btn-primary-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 18px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md, 8px);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
     background: var(--color-chili-red, #D71920);
     color: #fff;
 }
@@ -1343,8 +1355,9 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 
 .wt-qty {
     display: inline-flex;
+    align-self: flex-start;
     align-items: center;
-    background: var(--color-gray-100, #f3f4f6);
+    border: 1px solid var(--color-gray-300, #d1d5db);
     border-radius: var(--radius-md, 8px);
     overflow: hidden;
 }
@@ -1366,13 +1379,17 @@ useRealtimeRefresh(() => tablesStore.fetchAll(true), () => !loading.value && !op
 .wt-qty-btn:hover {
     color: var(--color-chili-red, #D71920);
 }
+.wt-qty-btn:disabled {
+    color: var(--color-gray-400, #9ca3af);
+    cursor: not-allowed;
+}
 
 .wt-qty-val {
     width: 52px;
     height: 44px;
     text-align: center;
     border: none;
-    background: transparent;
+    background: var(--color-gray-50, #f9fafb);
     font-size: 16px;
     font-weight: 700;
     font-family: inherit;

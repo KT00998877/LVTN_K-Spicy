@@ -47,6 +47,8 @@ class StaffKitchenController extends Controller
         $items = OrderItem::with(['order.tableSession.table', 'menuItem', 'toppings.topping'])
             ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['COMPLETED', 'CANCELLED', 'DELIVERING'])
                 ->where(fn ($q) => $q->where('order_type', '!=', 'ONLINE')->orWhereNotNull('confirmed_at')))
+            ->where(fn ($q) => $q->whereHas('order', fn ($order) => $order->where('order_type', '!=', 'DINE_IN'))
+                ->orWhereDoesntHave('menuItem.category', fn ($category) => $category->where('slug', 'do-uong')))
             ->whereIn('status', $statusArray)
             ->where('status', '!=', 'CANCELLED')
             ->orderBy('created_at')

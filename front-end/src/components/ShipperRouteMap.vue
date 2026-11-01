@@ -136,7 +136,7 @@ onBeforeUnmount(() => { alive = false; clear(); shipperMarker?.remove(); map?.re
             <span><span class="dot restaurant">🍜</span> Quán</span>
             <span><span class="dot customer">📍</span> Khách</span>
             <span v-if="shipperLocation"><span class="dot shipper">🛵</span> Shipper</span>
-            <span class="line"></span> Đường đi ô tô
+            <span class="line"></span> Đường đi
         </div>
     </div>
 </template>

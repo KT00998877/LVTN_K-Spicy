@@ -15,7 +15,7 @@
             <div class="login-section">
                 <h2 class="section-title">Đăng nhập nhân viên</h2>
                 <p class="section-desc">
-                    Nhập email + mật khẩu được cấp để vào khu vực phục vụ.
+                    Nhập email và mật khẩu được cấp để vào khu vực làm việc theo vai trò.
                 </p>
 
                 <form class="login-form" @submit.prevent="handleLogin">
@@ -124,6 +124,7 @@ const demoAccounts: DemoAccount[] = [
     { email: 'waiter@micay.local',   password: '00998877', role: 'WAITER',  label: 'Phục vụ' },
     { email: 'kitchen@micay.local',  password: '00998877', role: 'KITCHEN', label: 'Bếp' },
     { email: 'cashier@micay.local',  password: '00998877', role: 'CASHIER', label: 'Thu ngân' },
+    { email: 'supplier@micay.local', password: '00998877', role: 'SUPPLIER', label: 'Nhà cung cấp K' },
 ]
 
 function fillDemo(acc: DemoAccount): void {
@@ -139,7 +140,7 @@ async function handleLogin(): Promise<void> {
             WAITER:  '/staff/waiter/tables',
             KITCHEN: '/staff/kitchen/queue',
             CASHIER: '/staff/cashier/invoices',
-            SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard',
+            SHIPPER: '/staff/shipper', SUPPLIER: '/staff/supplier/purchase-orders', MANAGER: '/staff/manager/dashboard',
         }
         router.push(rootByRole[session.role] ?? '/staff/login')
     } catch {

@@ -6,14 +6,15 @@ import { createRefreshLoop, REFRESH_EVENT } from '@/utils/realtime'
 export function useStaffLiveRefresh(refresh: () => unknown | Promise<unknown>, enabled = () => true) {
     const live = useStaffNotificationsStore()
     let pending = false
+    let lastRefreshAt = Date.now()
     let loop: ReturnType<typeof createRefreshLoop> | undefined
     const wake = () => { pending = true; loop?.wake() }
     onMounted(() => {
         loop = createRefreshLoop(async () => {
             pending = false
-            try { await refresh() } catch (error) { pending = true; throw error }
+            try { await refresh(); lastRefreshAt = Date.now() } catch (error) { pending = true; throw error }
         }, { enabled: () => navigator.onLine && document.visibilityState === 'visible'
-            && enabled() && (pending || !live.connected) })
+            && enabled() && (pending || !live.connected || Date.now() - lastRefreshAt >= 10000) })
         window.addEventListener(STAFF_LIVE_EVENT, wake)
         window.addEventListener(REFRESH_EVENT, wake)
         window.addEventListener('online', wake)

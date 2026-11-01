@@ -310,7 +310,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                 <span class="order-code">#{{ group.order.code }}</span>
                             </div>
                             <div class="order-time" :class="getElapsedClass(group.order.placed_at)">
-                                <span class="time-label">?? ch?</span>
+                                <span class="time-label">Đã chờ</span>
                                 <span>{{ formatElapsed(group.order.placed_at) }}</span>
                             </div>
                         </div>
@@ -321,7 +321,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                 HĐ: {{ group.order.invoice_code }}
                             </span>
                             <span class="meta-item">
-                                ??t l?c {{ group.order.placed_at ? new Date(group.order.placed_at).toLocaleTimeString('vi-VN') : '?' }}
+                                Đặt lúc {{ group.order.placed_at ? new Date(group.order.placed_at).toLocaleTimeString('vi-VN') : '?' }}
                             </span>
                         </div>
 
@@ -377,8 +377,8 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                     <!-- Cancel -->
                                     <button v-if="['PENDING', 'PREPARING'].includes(status)"
                                         class="action-btn cancel"
-                                        :title="`H?y m?n ${entry.item.menu_item_name}`"
-                                        :aria-label="`H?y m?n ${entry.item.menu_item_name}`"
+                                        :title="`Hủy món ${entry.item.menu_item_name}`"
+                                        :aria-label="`Hủy món ${entry.item.menu_item_name}`"
                                         :disabled="updatingIds.includes(entry.item.id)" @click="onCancel(entry)">
                                         ✕
                                     </button>
@@ -387,7 +387,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                         </div>
 
                         <footer v-if="status !== 'READY'" class="order-status">
-                            {{ status === 'PENDING' ? 'Ch? ch? bi?n' : '?ang ch? bi?n' }}
+                            {{ status === 'PENDING' ? 'Chờ chế biến' : 'Đang chế biến' }}
                         </footer>
 
                         <!-- Ready State Indicator -->

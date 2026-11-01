@@ -11,8 +11,8 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
  *      → status = DELIVERED (chờ khách bấm "Tôi đã nhận hàng" để tích điểm)
  *
  * Chỉ đường:
- *   - Khi đơn ONLINE được bàn giao → modal hiển thị địa chỉ + bản đồ + chỉ dẫn tiếng Việt
- *   - Shipper xem trước đường đi (ô tô) từ quán đến khách, dùng OSRM
+ *   - Đơn ONLINE có nút dẫn đường xe máy bằng Google Maps.
+ *   - Bản đồ OSRM trong modal chỉ dùng để xem tuyến ô tô tham khảo.
  *
  * Thanh toán:
  *   - COD: hóa đơn UNPAID → shipper thu tiền khi giao → tự động ghi nhận PAID ở bước 3
@@ -77,10 +77,10 @@ async function handlePickup(id: number) {
     const ok = await deliveriesStore.pickup(id)
     if (ok) {
         toast.success('Đã xác nhận lấy món từ bếp.')
-        // Sau khi lấy món → tự động mở modal chỉ đường (chỉ cho đơn ONLINE có toạ độ).
+        // Sau khi lấy món, shipper chọn dẫn đường xe máy từ thẻ đơn.
         const order = list.value.find(o => o.id === id)
         if (order && order.order_type === 'ONLINE' && order.delivery_latitude != null && order.delivery_longitude != null) {
-            openRouteModal(order)
+            toast.success('Bấm “Dẫn đường ” trên đơn để mở Google Maps.')
         }
     } else if (error.value) {
         toast.error(error.value)
@@ -143,7 +143,7 @@ function closeRouteModal() {
 }
 
 function googleMapsUrl(lat: number, lng: number): string {
-    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=two-wheeler&dir_action=navigate`
 }
 function distanceText(meters: number): string {
     return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
@@ -463,12 +463,12 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                     <p v-if="o.note" class="note">Ghi chú khách: {{ o.note }}</p>
                     <div class="recipient-actions" v-if="o.order_type === 'ONLINE' && o.delivery_latitude != null && o.delivery_longitude != null">
                         <button type="button" class="btn-ghost-sm" @click="openRouteModal(o)">
-                            🗺️ Xem đường đi
+                            🗺️ Xem tuyến tham khảo
                         </button>
                         <a class="btn-ghost-sm"
                             :href="googleMapsUrl(Number(o.delivery_latitude), Number(o.delivery_longitude))"
                             target="_blank" rel="noopener noreferrer">
-                            🚗 Mở Google Maps
+                            🛵 Dẫn đường
                         </a>
                     </div>
                 </section>
@@ -601,7 +601,7 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                         </div>
                     </section>
 
-                    <div v-if="routeLoading" class="loading">Đang tính đường đi bằng ô tô…</div>
+                    <div v-if="routeLoading" class="loading">Đang tải tuyến đường tham khảo…</div>
                     <p v-else-if="routeError" class="alert error" role="alert">{{ routeError }}</p>
 
                     <template v-else-if="routeData">
@@ -617,14 +617,15 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                             <a class="btn-primary external"
                                 :href="googleMapsUrl(routeData.customer.latitude, routeData.customer.longitude)"
                                 target="_blank" rel="noopener noreferrer">
-                                Mở Google Maps để dẫn đường
+                                Dẫn đường  bằng Google Maps
                             </a>
                         </section>
 
+                        <p class="muted small">Bản đồ bên dưới dùng tuyến ô tô để tham khảo. Hãy dùng Google Maps để đi theo tuyến xe máy.</p>
                         <ShipperRouteMap :route-data="routeData" />
 
                         <section v-if="routeData.route.steps.length" class="route-steps">
-                            <h4>Chỉ dẫn đường đi (ô tô)</h4>
+                            <h4>Chỉ dẫn tuyến tham khảo (ô tô)</h4>
                             <ol>
                                 <li v-for="(step, idx) in routeData.route.steps" :key="idx">
                                     <span class="step-idx">{{ idx + 1 }}</span>

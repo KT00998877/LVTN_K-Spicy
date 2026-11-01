@@ -58,16 +58,25 @@ class StaffOrderController extends Controller
         return response()->json(['success' => true, 'data' => $order]);
     }
 
-    /** Temporary successful payment flow, without a payment gateway. */
-    public function demoPay(Request $request, int $id): JsonResponse
+    /** Ghi nhận khoản tiền phục vụ đã trực tiếp nhận tại bàn. */
+    public function collectTablePayment(Request $request, int $id): JsonResponse
     {
-        return DB::transaction(function () use ($request, $id) {
+        $data = $request->validate([
+            'method' => ['required', 'in:CASH,TRANSFER,QR'],
+            'expected_amount' => ['required', 'numeric', 'gt:0'],
+            'transaction_ref' => ['required_unless:method,CASH', 'nullable', 'string', 'max:100'],
+            'confirmed_received' => ['required', 'accepted'],
+        ]);
+        return DB::transaction(function () use ($request, $id, $data) {
             $order = \App\Models\Order::lockForUpdate()->findOrFail($id);
             if ($order->status === 'COMPLETED') {
-                return response()->json(['success' => true, 'data' => $this->service->getOrderDetail($id)]);
+                throw ValidationException::withMessages(['order' => ['Đơn đã thanh toán. Không ghi nhận tiền lần nữa.']]);
             }
-            if ($order->status === 'CANCELLED' || !$order->table_session_id || !$order->items()->where('status', '!=', 'CANCELLED')->exists()) {
+            if ($order->status === 'CANCELLED' || $order->order_type !== 'DINE_IN' || !$order->table_session_id || !$order->items()->where('status', '!=', 'CANCELLED')->exists() || $order->total_amount <= 0) {
                 throw ValidationException::withMessages(['order' => ['Đơn không đủ điều kiện thanh toán.']]);
+            }
+            if ((int) round($data['expected_amount'] * 100) !== (int) round((float) $order->total_amount * 100)) {
+                throw ValidationException::withMessages(['expected_amount' => ['Số tiền đơn đã thay đổi. Tải lại đơn trước khi thu tiền.']]);
             }
             $session = \App\Models\TableSession::lockForUpdate()->findOrFail($order->table_session_id);
             if ($session->status !== 'OPEN') {
@@ -79,16 +88,17 @@ class StaffOrderController extends Controller
             $now = now();
             $invoiceId = DB::table('invoices')->insertGetId([
                 'code' => 'HD-' . $now->format('Ymd') . '-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT), 'order_id' => $id,
-                'waiter_id' => $request->user()->id,
+                'customer_id' => $order->customer_id, 'waiter_id' => $request->user()->id,
                 'subtotal' => $order->subtotal, 'discount_amount' => $order->discount_amount,
                 'total_amount' => $order->total_amount, 'paid_amount' => $order->total_amount,
                 'status' => 'PAID', 'issued_at' => $now, 'paid_at' => $now,
                 'created_at' => $now, 'updated_at' => $now,
             ]);
             DB::table('payments')->insert([
-                'invoice_id' => $invoiceId, 'method' => 'OTHER', 'amount' => $order->total_amount,
+                'invoice_id' => $invoiceId, 'method' => $data['method'] === 'TRANSFER' ? 'BANK_TRANSFER' : $data['method'], 'amount' => $order->total_amount,
                 'status' => 'SUCCESS', 'processed_by' => $request->user()->id,
-                'processed_at' => $now, 'note' => 'Thanh toán mô phỏng, chưa tích hợp phương thức thanh toán.',
+                'transaction_ref' => $data['transaction_ref'] ?? null,
+                'processed_at' => $now, 'note' => 'Phục vụ xác nhận đã nhận tiền tại bàn.',
                 'created_at' => $now, 'updated_at' => $now,
             ]);
             $order->update(['status' => 'COMPLETED', 'completed_at' => $now]);

@@ -32,6 +32,7 @@ function session(fetchMe) {
         pinia, '@/utils/realtime': realtime,
         './staff': {}, './cart': { useCartStore: () => ({ $reset() {} }) },
         './orders': { useOrderStore: () => ({ $reset() {} }) }, '@/api/auth': { fetchMe },
+        './favorites': { useFavoritesStore: () => ({ $reset() {} }) },
     })
     const store = useAuthStore()
     store.token = 'test-token'

@@ -38,7 +38,7 @@ class EnsureStaffRole
 
         // Nếu tham số trống → chỉ cần user là staff (có 1 trong 4 role chuẩn)
         $allowed = empty($roles)
-            ? ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER']
+            ? ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER', 'SUPPLIER']
             : array_map(fn ($r) => strtoupper($r), $roles);
 
         $intersect = array_intersect($userRoles, $allowed);

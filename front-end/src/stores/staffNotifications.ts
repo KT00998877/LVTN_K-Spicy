@@ -31,6 +31,7 @@ export const useStaffNotificationsStore = defineStore('staffNotifications', () =
     let retry: ReturnType<typeof setInterval> | undefined
     let generation = 0
     let revision = 0
+    let startedAt = 0
     let audio: AudioContext | undefined
     const seen = new Set<string>()
     const signal = () => window.dispatchEvent(new Event(STAFF_LIVE_EVENT))
@@ -46,6 +47,7 @@ export const useStaffNotificationsStore = defineStore('staffNotifications', () =
             if (generation !== currentGeneration) return
             if (revision !== currentRevision) return
             const incoming = response.data.data.data
+            const newItems = nextPage === 1 ? incoming.filter(item => !seen.has(item.id) && Date.parse(item.created_at) >= startedAt) : []
             for (const item of incoming) seen.add(item.id)
             const merged = nextPage === 1 ? incoming : [...items.value, ...incoming]
             items.value = [...new Map(merged.map(item => [item.id, item])).values()]
@@ -53,6 +55,11 @@ export const useStaffNotificationsStore = defineStore('staffNotifications', () =
             page.value = response.data.data.current_page
             lastPage.value = response.data.data.last_page
             error.value = ''
+            if (newItems.length) {
+                latest.value = newItems[0] ?? null
+                playSound()
+                signal()
+            }
         } catch {
             if (generation === currentGeneration) error.value = 'Chưa tải được thông báo. Hệ thống sẽ tự thử lại.'
         } finally {
@@ -120,7 +127,7 @@ export const useStaffNotificationsStore = defineStore('staffNotifications', () =
     function start(session: StaffSession) {
         stop()
         const currentGeneration = generation
-        const startedAt = Date.now()
+        startedAt = Date.now()
         window.addEventListener('pointerdown', unlockSound, { once: true })
         void fetchPage()
         const key = import.meta.env.VITE_REVERB_APP_KEY
@@ -186,8 +193,13 @@ export const useStaffNotificationsStore = defineStore('staffNotifications', () =
         for (const role of roles) {
             echo.private(`staff-role.${role}`).subscribed(() => ready(role)).listen('.staff.order.updated', signal)
         }
+        let lastPoll = 0
         retry = setInterval(() => {
-            if (currentGeneration === generation && navigator.onLine && (!connected.value || error.value)) void fetchPage()
+            if (currentGeneration !== generation || !navigator.onLine) return
+            if (!connected.value || error.value || Date.now() - lastPoll >= 10000) {
+                lastPoll = Date.now()
+                void fetchPage()
+            }
         }, 3000)
     }
 

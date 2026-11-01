@@ -133,7 +133,7 @@ class StaffOrderService
             }
 
             /** @var MenuItem|null $menu */
-            $menu = MenuItem::find($data['menu_item_id']);
+            $menu = MenuItem::with('category')->find($data['menu_item_id']);
             if (!$menu || !$menu->is_active || !$menu->is_available) {
                 throw ValidationException::withMessages(['menu_item_id' => ['Món không khả dụng.']]);
             }
@@ -143,7 +143,7 @@ class StaffOrderService
             $note = isset($data['note']) ? mb_substr((string) $data['note'], 0, 200) : null;
 
             // Tính giá + toppings
-            $unitPrice = (float) $menu->price;
+            $unitPrice = app(FlashSaleService::class)->priceFor($menu);
             $toppingPrice = 0.0;
             $toppingData = [];
             $toppingIds = $data['topping_ids'] ?? [];
@@ -189,7 +189,8 @@ class StaffOrderService
                 'subtotal'             => $itemSubtotal,
                 'note'                 => $note,
                 'spicy_level_override' => $spicyLevel,
-                'status'               => 'PENDING',
+                'status'               => $menu->category?->slug === 'do-uong' ? 'READY' : 'PENDING',
+                'ready_at'             => $menu->category?->slug === 'do-uong' ? now() : null,
             ]);
 
             // Món gọi thêm cần vào hàng chờ dù đợt trước đã phục vụ xong.

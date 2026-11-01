@@ -5,15 +5,16 @@
 
 // ===== Roles =====
 
-export type StaffRole = 'WAITER' | 'KITCHEN' | 'CASHIER' | 'MANAGER' | 'SHIPPER'
+export type StaffRole = 'WAITER' | 'KITCHEN' | 'CASHIER' | 'MANAGER' | 'SHIPPER' | 'SUPPLIER'
 
-export const STAFF_ROLES: StaffRole[] = ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER']
+export const STAFF_ROLES: StaffRole[] = ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER', 'SUPPLIER']
 
 export const ROLE_LABELS: Record<StaffRole, { label: string; icon: string; color: string }> = {
     WAITER:  { label: 'Phục vụ',       icon: '🍽️', color: '#2563eb' },
     KITCHEN: { label: 'Bếp',           icon: '👨‍🍳', color: '#ea580c' },
     CASHIER: { label: 'Thu ngân',      icon: '💰', color: '#16a34a' },
     SHIPPER: { label: 'Giao hàng', icon: 'GH', color: '#0369a1' },
+    SUPPLIER: { label: 'Nhà cung cấp K', icon: 'NCC', color: '#861923' },
     MANAGER: { label: 'Quản lý',       icon: '👔', color: '#7c3aed' },
 }
 

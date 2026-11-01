@@ -314,8 +314,8 @@ export const staffOrders = {
         const res = await apiClient.post<{ data: Order }>(`/staff/orders/${orderId}/submit-items`, { items })
         return res.data.data
     },
-    async demoPay(orderId: number): Promise<Order> {
-        const res = await apiClient.post<{ data: Order }>(`/staff/orders/${orderId}/demo-pay`)
+    async collectTablePayment(orderId: number, expectedAmount: number, method: 'CASH' | 'TRANSFER' | 'QR', transactionRef: string): Promise<Order> {
+        const res = await apiClient.post<{ data: Order }>(`/staff/orders/${orderId}/collect-payment`, { expected_amount: expectedAmount, method, transaction_ref: transactionRef, confirmed_received: true })
         return res.data.data
     },
     /** GET /api/staff/orders?status= */
@@ -675,6 +675,9 @@ export interface MenuItemAdmin {
     category: string | null
     is_available: boolean
     image_url: string | null
+    flash_sale_discount?: number | null
+    flash_sale_starts_at?: string | null
+    flash_sale_ends_at?: string | null
     sold_out_reason?: string | null
     sold_out_at?: string | null
 }
@@ -723,6 +726,11 @@ export const staffDashboard = {
             payload.is_available === undefined ? `/staff/dashboard/menu-items/${id}` : `/staff/menu-items/${id}/availability`,
             payload
         )
+        return res.data.data
+    },
+
+    async setFlashSale(id: number, payload: { flash_sale_discount: number | null; flash_sale_starts_at: string | null; flash_sale_ends_at: string | null }): Promise<MenuItemAdmin> {
+        const res = await apiClient.patch<{ data: MenuItemAdmin }>(`/staff/dashboard/menu-items/${id}/flash-sale`, payload)
         return res.data.data
     },
 

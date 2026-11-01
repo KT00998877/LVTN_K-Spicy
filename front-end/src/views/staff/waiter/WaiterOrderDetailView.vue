@@ -44,7 +44,7 @@
                         </div>
                     </article>
                     <article v-for="item in order.items" :key="item.id" class="ticket-line" :class="{ cancelled: item.status === 'CANCELLED' }">
-                        <div class="line-heading"><b>{{ item.menu_item_name }}</b><span class="chip" :class="item.status">{{ itemLabels[item.status] }}</span></div>
+                        <div class="line-heading"><b>{{ item.menu_item_name }}</b><span class="chip" :class="item.status">{{ item.status === 'READY' && menu.some(m => m.id === item.menu_item_id && m.category_slug === 'do-uong') ? 'Chờ bưng' : itemLabels[item.status] }}</span></div>
                         <small v-if="isNoodleName(item.menu_item_name) && item.spicy_level !== null">Độ cay: {{ item.spicy_level === 0 ? 'Không cay' : 'Cấp ' + item.spicy_level }}</small>
                         <small v-for="t in item.toppings" :key="t.id">+ {{ t.name }}</small>
                         <small v-if="item.note">{{ item.note }}</small>
@@ -57,7 +57,7 @@
                 <footer class="ticket-footer">
                     <div class="total"><b>Tổng tiền bàn</b><strong>{{ formatVND(total) }}</strong></div>
                     <button class="send" :disabled="busy || closed || !draft.length" @click="sendItems">{{ busy ? 'Đang xử lý...' : 'Gửi xuống bếp' }}</button>
-                    <button class="pay" :disabled="busy || closed || !!draft.length || !activeItems.length" @click="pay">Thanh toán bàn này</button>
+                    <button class="pay" :disabled="busy || closed || !!draft.length || !activeItems.length" @click="openPayment">Thu tiền tại bàn</button>
                     <small v-if="draft.length">Gửi các món đã chọn trước khi thanh toán.</small>
                     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
                     <p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
@@ -65,6 +65,18 @@
             </aside>
         </div>
         <Teleport to="body">
+            <div v-if="paymentOpen" class="options-backdrop" @click.self="!busy && (paymentOpen = false)">
+                <form class="options payment-form" aria-labelledby="payment-title" @submit.prevent="pay">
+                    <div class="options-heading"><h3 id="payment-title">Xác nhận thu tiền tại {{ order.table_code ? 'bàn ' + order.table_code : 'bàn' }}</h3><button type="button" :disabled="busy" @click="paymentOpen = false">Đóng</button></div>
+                    <p class="payment-amount">Số tiền cần thu <strong>{{ formatVND(order.total_amount) }}</strong></p>
+                    <label class="field">Phương thức thanh toán<select v-model="paymentMethod" :disabled="busy" required><option value="CASH">Tiền mặt</option><option value="TRANSFER">Chuyển khoản</option><option value="QR">Quét QR</option></select></label>
+                    <label v-if="paymentMethod !== 'CASH'" class="field">Mã giao dịch ngân hàng<input v-model.trim="transactionRef" :disabled="busy" maxlength="100" required placeholder="Nhập mã sau khi kiểm tra đã nhận tiền" /></label>
+                    <label class="payment-confirm"><input v-model="confirmedReceived" type="checkbox" :disabled="busy" required />Tôi đã kiểm tra và nhận đủ {{ formatVND(order.total_amount) }}.</label>
+                    <p class="payment-help">Chỉ xác nhận sau khi thực nhận tiền. Hệ thống sẽ ghi giao dịch, hoàn tất đơn và giải phóng bàn.</p>
+                    <p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>
+                    <button class="pay" type="submit" :disabled="busy || !confirmedReceived">{{ busy ? 'Đang ghi nhận…' : 'Xác nhận đã thu tiền' }}</button>
+                </form>
+            </div>
             <div v-if="selected" class="options-backdrop" @click.self="selected = null">
                 <form class="options" @submit.prevent="addDraft">
                     <div class="options-heading"><h3>{{ selected.name }}</h3><button type="button" @click="selected = null">Đóng</button></div>
@@ -120,6 +132,10 @@ const selected = ref<MenuItemCard | null>(null)
 const spicy = ref(0)
 const quantity = ref(1)
 const note = ref('')
+const paymentOpen = ref(false)
+const paymentMethod = ref<'CASH' | 'TRANSFER' | 'QR'>('CASH')
+const transactionRef = ref('')
+const confirmedReceived = ref(false)
 interface DraftLine { key: number; menu: MenuItemCard; quantity: number; spicy_level: number; note: string }
 const draft = ref<DraftLine[]>([])
 let key = 0
@@ -160,7 +176,7 @@ async function loadOrder() {
     finally { loading.value = false }
 }
 async function refreshOrder() {
-    if (busy.value || !order.value || closed.value) return
+    if (busy.value || paymentOpen.value || !order.value || closed.value) return
     const id = order.value.id
     try {
         const fresh = await staffOrders.get(id)
@@ -173,7 +189,7 @@ async function runAction(action: () => Promise<void>) {
     actionError.value = ''
     notice.value = ''
     try { await action() }
-    catch (err: any) { actionError.value = err?.response?.data?.message || err?.message || 'Thao tác thất bại. Vui lòng thử lại.' }
+    catch (err: any) { actionError.value = Object.values(err?.response?.data?.errors || {}).flat()[0] as string || err?.response?.data?.message || err?.message || 'Thao tác thất bại. Vui lòng thử lại.' }
     finally { busy.value = false }
 }
 async function sendItems() {
@@ -181,7 +197,7 @@ async function sendItems() {
     await runAction(async () => {
         order.value = await staffOrders.submitItems(order.value!.id, draft.value.map(l => ({ menu_item_id: l.menu.id, quantity: l.quantity, spicy_level: l.spicy_level, note: l.note })))
         draft.value = []
-        notice.value = 'Đã lưu món vào hàng chờ bếp.'
+        notice.value = 'Đã lưu món. Đồ uống có thể bưng ngay; món ăn đã gửi xuống bếp.'
     })
 }
 async function serve(itemId: number) {
@@ -191,12 +207,22 @@ async function serve(itemId: number) {
         notice.value = 'Đã xác nhận bưng món.'
     })
 }
+function openPayment() {
+    if (busy.value || !order.value || closed.value || draft.value.length || !activeItems.value.length) return
+    actionError.value = ''
+    paymentMethod.value = 'CASH'
+    transactionRef.value = ''
+    confirmedReceived.value = false
+    paymentOpen.value = true
+}
 async function pay() {
     if (busy.value || !order.value || closed.value || draft.value.length || !activeItems.value.length) return
+    if (!confirmedReceived.value || (paymentMethod.value !== 'CASH' && !transactionRef.value)) return
     let paid = false
     await runAction(async () => {
-        order.value = await staffOrders.demoPay(order.value!.id)
+        order.value = await staffOrders.collectTablePayment(order.value!.id, order.value!.total_amount, paymentMethod.value, paymentMethod.value === 'CASH' ? '' : transactionRef.value)
         paid = true
+        paymentOpen.value = false
         await tablesStore.fetchAll()
     })
     // Điều hướng sau khi runAction đã bỏ cờ busy để guard cho phép rời trang.
@@ -288,6 +314,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--color-brand-act
 .spicy-levels input { margin: 0 3px 0 0; accent-color: var(--color-brand-action); }
 .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; font-size: 13px; }
 .field input, .field textarea { padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font: inherit; }
+.field select { padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font: inherit; background: #fff; }
+.payment-form { display: flex; flex-direction: column; gap: 14px; }.payment-form .field { margin: 0; }.payment-amount { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 14px; background: var(--color-brand-soft); border-radius: 8px; }.payment-confirm { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }.payment-help { margin: 0; color: #64748b; font-size: 12px; line-height: 1.5; }
 @media (max-width: 1100px) { .order-workspace { grid-template-columns: minmax(0, 1fr) 310px; gap: 12px; } }
 @media (max-width: 760px) { .order-workspace { grid-template-columns: 1fr; } .ticket { position: static; } .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .order-header h2 { font-size: 20px; } }
 </style>

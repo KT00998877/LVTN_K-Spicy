@@ -30,6 +30,7 @@
                     @click="openGroups[group.id] = !openGroups[group.id]"
                 >
                     <span>{{ group.label }}</span>
+                    <span v-if="!openGroups[group.id] && group.items.some((item) => managerBadgeFor(item.path) > 0)" class="nav-badge">{{ group.items.reduce((total, item) => total + managerBadgeFor(item.path), 0) }}</span>
                     <span class="group-chevron" :class="{ expanded: openGroups[group.id] }" aria-hidden="true"></span>
                 </button>
                 <div v-show="openGroups[group.id]" :id="'manager-group-' + group.id" class="group-links">
@@ -39,7 +40,10 @@
                         :to="item.path"
                         class="nav-item"
                         :class="{ active: isActive(item.path) }"
-                    >{{ item.label }}</RouterLink>
+                    >
+                        <span class="nav-label">{{ item.label }}</span>
+                        <span v-if="managerBadgeFor(item.path) > 0" class="nav-badge" :aria-label="`${managerBadgeFor(item.path)} việc cần xử lý`">{{ managerBadgeFor(item.path) }}</span>
+                    </RouterLink>
                 </div>
             </section>
         </nav>
@@ -70,13 +74,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, watch } from 'vue'
+import { computed, onMounted, ref, reactive, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useStaffStore } from '@/stores/staff'
 import { useKitchenStore } from '@/stores/staffKitchen'
 import { usePaymentsStore } from '@/stores/staffPayments'
 import { ROLE_LABELS, type StaffRole } from '@/types/staff'
+import api from '@/api/client'
+import { useStaffLiveRefresh } from '@/composables/useStaffLiveRefresh'
 
 const route = useRoute()
 const staffStore = useStaffStore()
@@ -87,6 +93,31 @@ const { roleInfo } = storeToRefs(staffStore)
 
 const collapsed = ref(false)
 const isManager = computed(() => staffStore.currentRole === 'MANAGER')
+type ManagerBadgeKey = 'online_orders' | 'purchase_orders' | 'stock_imports' | 'stocktakes' | 'stock_requests' | 'out_of_stock' | 'live_chat'
+const badgeKeyByPath: Record<string, ManagerBadgeKey> = {
+    '/staff/manager/online-orders': 'online_orders',
+    '/staff/manager/purchase-orders': 'purchase_orders',
+    '/staff/manager/stock-imports': 'stock_imports',
+    '/staff/manager/stocktake': 'stocktakes',
+    '/staff/manager/consumption': 'stock_requests',
+    '/staff/manager/inventory': 'out_of_stock',
+    '/staff/manager/live-chat': 'live_chat',
+}
+const managerCounts = ref<Partial<Record<ManagerBadgeKey, number>>>({})
+let countsLoading = false
+async function refreshManagerCounts() {
+    if (!isManager.value || countsLoading) return
+    countsLoading = true
+    try {
+        managerCounts.value = (await api.get<{ data: Record<ManagerBadgeKey, number> }>('/staff/manager/sidebar-counts')).data.data
+    } finally { countsLoading = false }
+}
+function managerBadgeFor(path: string): number {
+    const key = badgeKeyByPath[path]
+    return key ? managerCounts.value[key] ?? 0 : 0
+}
+onMounted(() => { if (isManager.value) void refreshManagerCounts().catch(() => {}) })
+useStaffLiveRefresh(refreshManagerCounts, () => isManager.value && !countsLoading)
 
 const managerGroups = [
     { id: 'menu', label: 'Quản lý thực đơn', items: [
@@ -98,6 +129,10 @@ const managerGroups = [
     { id: 'inventory', label: 'Kho & nguyên liệu', items: [
         { path: '/staff/manager/ingredients', label: 'Nguyên liệu' },
         { path: '/staff/manager/inventory', label: 'Kho hàng' },
+        { path: '/staff/manager/purchase-orders', label: 'Yêu cầu nhập hàng' },
+        { path: '/staff/manager/stock-imports', label: 'Phiếu nhập kho' },
+        { path: '/staff/manager/stock-transactions', label: 'Lịch sử giao dịch kho' },
+        { path: '/staff/manager/stocktake', label: 'Kiểm kê kho' },
         { path: '/staff/manager/consumption', label: 'Tiêu hao món bán' },
         { path: '/staff/manager/daily-stock', label: 'Sổ kho hằng ngày' },
     ] },
@@ -108,14 +143,14 @@ const managerGroups = [
     ] },
     { id: 'promotions', label: 'Khuyến mãi & Voucher', items: [
         { path: '/staff/manager/promotions', label: 'Mã giảm giá' },
-        { path: '/staff/manager/marketing-campaigns', label: 'Ưu đãi khung giờ vàng' },
+        { path: '/staff/manager/flash-sales', label: 'Flash Sale' },
+        { path: '/staff/manager/marketing-campaigns', label: 'Chiến dịch ưu đãi' },
         { path: '/staff/manager/marketing', label: 'AI Marketing Studio' },
     ] },
     { id: 'accounts', label: 'Tài khoản & phân quyền', items: [
         { path: '/staff/manager/accounts', label: 'Tài khoản' },
         { path: '/staff/manager/staff', label: 'Nhân viên' },
         { path: '/staff/manager/permissions', label: 'Phân quyền' },
-        { path: '/staff/manager/security', label: 'Bảo mật đăng nhập' },
     ] },
     { id: 'service', label: 'Dịch vụ khách hàng', items: [
         { path: '/staff/manager/live-chat', label: 'Tư vấn trực tiếp' },
@@ -149,7 +184,6 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
     WAITER: [
         { path: '/staff/waiter/tables',       label: 'Sơ đồ bàn',         roles: ['WAITER'] },
         { path: '/staff/waiter/orders',       label: 'Đơn đang phục vụ',  roles: ['WAITER'] },
-        { path: '/staff/waiter/reservations', label: 'Đặt bàn trước',     roles: ['WAITER'] },
     ],
     KITCHEN: [
         { path: '/staff/kitchen/queue',     label: 'Món chờ chế biến', roles: ['KITCHEN'] },
@@ -162,9 +196,13 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
         { path: '/staff/cashier/invoices',      label: 'Hóa đơn',            roles: ['CASHIER'] },
         { path: '/staff/cashier/online-orders', label: 'Đơn giao hàng',      roles: ['CASHIER'] },
         { path: '/staff/cashier/reservations',  label: 'Đặt bàn',            roles: ['CASHIER'] },
-        { path: '/staff/cashier/revenue',       label: 'Báo cáo doanh thu',  roles: ['CASHIER'] },
+        { path: '/staff/cashier/revenue',       label: 'Đối soát cuối ngày',  roles: ['CASHIER'] },
     ],
     SHIPPER: [{ path: '/staff/shipper', label: 'Giao hàng', roles: ['SHIPPER'] }],
+    SUPPLIER: [
+        { path: '/staff/supplier/purchase-orders', label: 'Yêu cầu nhập hàng', roles: ['SUPPLIER'] },
+        { path: '/staff/supplier/return-requests', label: 'Yêu cầu trả hàng', roles: ['SUPPLIER'] },
+    ],
     MANAGER: [
         { path: '/staff/manager/dashboard',  label: 'Tổng quan',         roles: ['MANAGER'] },
         { path: '/staff/manager/statistics', label: 'Thống kê tổng quan',roles: ['MANAGER'] },
@@ -372,6 +410,7 @@ const roleInfoSafe = computed(() => roleInfo.value ?? ROLE_LABELS.WAITER)
     text-align: center;
     line-height: 1.4;
 }
+.manager-groups .nav-item.active .nav-badge { background: var(--color-white); color: var(--color-brand-ink); }
 
 .sidebar-footer {
     padding: 12px;
@@ -401,5 +440,9 @@ const roleInfoSafe = computed(() => roleInfo.value ?? ROLE_LABELS.WAITER)
     .staff-sidebar .brand-text,
     .staff-sidebar .nav-badge { display: none; }
     .staff-sidebar .brand-mark { margin: 0 auto; }
+    .staff-sidebar.manager-sidebar { width: 260px; }
+    .staff-sidebar.manager-sidebar .nav-label,
+    .staff-sidebar.manager-sidebar .brand-text,
+    .staff-sidebar.manager-sidebar .nav-badge { display: initial; }
 }
 </style>
