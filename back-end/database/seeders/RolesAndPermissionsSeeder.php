@@ -16,6 +16,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['code' => 'WAITER',   'name' => 'Nhân viên phục vụ', 'description' => 'Phục vụ bàn, lên món, tạo hóa đơn'],
             ['code' => 'KITCHEN',  'name' => 'Nhân viên bếp',     'description' => 'Chế biến món, cập nhật trạng thái'],
             ['code' => 'CASHIER',  'name' => 'Thu ngân',          'description' => 'Quản lý thanh toán, đặt bàn, giờ công'],
+            ['code' => 'SUPPLIER', 'name' => 'Nhà cung cấp',      'description' => 'Phản hồi và giao yêu cầu nhập hàng'],
         ];
 
         foreach ($roles as $role) {
@@ -31,6 +32,9 @@ class RolesAndPermissionsSeeder extends Seeder
             ['code' => 'INGREDIENT_MANAGE', 'module' => 'INGREDIENT','description' => 'Quản lý nguyên liệu'],
             ['code' => 'INVENTORY_VIEW',    'module' => 'INVENTORY', 'description' => 'Xem tồn kho'],
             ['code' => 'INVENTORY_MANAGE',  'module' => 'INVENTORY', 'description' => 'Nhập/xuất/điều chỉnh kho'],
+            ['code' => 'PURCHASE_ORDER_VIEW', 'module' => 'PURCHASE_ORDER', 'description' => 'Xem yêu cầu nhập hàng'],
+            ['code' => 'PURCHASE_ORDER_RESPOND', 'module' => 'PURCHASE_ORDER', 'description' => 'Chấp nhận hoặc từ chối yêu cầu nhập hàng'],
+            ['code' => 'PURCHASE_ORDER_SHIP', 'module' => 'PURCHASE_ORDER', 'description' => 'Xác nhận gửi hàng'],
 
             ['code' => 'TABLE_VIEW',        'module' => 'TABLE',     'description' => 'Xem danh sách bàn'],
             ['code' => 'TABLE_MANAGE',      'module' => 'TABLE',     'description' => 'Mở/hủy bàn, tạo phiên phục vụ'],
@@ -66,6 +70,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'MANAGER' => [
                 'MENU_VIEW','MENU_MANAGE','CATEGORY_MANAGE',
                 'INGREDIENT_VIEW','INGREDIENT_MANAGE','INVENTORY_VIEW','INVENTORY_MANAGE',
+                'PURCHASE_ORDER_VIEW','PURCHASE_ORDER_RESPOND','PURCHASE_ORDER_SHIP',
                 'TABLE_VIEW','TABLE_MANAGE','RESERVATION_MANAGE',
                 'ORDER_CREATE','ORDER_VIEW','ORDER_UPDATE','ORDER_ITEM_UPDATE',
                 'INVOICE_CREATE','INVOICE_VIEW','INVOICE_ADJUST',
@@ -92,6 +97,9 @@ class RolesAndPermissionsSeeder extends Seeder
                 'MENU_VIEW','TABLE_VIEW','RESERVATION_MANAGE',
                 'ORDER_VIEW','INVOICE_CREATE','INVOICE_VIEW','PAYMENT_PROCESS',
                 'WORKSHIFT_MANAGE','REPORT_VIEW',
+            ],
+            'SUPPLIER' => [
+                'PURCHASE_ORDER_VIEW','PURCHASE_ORDER_RESPOND','PURCHASE_ORDER_SHIP',
             ],
         ];
 

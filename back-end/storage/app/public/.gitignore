@@ -1,2 +1,7 @@
 *
 !.gitignore
+!menu/
+menu/*
+!menu/bingsu-sua-dau.png
+!menu/hotteok-banh-kep-ngot.png
+!menu/patbingsu-dau-do.png

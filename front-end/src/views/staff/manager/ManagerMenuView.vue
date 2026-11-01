@@ -1,6 +1,6 @@
 <template>
     <div class="manager-menu">
-        <header class="manager-heading"><div><span class="eyebrow">QUẢN LÝ NHÀ HÀNG</span><h2>Thực đơn nhà hàng</h2><p>Tra cứu món, điều chỉnh giá và trạng thái mở bán.</p></div><button class="manager-button" :disabled="dashboardStore.loading" @click="dashboardStore.fetchAll()">Làm mới dữ liệu</button></header>
+        <header class="manager-heading"><div><span class="eyebrow">KHUYẾN MÃI & VOUCHER</span><h2>Flash Sale theo món</h2><p>Chọn món, mức giảm và thời gian áp dụng.</p></div><button class="manager-button" :disabled="dashboardStore.loading" @click="dashboardStore.fetchAll()">Làm mới dữ liệu</button></header>
         <p v-if="dashboardStore.loading" class="manager-notice" role="status">Đang tải dữ liệu…</p>
         <p v-else-if="dashboardStore.error" class="manager-notice error" role="alert">{{ dashboardStore.error }} <button @click="dashboardStore.fetchAll()">Thử lại</button></p>
         <div class="toolbar">
@@ -25,6 +25,7 @@
                         </div>
                         <span class="price">{{ formatVND(item.price) }}</span>
                     </div>
+                    <div v-if="item.flash_sale_discount && item.flash_sale_ends_at && new Date(item.flash_sale_ends_at).getTime() > Date.now()" class="sale-status">{{ item.flash_sale_starts_at && new Date(item.flash_sale_starts_at).getTime() > Date.now() ? 'Sắp diễn ra' : 'Đang Flash Sale' }} · giảm {{ formatVND(item.flash_sale_discount) }}</div>
                     <div class="menu-actions">
                         <label class="toggle-switch">
                             <input
@@ -37,6 +38,7 @@
                             <span class="toggle-text">{{ item.is_available ? 'Đang bán' : 'Hết món' }}</span>
                         </label>
                         <button class="manager-button" title="Cập nhật giá" @click="openEditDialog(item)">Sửa giá</button>
+                        <button class="manager-button" @click="openFlashSale(item)">Flash Sale</button>
                     </div>
                 </div>
             </div>
@@ -64,6 +66,22 @@
                 </div>
             </div>
         </Teleport>
+        <Teleport to="body">
+            <div v-if="saleItem" class="modal-backdrop" @click.self="saleItem = null">
+                <form class="modal-dialog" role="dialog" aria-modal="true" :aria-label="`Flash Sale ${saleItem.name}`" @submit.prevent="saveFlashSale">
+                    <div class="modal-header"><h3>Flash Sale — {{ saleItem.name }}</h3><button type="button" class="modal-close" @click="saleItem = null">Đóng</button></div>
+                    <div class="modal-body">
+                        <p>Giá gốc: {{ formatVND(saleItem.price) }}</p>
+                        <div class="form-group"><label class="form-label" for="sale-discount">Giảm mỗi món (đ)</label><input id="sale-discount" v-model.number="saleForm.discount" class="form-input" type="number" min="1000" :max="saleItem.price - 1" step="1000" required /></div>
+                        <div class="form-group"><label class="form-label" for="sale-start">Bắt đầu</label><input id="sale-start" v-model="saleForm.startsAt" class="form-input" type="datetime-local" required /></div>
+                        <div class="form-group"><label class="form-label" for="sale-end">Kết thúc</label><input id="sale-end" v-model="saleForm.endsAt" class="form-input" type="datetime-local" required /></div>
+                        <p v-if="saleForm.discount > 0 && saleForm.discount < saleItem.price" class="sale-preview">Giá Flash Sale: {{ formatVND(saleItem.price - saleForm.discount) }}</p>
+                        <p v-if="saleError" class="manager-notice error" role="alert">{{ saleError }}</p>
+                    </div>
+                    <div class="modal-footer"><button v-if="saleItem.flash_sale_discount" type="button" class="btn btn-secondary" :disabled="savingSale" @click="clearFlashSale">Gỡ Flash Sale</button><button type="button" class="btn btn-secondary" @click="saleItem = null">Hủy</button><button class="btn btn-primary" :disabled="savingSale">{{ savingSale ? 'Đang lưu…' : 'Lưu lịch' }}</button></div>
+                </form>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -73,7 +91,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDashboardStore } from '@/stores/staffDashboard'
 import { useToast, formatVND } from '@/composables/useStaffUtils'
-import type { MenuItemAdmin } from '@/api/staff'
+import { staffDashboard, type MenuItemAdmin } from '@/api/staff'
 
 const dashboardStore = useDashboardStore()
 const { menuItems } = storeToRefs(dashboardStore)
@@ -84,6 +102,54 @@ const searchQuery = ref('')
 const filterAvailable = ref<'all' | 'available' | 'unavailable'>('all')
 const editingItem = ref<MenuItemAdmin | null>(null)
 const saving = ref(false)
+const saleItem = ref<MenuItemAdmin | null>(null)
+const savingSale = ref(false)
+const saleError = ref('')
+const saleForm = reactive({ discount: 0, startsAt: '', endsAt: '' })
+
+function localDateTime(value?: string | null): string {
+    if (!value) return ''
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+function openFlashSale(item: MenuItemAdmin): void {
+    saleItem.value = item
+    saleError.value = ''
+    saleForm.discount = item.flash_sale_discount ?? 0
+    saleForm.startsAt = localDateTime(item.flash_sale_starts_at)
+    saleForm.endsAt = localDateTime(item.flash_sale_ends_at)
+}
+
+async function saveFlashSale(): Promise<void> {
+    if (!saleItem.value || savingSale.value) return
+    if (!Number.isInteger(saleForm.discount) || saleForm.discount < 1000 || saleForm.discount >= saleItem.value.price) { saleError.value = 'Mức giảm phải từ 1.000đ và nhỏ hơn giá gốc.'; return }
+    const start = new Date(saleForm.startsAt)
+    const end = new Date(saleForm.endsAt)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start || end <= new Date()) { saleError.value = 'Thời gian kết thúc phải sau lúc bắt đầu và ở tương lai.'; return }
+    savingSale.value = true
+    saleError.value = ''
+    try {
+        await staffDashboard.setFlashSale(saleItem.value.id, { flash_sale_discount: saleForm.discount, flash_sale_starts_at: start.toISOString(), flash_sale_ends_at: end.toISOString() })
+        await dashboardStore.fetchAll()
+        saleItem.value = null
+        toast.success('Đã lưu Flash Sale')
+    } catch (err: any) { saleError.value = err?.response?.data?.message || 'Không thể lưu Flash Sale.' }
+    finally { savingSale.value = false }
+}
+
+async function clearFlashSale(): Promise<void> {
+    if (!saleItem.value || savingSale.value) return
+    savingSale.value = true
+    saleError.value = ''
+    try {
+        await staffDashboard.setFlashSale(saleItem.value.id, { flash_sale_discount: null, flash_sale_starts_at: null, flash_sale_ends_at: null })
+        await dashboardStore.fetchAll()
+        saleItem.value = null
+        toast.success('Đã gỡ Flash Sale')
+    } catch (err: any) { saleError.value = err?.response?.data?.message || 'Không thể gỡ Flash Sale.' }
+    finally { savingSale.value = false }
+}
 
 const editForm = reactive({ price: 0 })
 const categories = computed(() => [...new Set(menuItems.value.map(item => item.category))].filter((category): category is string => !!category))
@@ -203,6 +269,8 @@ useRealtimeRefresh(() => dashboardStore.fetchAll(true), () => !dashboardStore.lo
     color: #f97316;
     font-size: 15px;
 }
+.sale-status { color: #b91c1c; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+.sale-preview { font-weight: 700; color: #b91c1c; }
 
 .menu-meta {
     display: flex;
@@ -221,6 +289,8 @@ useRealtimeRefresh(() => dashboardStore.fetchAll(true), () => !dashboardStore.lo
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .toggle-switch {

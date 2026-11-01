@@ -138,6 +138,10 @@ restart-chatbot.cmd
 /back-end/storage/pail
 /back-end/storage/app/public/*
 !/back-end/storage/app/public/.gitignore
+!/back-end/storage/app/public/menu/
+!/back-end/storage/app/public/menu/bingsu-sua-dau.png
+!/back-end/storage/app/public/menu/hotteok-banh-kep-ngot.png
+!/back-end/storage/app/public/menu/patbingsu-dau-do.png
 /back-end/storage/app/private/*
 !/back-end/storage/app/private/.gitignore
 /back-end/storage/framework/cache/data/*

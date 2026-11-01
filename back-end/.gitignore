@@ -26,3 +26,10 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /tests/
+!/tests/
+/tests/*
+!/tests/Feature/
+/tests/Feature/*
+!/tests/Feature/MarketingRealMenuCoverTest.php
+!/tests/Feature/TablePaymentTest.php
+!/tests/Feature/GoogleLoginTest.php
