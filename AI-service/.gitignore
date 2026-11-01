@@ -42,3 +42,5 @@ Thumbs.db
 dist/
 build/
 *.whl
+/docs/
+/evaluation/
