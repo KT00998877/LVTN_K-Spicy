@@ -596,6 +596,36 @@ class ToolExecutor:
         # Optional RAG retriever, attached by the service layer when it needs
         # to blend knowledge-base context with live tool data.
         self._retriever: Optional[Any] = None
+
+    @staticmethod
+    def _valid_arguments(arguments: Any, schema: dict[str, Any]) -> bool:
+        if not isinstance(arguments, dict):
+            return False
+        properties = schema.get("properties", {})
+        if any(key not in arguments for key in schema.get("required", [])):
+            return False
+        for key, value in arguments.items():
+            spec = properties.get(key)
+            if spec is None:
+                return False
+            kind = spec.get("type")
+            if kind == "integer" and (type(value) is not int or value < spec.get("minimum", value) or value > spec.get("maximum", value)):
+                return False
+            if key in {"order_id", "menu_item_id"} and value <= 0:
+                return False
+            if kind == "number" and (type(value) not in (int, float) or value < spec.get("minimum", value) or value > spec.get("maximum", value)):
+                return False
+            if kind == "string" and (not isinstance(value, str) or len(value) > spec.get("maxLength", len(value))):
+                return False
+            if key == "slug" and (not value or "/" in value or ".." in value):
+                return False
+            if "enum" in spec and value not in spec["enum"]:
+                return False
+            if kind == "array" and (not isinstance(value, list) or any(type(item) is not int for item in value)):
+                return False
+            if kind == "boolean" and type(value) is not bool:
+                return False
+        return True
     
     async def execute(
         self,
@@ -639,6 +669,14 @@ class ToolExecutor:
                 error="Thao tác này yêu cầu đăng nhập. Vui lòng đăng nhập để tiếp tục.",
                 error_code="UNAUTHORIZED",
                 latency_ms=int((time.perf_counter() - start) * 1000)
+            )
+
+        if not self._valid_arguments(arguments, tool_spec.parameters):
+            return ToolResult(
+                tool=tool_name, success=False,
+                error="Tham số công cụ không hợp lệ.",
+                error_code="INVALID_ARGUMENTS",
+                latency_ms=int((time.perf_counter() - start) * 1000),
             )
         
         # Check confirmation for write tools

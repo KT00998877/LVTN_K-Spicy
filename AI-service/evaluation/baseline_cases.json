@@ -1,0 +1,42 @@
+{
+  "retrieval": [
+    {"id":"r01","query":"Quán mở cửa lúc mấy giờ?","relevant_chunk_ids":["faq-gio-mo-cua"]},
+    {"id":"r02","query":"Cuối tuần nhà hàng có phục vụ không?","relevant_chunk_ids":["faq-gio-mo-cua"]},
+    {"id":"r03","query":"Địa chỉ K-Spicy ở đâu?","relevant_chunk_ids":["faq-dia-chi-quan","rest-info"]},
+    {"id":"r04","query":"Tôi gọi số nào để liên hệ quán?","relevant_chunk_ids":["faq-lien-he-hotline","rest-info"]},
+    {"id":"r05","query":"Mì cay có bao nhiêu mức cay?","relevant_chunk_ids":["faq-mon-cay-co-nhieu","policy-spicy-level-guide"]},
+    {"id":"r06","query":"Người mới ăn cay nên chọn cấp độ nào?","relevant_chunk_ids":["policy-spicy-level-guide","faq-mon-cay-co-nhieu"]},
+    {"id":"r07","query":"Quán có món cho người ăn chay thuần túy không?","relevant_chunk_ids":["faq-an-chay"]},
+    {"id":"r08","query":"Khách bị dị ứng đậu nành cần lưu ý gì?","relevant_chunk_ids":["faq-allergy"]},
+    {"id":"r09","query":"Đặt bàn trước tối thiểu bao lâu?","relevant_chunk_ids":["policy-reservation-rules","faq-dat-ban"]},
+    {"id":"r10","query":"Nhóm hơn 20 người có đặt bàn được không?","relevant_chunk_ids":["faq-dat-ban-nhom-lon","policy-reservation-rules"]},
+    {"id":"r11","query":"Quán giao hàng trong bán kính bao nhiêu km?","relevant_chunk_ids":["policy-delivery-rules","faq-giao-hang"]},
+    {"id":"r12","query":"Có thể trả tiền bằng MoMo không?","relevant_chunk_ids":["faq-thanh-toan"]},
+    {"id":"r13","query":"Quán có chỗ đậu ô tô không?","relevant_chunk_ids":["faq-do-xe"]},
+    {"id":"r14","query":"Ở quán có wifi cho khách không?","relevant_chunk_ids":["faq-wifi"]},
+    {"id":"r15","query":"Tôi có thể mua món mang đi không?","relevant_chunk_ids":["faq-mang-ve"]},
+    {"id":"r16","query":"Hạng Kim Cương cần chi tiêu bao nhiêu?","relevant_chunk_ids":["lt-diamond"]},
+    {"id":"r17","query":"Thành viên Bạc được tích điểm hệ số mấy?","relevant_chunk_ids":["lt-silver"]},
+    {"id":"r18","query":"Nhân viên có thể hủy món khi khách đổi ý không?","relevant_chunk_ids":["policy-cancel-khach-doi-y","policy-cancellation"]},
+    {"id":"r19","query":"Món đã bắt đầu chế biến thì ai xử lý hủy?","relevant_chunk_ids":["policy-cancel-mon-dang-che-bien","policy-cancellation"]},
+    {"id":"r20","query":"Đặt tiệc sinh nhật tại quán có được tặng tráng miệng không?","relevant_chunk_ids":["faq-khuyen-mai-sinh-nhat"]}
+  ],
+  "intent": [
+    {"id":"i01","message":"Xin chào","expected":"greet_user"},
+    {"id":"i02","message":"Cho tôi xem giỏ hàng","expected":"get_cart"},
+    {"id":"i03","message":"Thêm mì cay bò vào giỏ","expected":"add_to_cart"},
+    {"id":"i04","message":"Thực đơn có món gì?","expected":"get_menu"},
+    {"id":"i05","message":"Mì cay bò giá bao nhiêu?","expected":"get_price"},
+    {"id":"i06","message":"Có voucher nào không?","expected":"get_promotion"},
+    {"id":"i07","message":"Tôi muốn đặt bàn","expected":"make_reservation"},
+    {"id":"i08","message":"Đặt bàn như thế nào?","expected":"reservation_info"},
+    {"id":"i09","message":"Theo dõi đơn hàng của tôi","expected":"track_order"},
+    {"id":"i10","message":"Quán ở đâu?","expected":"get_info"},
+    {"id":"i11","message":"Tôi không muốn thêm vào giỏ","expected":"unknown","tag":"negation"},
+    {"id":"i12","message":"Toi muon xem gio hang","expected":"get_cart","tag":"no_diacritics"},
+    {"id":"i13","message":"Giá mì cay bò và thêm vào giỏ","expected":"add_to_cart","tag":"multi_intent_primary"},
+    {"id":"i14","message":"Mì cay có cay không?","expected":"unknown","tag":"ambiguous"},
+    {"id":"i15","message":"Cảm ơn bạn","expected":"unknown"},
+    {"id":"i16","message":"Quán mở cửa lúc mấy giờ?","expected":"get_info","tag":"diacritic_collision"}
+  ]
+}

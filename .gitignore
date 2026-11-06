@@ -104,6 +104,7 @@ dev.log
 # 6. ARCHIVE  (legacy code - 122MB, superseded by active dirs)
 # ---------------------------------------------------------------------------
 /archive/
+/AI-service-archive/
 
 # ---------------------------------------------------------------------------
 # 7. DOCS / ARTIFACTS  (keep .md, .svg, .png source of truth)

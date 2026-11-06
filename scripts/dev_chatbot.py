@@ -26,7 +26,8 @@ def main():
             if sock.connect_ex(("127.0.0.1", port)) == 0:
                 raise SystemExit(f"Port {port} is occupied. Stop its existing dev service before starting this stack.")
     env = os.environ.copy()
-    env.update(LARAVEL_API_URL="http://127.0.0.1:8000", PYTHONIOENCODING="utf-8")
+    env.update(LARAVEL_API_URL="http://127.0.0.1:8000", AI_SERVICE_HOST="127.0.0.1",
+               AI_SERVICE_PORT="8001", PYTHONIOENCODING="utf-8")
     processes = []
     logs = []
     # The two Laravel processes bind 0.0.0.0 so a phone on the LAN can reach

@@ -1,0 +1,13 @@
+{
+  "scope": "offline_static_retrieval_and_keyword_intent_only",
+  "retrieval_case_count": 20,
+  "intent_case_count": 15,
+  "k": 5,
+  "methods": {
+    "bm25": {"hit_at_5": 0.95, "recall_at_5": 0.925, "mrr": 0.8916666666666666},
+    "vector": {"hit_at_5": 0.85, "recall_at_5": 0.825, "mrr": 0.6416666666666667},
+    "hybrid": {"hit_at_5": 0.95, "recall_at_5": 0.925, "mrr": 0.75}
+  },
+  "intent_accuracy": 0.9333333333333333,
+  "note": "Summary captured before steps 2-5. Per-case results from that run were overwritten; see BASELINE.md."
+}

@@ -101,7 +101,8 @@ def main() -> None:
         raise SystemExit("Create AI-service/venv and install its dependencies first.")
 
     env = os.environ.copy()
-    env.update(LARAVEL_API_URL="http://127.0.0.1:8000", PYTHONIOENCODING="utf-8")
+    env.update(LARAVEL_API_URL="http://127.0.0.1:8000", AI_SERVICE_HOST="127.0.0.1",
+               AI_SERVICE_PORT=str(AI_PORT), PYTHONIOENCODING="utf-8")
     print("Starting AI Service...", flush=True)
     process = subprocess.Popen([str(python), "app.py"], cwd=AI_ROOT, env=env)
     try:

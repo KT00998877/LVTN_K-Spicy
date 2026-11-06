@@ -128,6 +128,15 @@ def is_reservation_request(message: str, tokens: list[str]) -> bool:
     return True
 
 
+def is_negated_cart_request(message: str) -> bool:
+    normalized = normalize_diacritics(message)
+    if "gio" not in normalized and not re.search(r"\bthem\b", normalized):
+        return False
+    if re.search(r"\b(?:khong|chua|dung)\s+(?:(?:muon|can)\s+)?(?:them|cho|mua|order)\b", normalized):
+        return True
+    return bool(re.search(r"\b(?:dung|huy|thoi|khong can nua)\b", normalized) and "gio" in normalized)
+
+
 def detect_intent(message: str) -> str:
     """
     Simple keyword-based intent detection with accurate word matching.
@@ -138,9 +147,12 @@ def detect_intent(message: str) -> str:
     msg_lower = message.lower()
     tokens = tokenize(msg_lower)
     normalized = normalize_diacritics(msg_lower)
+    if is_negated_cart_request(message):
+        return "unknown"
+    cart_mention = "giỏ" in msg_lower or "gio hang" in normalized
 
     # Specific actions take precedence over dish names and generic price words.
-    if matches_whole_word(message, "giỏ", tokens):
+    if cart_mention:
         return "add_to_cart" if matches_whole_word(message, "thêm", tokens) else "get_cart"
     if any(matches_whole_word(message, word, tokens) for word in ("khuyến mãi", "voucher", "giảm giá")):
         return "get_promotion"
@@ -152,23 +164,25 @@ def detect_intent(message: str) -> str:
     if is_reservation_request(message, tokens):
         return "make_reservation"
 
-    # Menu queries (check first - more specific)
-    menu_keywords = ["menu", "thực đơn", "danh mục", "món", "món gì", "có gì"]
-    if any(matches_whole_word(msg_lower, k, tokens) for k in menu_keywords):
-        return "get_menu"
-
     # Price queries
     price_keywords = ["giá", "bao nhiêu", "price", "tiền", "nhiều tiền"]
     if any(matches_whole_word(msg_lower, k, tokens) for k in price_keywords):
         return "get_price"
 
+    # Menu queries
+    menu_keywords = ["menu", "thực đơn", "danh mục", "món", "món gì", "có gì"]
+    if any(matches_whole_word(msg_lower, k, tokens) for k in menu_keywords):
+        return "get_menu"
+    if re.search(r"\b(?:mua|an|chon)\s+gi\b", normalized):
+        return "get_menu"
+
     # Cart queries
-    cart_keywords = ["giỏ", "giỏ hàng", "cart", "xem giỏ"]
+    cart_keywords = ["cart"]
     if any(matches_whole_word(msg_lower, k, tokens) for k in cart_keywords):
         return "get_cart"
 
     # Add to cart
-    add_cart_keywords = ["thêm vào giỏ", "cho vào giỏ", "mua", "order"]
+    add_cart_keywords = ["thêm vào giỏ", "cho vào giỏ"]
     if any(matches_whole_word(msg_lower, k, tokens) for k in add_cart_keywords):
         return "add_to_cart"
 
@@ -183,8 +197,8 @@ def detect_intent(message: str) -> str:
         return "track_order"
 
     # Info queries
-    info_keywords = ["ở đâu", "địa chỉ", "số điện thoại", "hotline", "mở cửa", "giờ"]
-    if any(k in msg_lower for k in info_keywords):
+    info_keywords = ["ở đâu", "địa chỉ", "số điện thoại", "hotline", "mở cửa", "giờ", "sdt"]
+    if any(matches_whole_word(message, keyword, tokens) for keyword in info_keywords):
         return "get_info"
 
     # Promotion queries
@@ -203,6 +217,42 @@ def detect_intent(message: str) -> str:
 
     # Default
     return "unknown"
+
+
+def detect_intents(message: str) -> list[str]:
+    """Detect distinct intents in clauses without changing the public intent field."""
+    clauses = re.split(r"\b(?:và|va|rồi|roi|sau đó|sau do)\b|[;,]", message, flags=re.IGNORECASE)
+    intents = [detect_intent(clause.strip()) for clause in clauses if clause.strip()]
+    return list(dict.fromkeys(intent for intent in intents if intent != "unknown"))
+
+
+def cart_write_issue(message: str) -> Optional[str]:
+    """Require a clear cart command with quantity and named item."""
+    normalized = normalize_diacritics(message)
+    if is_negated_cart_request(message):
+        return "not_requested"
+    if not re.search(r"\b(?:them|cho)\b.*\bgio(?:\s+hang)?\b", normalized):
+        return "not_requested"
+    match = re.search(
+        r"\b(?:them|cho)\s+(\d+)\s+(?:(?:phan|suat|mon|cai)\s+)?(.+?)\s+(?:vao\s+)?gio(?:\s+hang)?\b",
+        normalized,
+    )
+    if not match or not 1 <= int(match.group(1)) <= 99:
+        return "missing_quantity"
+    item = match.group(2).strip()
+    if re.match(r"^(?:mon|cai|no|do|nay)(?:\s|$)", item) or item in {"mi cay", "topping", "vao"}:
+        return "missing_item"
+    return None
+
+
+def retrieval_query(message: str) -> str:
+    """Expand short address/phone queries without changing the user's message."""
+    normalized = normalize_diacritics(message).strip()
+    if normalized in {"dia chi", "dia chi quan"}:
+        return "địa chỉ nhà hàng K-Spicy"
+    if normalized in {"sdt", "so dien thoai"}:
+        return "số điện thoại hotline nhà hàng K-Spicy"
+    return message
 
 
 def is_high_spice_preference(message: str) -> bool:
@@ -276,7 +326,7 @@ class ChatService:
         
         try:
             # Use await directly since this is async
-            results = await self._retriever.retrieve(query, top_k=5)
+            results = await self._retriever.retrieve(retrieval_query(query), top_k=5)
             
             if not results:
                 return ""
@@ -309,7 +359,7 @@ class ChatService:
             return {}
         
         try:
-            results = await self._retriever.retrieve(query, top_k=5)
+            results = await self._retriever.retrieve(retrieval_query(query), top_k=5)
             
             return {
                 "chunks_used": len(results),
@@ -580,26 +630,30 @@ class BusinessToolService:
         Returns:
             Tuple of (system_prompt, tool_declarations)
         """
-        # Smaller tool sets reduce latency and unrelated calls; retain all tools
-        # for ambiguous or compound questions.
-        relevant = {
+        # Offer the union of tools needed by each recognized intent.
+        tool_sets = {
             'get_menu': {'menu_lookup', 'menu_item_detail'},
             'get_price': {'menu_lookup', 'menu_item_detail'},
             'add_to_cart': {'menu_lookup', 'menu_item_detail', 'cart_add_item'},
             'get_promotion': {'promotion_list', 'voucher_preview'},
             'make_reservation': {'reservation_options'},
             'reservation_info': {'reservation_options'},
+            'get_cart': {'cart_view'},
             'track_order': {'order_list', 'order_detail'},
-        }.get(detect_intent(query))
-        if any(word in query.lower() for word in (' và ', ' rồi ', ';', 'danh mục')):
-            relevant = None
+        }
+        intents = detect_intents(query)
+        relevant = set().union(*(tool_sets.get(intent, set()) for intent in intents))
+        if not relevant:
+            relevant = {tool['name'] for tool in self._tool_registry.get_all_tools()}
+        if cart_write_issue(query) is not None:
+            relevant.discard('cart_add_item')
         tool_declarations = [tool for tool in self._tool_registry.get_all_tools()
-                             if relevant is None or tool['name'] in relevant]
+                             if tool['name'] in relevant]
 
         # Get tool list for system prompt
         tool_list = []
         for tool in self._tool_registry._tools.values():
-            if relevant is None or tool.name in relevant:
+            if tool.name in relevant:
                 tool_list.append(f"- {tool.name}: {tool.description}")
 
         tool_list_str = "\n".join(tool_list) if tool_list else "Không có công cụ khả dụng."
@@ -644,13 +698,19 @@ class BusinessToolService:
             Dict with intent, reply, tool_calls, confirmation_required, etc.
         """
         intent = detect_intent(message)
-        if not user_token and intent in {"get_cart", "add_to_cart", "track_order"}:
+        intents = detect_intents(message)
+        compound = len(intents) > 1
+        write_issue = cart_write_issue(message)
+        if intent == "add_to_cart" and not compound and write_issue in {"missing_item", "missing_quantity"}:
+            needed = "tên món" if write_issue == "missing_item" else "số lượng"
+            return {"intent": "unknown", "reply": f"Bạn muốn thêm món nào và bao nhiêu phần? Mình cần {needed} trước khi chuẩn bị giỏ hàng nhé.", "model": "live-api"}
+        if not compound and not user_token and intent in {"get_cart", "add_to_cart", "track_order"}:
             return {"intent": intent, "reply": "Bạn vui lòng đăng nhập để sử dụng chức năng này nhé.", "model": "live-api"}
-        if intent == "get_cart":
+        if intent == "get_cart" and not compound:
             answer = await self._read_only_fallback(message, user_id, user_token)
             return answer or {"intent": "error", "reply": "Chưa lấy được giỏ hàng. Vui lòng thử lại.", "model": "live-api"}
 
-        if intent in {"unknown", "get_menu"} and is_high_spice_preference(message):
+        if not compound and intent in {"unknown", "get_menu"} and is_high_spice_preference(message):
             result = await self._tool_executor.execute(
                 tool_name="menu_lookup",
                 arguments={"category": "mi-cay-han-quoc", "per_page": 20},
@@ -691,6 +751,8 @@ class BusinessToolService:
         # Build prompt with tools
         system_prompt, tool_declarations = self._build_tool_prompt(message)
         system_prompt += "\nKhách hiện tại " + ("đã đăng nhập." if user_token else "chưa đăng nhập.")
+        if write_issue in {"missing_item", "missing_quantity"}:
+            system_prompt += "\nYêu cầu thêm giỏ còn thiếu món hoặc số lượng. Hãy trả lời phần tra cứu nếu có và hỏi lại thông tin thiếu; không nói rằng đã thêm món."
 
         # Get RAG context if enabled
         rag_context = ""
@@ -732,7 +794,7 @@ Với các thông tin chung (địa chỉ, giờ mở cửa), bạn có thể tr
             tools=tool_declarations,
             temperature=0.6,
             history=prior_history,
-            function_calling_mode="ANY" if intent == "add_to_cart" else "AUTO",
+            function_calling_mode="ANY" if intent == "add_to_cart" and write_issue is None else "AUTO",
         )
 
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -741,6 +803,7 @@ Với các thông tin chung (địa chỉ, giờ mở cửa), bạn có thể tr
             logger.warning(f"Gemini function calling error: {result.error}")
             fallback = await self._read_only_fallback(message, user_id, user_token)
             if fallback:
+                fallback["fallback_used"] = True
                 return fallback
             return {
                 "intent": "error",
@@ -753,6 +816,7 @@ Với các thông tin chung (địa chỉ, giờ mở cửa), bạn có thể tr
         tool_results: list[dict[str, Any]] = []
         tool_history: list[dict[str, Any]] = []
         tool_calls = result.function_calls or []
+        allowed_tool_names = {tool["name"] for tool in tool_declarations}
         final_response = "" if tool_calls else (result.text or "")
 
         for round_idx in range(max_tool_rounds):
@@ -766,12 +830,25 @@ Với các thông tin chung (địa chỉ, giờ mở cửa), bạn có thể tr
                 tool_args = tool_call.get("args", {})
 
                 # Execute tool
-                exec_result = await self._tool_executor.execute(
-                    tool_name=tool_name,
-                    arguments=tool_args,
-                    user_id=user_id,
-                    user_token=user_token
-                )
+                if tool_name not in allowed_tool_names:
+                    exec_result = ToolResult(
+                        tool=tool_name, success=False,
+                        error="Công cụ không có trong yêu cầu hiện tại.",
+                        error_code="TOOL_NOT_OFFERED",
+                    )
+                elif tool_name == "cart_add_item" and write_issue is not None:
+                    exec_result = ToolResult(
+                        tool=tool_name, success=False,
+                        error="Vui lòng nêu rõ món và số lượng trước khi thêm vào giỏ.",
+                        error_code="CLARIFICATION_REQUIRED",
+                    )
+                else:
+                    exec_result = await self._tool_executor.execute(
+                        tool_name=tool_name,
+                        arguments=tool_args,
+                        user_id=user_id,
+                        user_token=user_token
+                    )
 
                 tool_results.append({
                     "tool": tool_name,

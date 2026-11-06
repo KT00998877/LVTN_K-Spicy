@@ -3,6 +3,7 @@ Hybrid Retrieval module - combines BM25 and Vector search.
 """
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from collections import Counter
@@ -267,7 +268,7 @@ class HybridRetriever:
         
         if method == "vector":
             if self._vector:
-                results = self._vector.search(query, k)
+                results = await asyncio.to_thread(self._vector.search, query, k)
                 return self._vector.to_retrieved_chunks(results)
             return []
         
@@ -279,8 +280,12 @@ class HybridRetriever:
             bm25_results = self._bm25.rank(query, k * 2)
         
         if self.use_vector and self._vector:
-            vec_raw = self._vector.search(query, k * 2)
-            vector_results = self._vector.to_retrieved_chunks(vec_raw)
+            try:
+                vec_raw = await asyncio.to_thread(self._vector.search, query, k * 2)
+                vector_results = self._vector.to_retrieved_chunks(vec_raw)
+            except Exception as exc:
+                logger.warning("Vector retrieval failed; using BM25 results: {}", type(exc).__name__)
+                return bm25_results[:k]
         
         return self._rrf_fusion(bm25_results, vector_results, k)
     

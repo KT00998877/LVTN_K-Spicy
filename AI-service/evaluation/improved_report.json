@@ -1,0 +1,1146 @@
+{
+  "scope": "offline_static_retrieval_and_keyword_intent_only",
+  "retrieval_case_count": 20,
+  "intent_case_count": 16,
+  "k": 5,
+  "methods": {
+    "bm25": {
+      "metrics": {
+        "hit_at_5": 0.95,
+        "recall_at_5": 0.925,
+        "mrr": 0.8916666666666666,
+        "mean_latency_ms": 0.23610000000000003,
+        "first_query_latency_ms": 0.23,
+        "later_queries_mean_latency_ms": 0.23642105263157895
+      },
+      "cases": [
+        {
+          "id": "r01",
+          "retrieved_chunk_ids": [
+            "faq-gio-mo-cua",
+            "faq-lien-he-hotline",
+            "faq-dat-ban",
+            "faq-dia-chi-quan",
+            "rest-info"
+          ],
+          "hits_at_k": [
+            "faq-gio-mo-cua"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.23
+        },
+        {
+          "id": "r02",
+          "retrieved_chunk_ids": [
+            "faq-an-tai-cho",
+            "policy-cancellation",
+            "faq-an-chay",
+            "policy-cancel-het-thoi-gian",
+            "lt-gold"
+          ],
+          "hits_at_k": [],
+          "recall_at_k": 0.0,
+          "reciprocal_rank": 0.0,
+          "latency_ms": 0.307
+        },
+        {
+          "id": "r03",
+          "retrieved_chunk_ids": [
+            "faq-dia-chi-quan",
+            "rest-info",
+            "faq-thanh-toan",
+            "faq-do-xe",
+            "faq-gio-mo-cua"
+          ],
+          "hits_at_k": [
+            "faq-dia-chi-quan",
+            "rest-info"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.148
+        },
+        {
+          "id": "r04",
+          "retrieved_chunk_ids": [
+            "faq-lien-he-hotline",
+            "policy-reservation-rules",
+            "faq-an-chay",
+            "faq-dat-ban",
+            "faq-dat-ban-nhom-lon"
+          ],
+          "hits_at_k": [
+            "faq-lien-he-hotline"
+          ],
+          "recall_at_k": 0.5,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.246
+        },
+        {
+          "id": "r05",
+          "retrieved_chunk_ids": [
+            "faq-mon-khong-cay",
+            "policy-spicy-level-guide",
+            "faq-mon-cay-co-nhieu",
+            "faq-combo-gia-dinh",
+            "rest-info"
+          ],
+          "hits_at_k": [
+            "policy-spicy-level-guide",
+            "faq-mon-cay-co-nhieu"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "latency_ms": 0.237
+        },
+        {
+          "id": "r06",
+          "retrieved_chunk_ids": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide",
+            "faq-combo-gia-dinh",
+            "faq-mon-khong-cay",
+            "faq-an-chay"
+          ],
+          "hits_at_k": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.267
+        },
+        {
+          "id": "r07",
+          "retrieved_chunk_ids": [
+            "faq-an-chay",
+            "faq-mon-khong-cay",
+            "faq-an-tai-cho",
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "hits_at_k": [
+            "faq-an-chay"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.276
+        },
+        {
+          "id": "r08",
+          "retrieved_chunk_ids": [
+            "faq-allergy",
+            "faq-do-xe",
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation",
+            "faq-mang-ve"
+          ],
+          "hits_at_k": [
+            "faq-allergy"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.235
+        },
+        {
+          "id": "r09",
+          "retrieved_chunk_ids": [
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "rest-info",
+            "faq-an-tai-cho",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-dat-ban",
+            "policy-reservation-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.185
+        },
+        {
+          "id": "r10",
+          "retrieved_chunk_ids": [
+            "faq-an-tai-cho",
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "faq-dat-ban-nhom-lon",
+            "faq-mon-khong-cay"
+          ],
+          "hits_at_k": [
+            "policy-reservation-rules",
+            "faq-dat-ban-nhom-lon"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.3333333333333333,
+          "latency_ms": 0.248
+        },
+        {
+          "id": "r11",
+          "retrieved_chunk_ids": [
+            "faq-giao-hang",
+            "policy-delivery-rules",
+            "faq-gio-mo-cua",
+            "rest-info",
+            "faq-thanh-toan"
+          ],
+          "hits_at_k": [
+            "faq-giao-hang",
+            "policy-delivery-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.228
+        },
+        {
+          "id": "r12",
+          "retrieved_chunk_ids": [
+            "faq-thanh-toan",
+            "faq-allergy",
+            "faq-mon-khong-cay",
+            "faq-an-tai-cho",
+            "faq-an-chay"
+          ],
+          "hits_at_k": [
+            "faq-thanh-toan"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.181
+        },
+        {
+          "id": "r13",
+          "retrieved_chunk_ids": [
+            "faq-do-xe",
+            "faq-an-tai-cho",
+            "faq-allergy",
+            "faq-mon-khong-cay",
+            "faq-dat-ban-nhom-lon"
+          ],
+          "hits_at_k": [
+            "faq-do-xe"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.19
+        },
+        {
+          "id": "r14",
+          "retrieved_chunk_ids": [
+            "faq-wifi",
+            "faq-an-tai-cho",
+            "faq-mon-khong-cay",
+            "faq-an-chay",
+            "faq-do-xe"
+          ],
+          "hits_at_k": [
+            "faq-wifi"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.182
+        },
+        {
+          "id": "r15",
+          "retrieved_chunk_ids": [
+            "faq-mang-ve",
+            "faq-do-xe",
+            "faq-an-tai-cho",
+            "faq-mon-khong-cay",
+            "faq-gio-mo-cua"
+          ],
+          "hits_at_k": [
+            "faq-mang-ve"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.202
+        },
+        {
+          "id": "r16",
+          "retrieved_chunk_ids": [
+            "lt-diamond",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-gold",
+            "lt-silver"
+          ],
+          "hits_at_k": [
+            "lt-diamond"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.203
+        },
+        {
+          "id": "r17",
+          "retrieved_chunk_ids": [
+            "lt-silver",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-diamond",
+            "lt-gold"
+          ],
+          "hits_at_k": [
+            "lt-silver"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.238
+        },
+        {
+          "id": "r18",
+          "retrieved_chunk_ids": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation",
+            "faq-an-chay",
+            "faq-allergy",
+            "policy-cancel-khach-di-ve"
+          ],
+          "hits_at_k": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.292
+        },
+        {
+          "id": "r19",
+          "retrieved_chunk_ids": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation",
+            "policy-cancel-nau-sai",
+            "policy-cancel-loi-he-thong",
+            "policy-cancel-chat-luong-khong-dat"
+          ],
+          "hits_at_k": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.274
+        },
+        {
+          "id": "r20",
+          "retrieved_chunk_ids": [
+            "faq-khuyen-mai-sinh-nhat",
+            "faq-dat-ban-nhom-lon",
+            "faq-an-tai-cho",
+            "rest-info",
+            "lt-bronze"
+          ],
+          "hits_at_k": [
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 0.353
+        }
+      ]
+    },
+    "vector": {
+      "metrics": {
+        "hit_at_5": 0.95,
+        "recall_at_5": 0.925,
+        "mrr": 0.925,
+        "mean_latency_ms": 684.7116,
+        "first_query_latency_ms": 13075.914,
+        "later_queries_mean_latency_ms": 32.543052631578945
+      },
+      "cases": [
+        {
+          "id": "r01",
+          "retrieved_chunk_ids": [
+            "faq-gio-mo-cua",
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "faq-dia-chi-quan",
+            "faq-an-tai-cho"
+          ],
+          "hits_at_k": [
+            "faq-gio-mo-cua"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 13075.914
+        },
+        {
+          "id": "r02",
+          "retrieved_chunk_ids": [
+            "policy-cancellation",
+            "policy-cancel-het-thoi-gian",
+            "faq-an-tai-cho",
+            "policy-cancel-khach-di-ve",
+            "policy-cancel-chat-luong-khong-dat"
+          ],
+          "hits_at_k": [],
+          "recall_at_k": 0.0,
+          "reciprocal_rank": 0.0,
+          "latency_ms": 26.916
+        },
+        {
+          "id": "r03",
+          "retrieved_chunk_ids": [
+            "faq-dia-chi-quan",
+            "rest-info",
+            "faq-an-tai-cho",
+            "faq-giao-hang",
+            "faq-mang-ve"
+          ],
+          "hits_at_k": [
+            "faq-dia-chi-quan",
+            "rest-info"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 27.383
+        },
+        {
+          "id": "r04",
+          "retrieved_chunk_ids": [
+            "faq-dat-ban-nhom-lon",
+            "faq-lien-he-hotline",
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-lien-he-hotline"
+          ],
+          "recall_at_k": 0.5,
+          "reciprocal_rank": 0.5,
+          "latency_ms": 28.645
+        },
+        {
+          "id": "r05",
+          "retrieved_chunk_ids": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide",
+            "faq-combo-gia-dinh",
+            "rest-info",
+            "faq-an-chay"
+          ],
+          "hits_at_k": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 36.323
+        },
+        {
+          "id": "r06",
+          "retrieved_chunk_ids": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide",
+            "faq-combo-gia-dinh",
+            "faq-an-chay",
+            "faq-mon-khong-cay"
+          ],
+          "hits_at_k": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 49.464
+        },
+        {
+          "id": "r07",
+          "retrieved_chunk_ids": [
+            "faq-an-chay",
+            "faq-mon-khong-cay",
+            "faq-mon-cay-co-nhieu",
+            "faq-combo-gia-dinh",
+            "faq-do-an-them"
+          ],
+          "hits_at_k": [
+            "faq-an-chay"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 49.752
+        },
+        {
+          "id": "r08",
+          "retrieved_chunk_ids": [
+            "faq-allergy",
+            "policy-cancel-het-nguyen-lieu",
+            "faq-an-tai-cho",
+            "faq-khuyen-mai-sinh-nhat",
+            "policy-cancel-khach-doi-y"
+          ],
+          "hits_at_k": [
+            "faq-allergy"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 40.121
+        },
+        {
+          "id": "r09",
+          "retrieved_chunk_ids": [
+            "policy-reservation-rules",
+            "faq-dat-ban",
+            "faq-an-tai-cho",
+            "faq-dat-ban-nhom-lon",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "policy-reservation-rules",
+            "faq-dat-ban"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 32.223
+        },
+        {
+          "id": "r10",
+          "retrieved_chunk_ids": [
+            "faq-dat-ban-nhom-lon",
+            "policy-reservation-rules",
+            "faq-dat-ban",
+            "faq-an-tai-cho",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-dat-ban-nhom-lon",
+            "policy-reservation-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 26.06
+        },
+        {
+          "id": "r11",
+          "retrieved_chunk_ids": [
+            "policy-delivery-rules",
+            "faq-giao-hang",
+            "faq-mang-ve",
+            "faq-do-xe",
+            "faq-an-tai-cho"
+          ],
+          "hits_at_k": [
+            "policy-delivery-rules",
+            "faq-giao-hang"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 33.403
+        },
+        {
+          "id": "r12",
+          "retrieved_chunk_ids": [
+            "faq-thanh-toan",
+            "lt-bronze",
+            "lt-gold",
+            "lt-diamond",
+            "faq-voucher-khuyen-mai"
+          ],
+          "hits_at_k": [
+            "faq-thanh-toan"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 29.348
+        },
+        {
+          "id": "r13",
+          "retrieved_chunk_ids": [
+            "faq-do-xe",
+            "faq-an-tai-cho",
+            "faq-dia-chi-quan",
+            "faq-do-an-them",
+            "faq-allergy"
+          ],
+          "hits_at_k": [
+            "faq-do-xe"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 30.426
+        },
+        {
+          "id": "r14",
+          "retrieved_chunk_ids": [
+            "faq-wifi",
+            "faq-an-tai-cho",
+            "faq-dat-ban",
+            "faq-thanh-toan",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-wifi"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 25.467
+        },
+        {
+          "id": "r15",
+          "retrieved_chunk_ids": [
+            "faq-mang-ve",
+            "faq-giao-hang",
+            "policy-cancellation",
+            "policy-cancel-het-thoi-gian",
+            "policy-cancel-mon-dang-che-bien"
+          ],
+          "hits_at_k": [
+            "faq-mang-ve"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 24.211
+        },
+        {
+          "id": "r16",
+          "retrieved_chunk_ids": [
+            "lt-diamond",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-gold",
+            "lt-silver"
+          ],
+          "hits_at_k": [
+            "lt-diamond"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 28.926
+        },
+        {
+          "id": "r17",
+          "retrieved_chunk_ids": [
+            "lt-silver",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-gold",
+            "lt-diamond"
+          ],
+          "hits_at_k": [
+            "lt-silver"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 27.045
+        },
+        {
+          "id": "r18",
+          "retrieved_chunk_ids": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation",
+            "policy-cancel-khach-di-ve",
+            "policy-cancel-khac",
+            "policy-cancel-het-nguyen-lieu"
+          ],
+          "hits_at_k": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 33.447
+        },
+        {
+          "id": "r19",
+          "retrieved_chunk_ids": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation",
+            "policy-cancel-het-nguyen-lieu",
+            "policy-cancel-nau-sai",
+            "policy-cancel-khach-doi-y"
+          ],
+          "hits_at_k": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 30.255
+        },
+        {
+          "id": "r20",
+          "retrieved_chunk_ids": [
+            "faq-khuyen-mai-sinh-nhat",
+            "faq-dat-ban-nhom-lon",
+            "faq-an-tai-cho",
+            "lt-bronze",
+            "policy-cancel-het-nguyen-lieu"
+          ],
+          "hits_at_k": [
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 38.903
+        }
+      ]
+    },
+    "hybrid": {
+      "metrics": {
+        "hit_at_5": 0.95,
+        "recall_at_5": 0.925,
+        "mrr": 0.925,
+        "mean_latency_ms": 30.99805,
+        "first_query_latency_ms": 31.955,
+        "later_queries_mean_latency_ms": 30.947684210526315
+      },
+      "cases": [
+        {
+          "id": "r01",
+          "retrieved_chunk_ids": [
+            "faq-gio-mo-cua",
+            "faq-dat-ban",
+            "faq-lien-he-hotline",
+            "faq-dia-chi-quan",
+            "policy-reservation-rules"
+          ],
+          "hits_at_k": [
+            "faq-gio-mo-cua"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 31.955
+        },
+        {
+          "id": "r02",
+          "retrieved_chunk_ids": [
+            "policy-cancellation",
+            "faq-an-tai-cho",
+            "policy-cancel-het-thoi-gian",
+            "policy-cancel-chat-luong-khong-dat",
+            "faq-lien-he-hotline"
+          ],
+          "hits_at_k": [],
+          "recall_at_k": 0.0,
+          "reciprocal_rank": 0.0,
+          "latency_ms": 35.641
+        },
+        {
+          "id": "r03",
+          "retrieved_chunk_ids": [
+            "faq-dia-chi-quan",
+            "rest-info",
+            "faq-do-xe",
+            "faq-gio-mo-cua",
+            "faq-mang-ve"
+          ],
+          "hits_at_k": [
+            "faq-dia-chi-quan",
+            "rest-info"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 26.37
+        },
+        {
+          "id": "r04",
+          "retrieved_chunk_ids": [
+            "faq-lien-he-hotline",
+            "faq-dat-ban-nhom-lon",
+            "policy-reservation-rules",
+            "faq-dat-ban",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-lien-he-hotline"
+          ],
+          "recall_at_k": 0.5,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 35.296
+        },
+        {
+          "id": "r05",
+          "retrieved_chunk_ids": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide",
+            "faq-mon-khong-cay",
+            "faq-combo-gia-dinh",
+            "rest-info"
+          ],
+          "hits_at_k": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 30.018
+        },
+        {
+          "id": "r06",
+          "retrieved_chunk_ids": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide",
+            "faq-combo-gia-dinh",
+            "faq-mon-khong-cay",
+            "faq-an-chay"
+          ],
+          "hits_at_k": [
+            "faq-mon-cay-co-nhieu",
+            "policy-spicy-level-guide"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 38.468
+        },
+        {
+          "id": "r07",
+          "retrieved_chunk_ids": [
+            "faq-an-chay",
+            "faq-mon-khong-cay",
+            "faq-mon-cay-co-nhieu",
+            "faq-combo-gia-dinh",
+            "policy-spicy-level-guide"
+          ],
+          "hits_at_k": [
+            "faq-an-chay"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 30.699
+        },
+        {
+          "id": "r08",
+          "retrieved_chunk_ids": [
+            "faq-allergy",
+            "policy-cancel-khach-doi-y",
+            "faq-an-tai-cho",
+            "policy-cancellation",
+            "faq-do-xe"
+          ],
+          "hits_at_k": [
+            "faq-allergy"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 35.685
+        },
+        {
+          "id": "r09",
+          "retrieved_chunk_ids": [
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "faq-an-tai-cho",
+            "faq-dat-ban-nhom-lon",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-dat-ban",
+            "policy-reservation-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 28.21
+        },
+        {
+          "id": "r10",
+          "retrieved_chunk_ids": [
+            "faq-an-tai-cho",
+            "faq-dat-ban-nhom-lon",
+            "faq-dat-ban",
+            "policy-reservation-rules",
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "hits_at_k": [
+            "faq-dat-ban-nhom-lon",
+            "policy-reservation-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "latency_ms": 32.8
+        },
+        {
+          "id": "r11",
+          "retrieved_chunk_ids": [
+            "faq-giao-hang",
+            "policy-delivery-rules",
+            "faq-gio-mo-cua",
+            "faq-mang-ve",
+            "faq-dia-chi-quan"
+          ],
+          "hits_at_k": [
+            "faq-giao-hang",
+            "policy-delivery-rules"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 29.296
+        },
+        {
+          "id": "r12",
+          "retrieved_chunk_ids": [
+            "faq-thanh-toan",
+            "policy-cancellation",
+            "faq-allergy",
+            "lt-bronze",
+            "faq-mon-khong-cay"
+          ],
+          "hits_at_k": [
+            "faq-thanh-toan"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 29.932
+        },
+        {
+          "id": "r13",
+          "retrieved_chunk_ids": [
+            "faq-do-xe",
+            "faq-an-tai-cho",
+            "faq-allergy",
+            "faq-thanh-toan",
+            "faq-dia-chi-quan"
+          ],
+          "hits_at_k": [
+            "faq-do-xe"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 27.62
+        },
+        {
+          "id": "r14",
+          "retrieved_chunk_ids": [
+            "faq-wifi",
+            "faq-an-tai-cho",
+            "faq-khuyen-mai-sinh-nhat",
+            "faq-mon-khong-cay",
+            "faq-dat-ban"
+          ],
+          "hits_at_k": [
+            "faq-wifi"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 26.805
+        },
+        {
+          "id": "r15",
+          "retrieved_chunk_ids": [
+            "faq-mang-ve",
+            "policy-cancellation",
+            "policy-cancel-chat-luong-khong-dat",
+            "faq-do-xe",
+            "faq-giao-hang"
+          ],
+          "hits_at_k": [
+            "faq-mang-ve"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 29.395
+        },
+        {
+          "id": "r16",
+          "retrieved_chunk_ids": [
+            "lt-diamond",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-gold",
+            "lt-silver"
+          ],
+          "hits_at_k": [
+            "lt-diamond"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 28.13
+        },
+        {
+          "id": "r17",
+          "retrieved_chunk_ids": [
+            "lt-silver",
+            "faq-thanh-vien",
+            "lt-bronze",
+            "lt-diamond",
+            "lt-gold"
+          ],
+          "hits_at_k": [
+            "lt-silver"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 32.962
+        },
+        {
+          "id": "r18",
+          "retrieved_chunk_ids": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation",
+            "policy-cancel-khach-di-ve",
+            "policy-cancel-nau-sai",
+            "policy-cancel-khac"
+          ],
+          "hits_at_k": [
+            "policy-cancel-khach-doi-y",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 28.486
+        },
+        {
+          "id": "r19",
+          "retrieved_chunk_ids": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation",
+            "policy-cancel-nau-sai",
+            "policy-cancel-het-nguyen-lieu",
+            "policy-cancel-chat-luong-khong-dat"
+          ],
+          "hits_at_k": [
+            "policy-cancel-mon-dang-che-bien",
+            "policy-cancellation"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 33.757
+        },
+        {
+          "id": "r20",
+          "retrieved_chunk_ids": [
+            "faq-khuyen-mai-sinh-nhat",
+            "faq-dat-ban-nhom-lon",
+            "faq-an-tai-cho",
+            "lt-bronze",
+            "faq-mon-khong-cay"
+          ],
+          "hits_at_k": [
+            "faq-khuyen-mai-sinh-nhat"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "latency_ms": 28.436
+        }
+      ]
+    }
+  },
+  "intent": {
+    "accuracy": 1.0,
+    "cases": [
+      {
+        "id": "i01",
+        "expected": "greet_user",
+        "actual": "greet_user",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i02",
+        "expected": "get_cart",
+        "actual": "get_cart",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i03",
+        "expected": "add_to_cart",
+        "actual": "add_to_cart",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i04",
+        "expected": "get_menu",
+        "actual": "get_menu",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i05",
+        "expected": "get_price",
+        "actual": "get_price",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i06",
+        "expected": "get_promotion",
+        "actual": "get_promotion",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i07",
+        "expected": "make_reservation",
+        "actual": "make_reservation",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i08",
+        "expected": "reservation_info",
+        "actual": "reservation_info",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i09",
+        "expected": "track_order",
+        "actual": "track_order",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i10",
+        "expected": "get_info",
+        "actual": "get_info",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i11",
+        "expected": "unknown",
+        "actual": "unknown",
+        "correct": true,
+        "tag": "negation"
+      },
+      {
+        "id": "i12",
+        "expected": "get_cart",
+        "actual": "get_cart",
+        "correct": true,
+        "tag": "no_diacritics"
+      },
+      {
+        "id": "i13",
+        "expected": "add_to_cart",
+        "actual": "add_to_cart",
+        "correct": true,
+        "tag": "multi_intent_primary"
+      },
+      {
+        "id": "i14",
+        "expected": "unknown",
+        "actual": "unknown",
+        "correct": true,
+        "tag": "ambiguous"
+      },
+      {
+        "id": "i15",
+        "expected": "unknown",
+        "actual": "unknown",
+        "correct": true,
+        "tag": null
+      },
+      {
+        "id": "i16",
+        "expected": "get_info",
+        "actual": "get_info",
+        "correct": true,
+        "tag": "diacritic_collision"
+      }
+    ]
+  },
+  "not_measured": [
+    "answer_correctness",
+    "tool_execution",
+    "auth",
+    "gemini_errors",
+    "end_to_end_latency"
+  ]
+}

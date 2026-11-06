@@ -1,5 +1,7 @@
 # K-Spicy AI Chatbot Service
 
+Đây là AI service chính của ứng dụng, chạy trên `127.0.0.1:8001` qua `scripts/dev_chatbot.py` hoặc `scripts/restart_chatbot.py`. Cài dependency trong `requirements.txt` trước khi chạy. Kết quả kiểm thử nằm trong `evaluation/`.
+
 Korean Spicy Noodle Restaurant AI Chatbot Service using Google Gemini API.
 
 ## Overview

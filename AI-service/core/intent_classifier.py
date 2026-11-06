@@ -4,6 +4,7 @@ Uses Gemini Structured Output for intent detection.
 """
 from __future__ import annotations
 
+import asyncio
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -107,7 +108,7 @@ class IntentClassifier:
         
         # Gemini structured classification
         if self._gemini.is_configured:
-            result = self._classify_with_gemini(message)
+            result = await asyncio.to_thread(self._classify_with_gemini, message)
             if result:
                 return result
         

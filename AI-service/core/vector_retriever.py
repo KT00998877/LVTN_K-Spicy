@@ -31,11 +31,12 @@ class VectorRetriever:
     Vector retriever using cosine similarity.
     
     Uses pre-computed embeddings (multilingual-e5-small, 384 dim).
-    Does NOT load any model - uses stored embeddings.
+    Encodes each query with the same E5 model used for stored embeddings.
     """
     
-    DEFAULT_EMBEDDINGS_PATH = "knowledge_base/embeddings/embeddings.jsonl"
+    DEFAULT_EMBEDDINGS_PATH = str(Path(__file__).resolve().parents[1] / "knowledge_base" / "embeddings" / "embeddings.jsonl")
     EMBEDDING_DIM = 384
+    MODEL_ID = "intfloat/multilingual-e5-small"
     
     def __init__(
         self,
@@ -55,6 +56,7 @@ class VectorRetriever:
         # Load embeddings
         self._chunk_embeddings: dict[str, list[float]] = {}
         self._chunk_norms: dict[str, float] = {}
+        self._query_model = None
         
         self._load_embeddings()
     
@@ -101,50 +103,18 @@ class VectorRetriever:
         dot = sum(a * b for a, b in zip(vec_a, vec_b))
         return dot / (norm_a * norm_b)
     
-    def _average_query_embedding(self, query: str) -> list[float]:
-        """
-        Compute average embedding for a query using chunk embeddings.
-        
-        Since we don't load the e5 model, we use a heuristic:
-        find chunks with similar text and average their embeddings.
-        
-        Note: This is a fallback for when the model is unavailable.
-        Real production should use the actual embedding model.
-        """
-        query_words = set(query.lower().split())
-        query_words = {w for w in query_words if len(w) > 2}
-        
-        # Find chunks with most matching words
-        scored_chunks = []
-        for chunk in self.chunks:
-            chunk_words = set(chunk.text.lower().split())
-            overlap = len(query_words & chunk_words)
-            if overlap > 0:
-                scored_chunks.append((overlap, chunk.chunk_id))
-        
-        if not scored_chunks:
-            # Fallback: use first chunk embedding
-            if self.chunks:
-                return self._chunk_embeddings.get(
-                    self.chunks[0].chunk_id, 
-                    [0.0] * self.EMBEDDING_DIM
-                )
-            return [0.0] * self.EMBEDDING_DIM
-        
-        scored_chunks.sort(key=lambda x: x[0], reverse=True)
-        top_n = min(3, len(scored_chunks))
-        
-        # Average top matching embeddings
-        avg = [0.0] * self.EMBEDDING_DIM
-        for _, chunk_id in scored_chunks[:top_n]:
-            emb = self._chunk_embeddings.get(chunk_id)
-            if emb:
-                for i in range(len(avg)):
-                    avg[i] += emb[i]
-        
-        # Normalize
-        avg = [x / top_n for x in avg]
-        return avg
+    def _embed_query(self, query: str) -> list[float]:
+        """Encode a question directly in the stored E5 document vector space."""
+        if self._query_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError("Install sentence-transformers for vector retrieval") from exc
+            self._query_model = SentenceTransformer(self.MODEL_ID)
+        vector = self._query_model.encode("query: " + query, normalize_embeddings=True)
+        if len(vector) != self.EMBEDDING_DIM:
+            raise ValueError("Query embedding dimension differs from stored vectors")
+        return list(vector)
     
     def search(
         self,
@@ -164,8 +134,7 @@ class VectorRetriever:
         if not self._chunk_embeddings:
             return []
         
-        # Compute query embedding via average of matching chunks
-        query_vec = self._average_query_embedding(query)
+        query_vec = self._embed_query(query)
         query_norm = self._norm(query_vec)
         
         if query_norm == 0:
