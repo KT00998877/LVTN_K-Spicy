@@ -25,12 +25,51 @@ class ShipperRepository {
   ShipperRepository(this._dio);
   final Dio _dio;
 
+  Future<List<NearbyJob>> fetchNearbyJobs() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/staff/deliveries/nearby-jobs',
+      );
+      return ((res.data?['data'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => NearbyJob.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
+
+  Future<void> accept(int orderId) async {
+    try {
+      await _dio.post('/staff/deliveries/$orderId/accept');
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
+
+  Future<void> updateLocation(
+    double latitude,
+    double longitude,
+    double accuracy,
+  ) async {
+    try {
+      await _dio.post(
+        '/staff/deliveries/location',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'accuracy': accuracy,
+        },
+      );
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
+
   /// GET /api/staff/deliveries
   Future<List<DeliveryOrder>> fetchDeliveries() async {
     try {
-      final res = await _dio.get<Map<String, dynamic>>(
-        '/staff/deliveries',
-      );
+      final res = await _dio.get<Map<String, dynamic>>('/staff/deliveries');
       final body = res.data ?? const {};
       final list = (body['data'] as List?) ?? const [];
       return list

@@ -5,3 +5,7 @@
 Chatbot là tác vụ của khách hàng, mở từ nút “Trợ lý” trong shell khách hàng. Màn chat dùng AppBar, vùng hội thoại cuộn, câu hỏi gợi ý, ô nhập có nhãn, trạng thái tải/lỗi và thẻ xác nhận thao tác. Nút xác nhận và hủy đều hiển thị; thao tác ghi chỉ chạy sau khi khách bấm xác nhận. Dùng màu và khoảng cách từ `AppColors` và `AppSpacing`; giữ vùng nhập trong `SafeArea` để bàn phím không che điều khiển.
 
 Các màn hình hoặc thành phần khách hàng thêm sau này nên dùng lại token, nhãn tiếng Việt rõ nghĩa và kích thước chạm tối thiểu 48 dp.
+
+## Shipper
+
+Màn hình shipper dùng bốn thẻ thống kê theo lưới hai cột trên điện thoại, thanh tab cuộn ngang theo thứ tự đơn gần nhất → được phân công → đang giao → chờ xác nhận → hoàn tất. Giữ trạng thái vị trí và lỗi API rõ ràng; lỗi của một nguồn dữ liệu không xóa dữ liệu đã tải từ nguồn khác. Thẻ đơn giữ các bước giao, thông tin người nhận, thanh toán và hành động tương ứng với trạng thái.

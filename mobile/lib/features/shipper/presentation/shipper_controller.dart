@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import '../../../core/api/api_exception.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/domain/order_models.dart';
@@ -16,11 +18,13 @@ import '../domain/shipper_models.dart';
 ///   - auto-refresh định kỳ 30s (mềm, không ép UI reload)
 /// ============================================================
 
-enum ShipperTab { delivering, awaiting, completed }
+enum ShipperTab { nearby, assigned, delivering, awaiting, completed }
 
 class ShipperHomeState {
   ShipperHomeState({
     this.orders = const [],
+    this.nearbyJobs = const [],
+    this.nearbyLoaded = false,
     this.stats,
     this.isLoading = false,
     this.busyId,
@@ -30,6 +34,8 @@ class ShipperHomeState {
   });
 
   final List<DeliveryOrder> orders;
+  final List<NearbyJob> nearbyJobs;
+  final bool nearbyLoaded;
   final ShipperStats? stats;
   final bool isLoading;
 
@@ -43,6 +49,17 @@ class ShipperHomeState {
   List<DeliveryOrder> get deliveringOrders =>
       orders.where((o) => o.status == OrderStatus.delivering).toList();
 
+  List<DeliveryOrder> get assignedOrders => orders
+      .where(
+        (o) => [
+          OrderStatus.confirmed,
+          OrderStatus.preparing,
+          OrderStatus.ready,
+          OrderStatus.readyNotifyShipper,
+        ].contains(o.status),
+      )
+      .toList();
+
   List<DeliveryOrder> get awaitingOrders =>
       orders.where((o) => o.status == OrderStatus.delivered).toList();
 
@@ -51,6 +68,8 @@ class ShipperHomeState {
 
   ShipperHomeState copyWith({
     List<DeliveryOrder>? orders,
+    List<NearbyJob>? nearbyJobs,
+    bool? nearbyLoaded,
     ShipperStats? stats,
     bool? isLoading,
     int? busyId,
@@ -62,6 +81,8 @@ class ShipperHomeState {
   }) {
     return ShipperHomeState(
       orders: orders ?? this.orders,
+      nearbyJobs: nearbyJobs ?? this.nearbyJobs,
+      nearbyLoaded: nearbyLoaded ?? this.nearbyLoaded,
       stats: stats ?? this.stats,
       isLoading: isLoading ?? this.isLoading,
       busyId: clearBusy ? null : (busyId ?? this.busyId),
@@ -91,29 +112,88 @@ class ShipperHomeController extends StateNotifier<ShipperHomeState> {
     if (!quiet) {
       state = state.copyWith(isLoading: true, clearError: true);
     }
+    bool current() => mounted && revision == _revision;
+
+    Future<void> loadOrders() async {
+      try {
+        final orders = await _repo.fetchDeliveries();
+        if (!current()) return;
+        state = state.copyWith(
+          orders: orders,
+          isLoading: false,
+          hasLoadedOnce: true,
+          lastRefreshedAt: DateTime.now(),
+        );
+      } catch (e) {
+        if (!current()) return;
+        state = state.copyWith(
+          isLoading: false,
+          hasLoadedOnce: true,
+          errorMessage: e is ApiException
+              ? e.message
+              : 'Không tải được đơn giao hàng. Vui lòng thử lại.',
+        );
+      }
+    }
+
+    Future<void> loadStats() async {
+      try {
+        final stats = await _repo.fetchStats();
+        if (current()) {
+          state = state.copyWith(stats: stats);
+        }
+      } catch (e) {
+        if (current()) {
+          state = state.copyWith(
+            errorMessage: e is ApiException
+                ? e.message
+                : 'Không tải được thống kê.',
+          );
+        }
+      }
+    }
+
+    Future<void> loadNearby() async {
+      try {
+        final nearby = await _repo.fetchNearbyJobs();
+        if (current()) {
+          state = state.copyWith(nearbyJobs: nearby, nearbyLoaded: true);
+        }
+      } catch (e) {
+        if (current()) {
+          state = state.copyWith(
+            nearbyLoaded: true,
+            errorMessage: e is ApiException
+                ? e.message
+                : 'Không tải được đơn gần bạn.',
+          );
+        }
+      }
+    }
+
+    unawaited(loadStats());
+    unawaited(loadNearby());
+    await loadOrders();
+  }
+
+  Future<bool> accept(int orderId) async {
+    if (state.busyId != null) return false;
+    state = state.copyWith(busyId: orderId, clearError: true);
     try {
-      final results = await Future.wait([
-        _repo.fetchDeliveries(),
-        _repo.fetchStats(),
-      ]);
-      if (!mounted || revision != _revision) return;
-      state = state.copyWith(
-        orders: results[0] as List<DeliveryOrder>,
-        stats: results[1] as ShipperStats,
-        isLoading: false,
-        lastRefreshedAt: DateTime.now(),
-        hasLoadedOnce: true,
-      );
+      await _repo.accept(orderId);
+      if (!mounted) return false;
+      state = state.copyWith(clearBusy: true);
+      await refresh(quiet: true);
+      return true;
     } catch (e) {
-      if (!mounted || revision != _revision) return;
-      final msg = e is ApiException
-          ? e.message
-          : 'Không tải được đơn giao hàng. Vui lòng thử lại.';
+      if (!mounted) return false;
       state = state.copyWith(
-        isLoading: false,
-        errorMessage: msg,
-        hasLoadedOnce: true,
+        clearBusy: true,
+        errorMessage: e is ApiException
+            ? e.message
+            : 'Không nhận được đơn. Vui lòng thử lại.',
       );
+      return false;
     }
   }
 
@@ -159,14 +239,12 @@ class ShipperHomeController extends StateNotifier<ShipperHomeState> {
   Future<bool> complete(int orderId) =>
       _runAction(() => _repo.complete(orderId), orderId);
 
-  Future<bool> reportIssue(int orderId, String reason) => _runAction(
-        () => _repo.reportIssue(orderId, reason),
-        orderId,
-      );
+  Future<bool> reportIssue(int orderId, String reason) =>
+      _runAction(() => _repo.reportIssue(orderId, reason), orderId);
 }
 
 final shipperHomeControllerProvider =
     StateNotifierProvider<ShipperHomeController, ShipperHomeState>((ref) {
-  ref.watch(authControllerProvider.select((a) => (a.user?.id, a.token)));
-  return ShipperHomeController(ref.watch(shipperRepositoryProvider));
-});
+      ref.watch(authControllerProvider.select((a) => (a.user?.id, a.token)));
+      return ShipperHomeController(ref.watch(shipperRepositoryProvider));
+    });

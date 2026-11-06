@@ -42,6 +42,38 @@ class ShipperStats {
   }
 }
 
+class NearbyJob {
+  const NearbyJob({
+    required this.id,
+    required this.code,
+    this.recipientName,
+    this.deliveryAddress,
+    required this.totalAmount,
+    required this.paymentMethod,
+    this.distanceKm,
+    required this.isMine,
+  });
+  final int id;
+  final String code;
+  final String? recipientName;
+  final String? deliveryAddress;
+  final double totalAmount;
+  final String paymentMethod;
+  final double? distanceKm;
+  final bool isMine;
+
+  factory NearbyJob.fromJson(Map<String, dynamic> json) => NearbyJob(
+    id: (json['id'] as num).toInt(),
+    code: (json['code'] ?? '').toString(),
+    recipientName: _asString(json['recipient_name']),
+    deliveryAddress: _asString(json['delivery_address']),
+    totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+    paymentMethod: (json['payment_method'] ?? '').toString(),
+    distanceKm: (json['distance_km'] as num?)?.toDouble(),
+    isMine: json['is_mine'] == true,
+  );
+}
+
 /// Đơn của shipper — dùng cho tab list + cards
 class DeliveryOrder {
   DeliveryOrder({
@@ -133,8 +165,8 @@ class DeliveryOrder {
       customerName: _asString(json['recipient_name']),
       customerPhone: _asString(json['recipient_phone']),
       deliveryAddress: _asString(json['delivery_address']),
-      deliveryLatitude: (json['delivery_latitude'] as num?)?.toDouble(),
-      deliveryLongitude: (json['delivery_longitude'] as num?)?.toDouble(),
+      deliveryLatitude: _asDouble(json['delivery_latitude']),
+      deliveryLongitude: _asDouble(json['delivery_longitude']),
       note: _asString(json['note']),
       deliveryIssue: _asString(json['delivery_issue']),
       payment: payment,
@@ -215,3 +247,6 @@ String? _asString(Object? raw) {
   final s = raw.toString();
   return s.isEmpty ? null : s;
 }
+
+double? _asDouble(Object? raw) =>
+    raw is num ? raw.toDouble() : double.tryParse(raw?.toString() ?? '');

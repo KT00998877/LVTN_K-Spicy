@@ -1,26 +1,28 @@
-﻿import 'dart:async' show Timer;
+import 'dart:async' show Timer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../app/theme.dart';
 import '../auth/presentation/auth_controller.dart';
 import '../orders/domain/order_models.dart';
 import 'domain/shipper_models.dart';
+import 'data/shipper_repository.dart';
 import 'presentation/shipper_controller.dart';
 
 /// ============================================================
-/// ðŸ›µ SHIPPER HOME â€” mÃ n chÃ­nh cho nhÃ¢n viÃªn giao hÃ ng
+/// 🛵 SHIPPER HOME — màn chính cho nhân viên giao hàng
 /// ============================================================
 /// Mirror ShipperHomeView.vue (web):
-///   â€¢ Stats card: Äang giao / Chá» XN / HoÃ n táº¥t hÃ´m nay / COD hÃ´m nay
-///   â€¢ 3 tab: Äang giao Â· Chá» khÃ¡ch xÃ¡c nháº­n Â· HoÃ n táº¥t
-///   â€¢ Card Ä‘Æ¡n: mÃ£, status pill, type badge, payment pill,
-///     timeline 3 bÆ°á»›c, thÃ´ng tin ngÆ°á»i nháº­n, danh sÃ¡ch mÃ³n,
-///     payment summary, action buttons theo tráº¡ng thÃ¡i.
-///   â€¢ Bottom sheet "BÃ¡o sá»± cá»‘" + route sang map "Xem Ä‘Æ°á»ng Ä‘i"
+///   • Stats card: Đang giao / Chờ XN / Hoàn tất hôm nay / COD hôm nay
+///   • 3 tab: Đang giao · Chờ khách xác nhận · Hoàn tất
+///   • Card đơn: mã, status pill, type badge, payment pill,
+///     timeline 3 bước, thông tin người nhận, danh sách món,
+///     payment summary, action buttons theo trạng thái.
+///   • Bottom sheet "Báo sự cố" + route sang map "Xem đường đi"
 /// ============================================================
 
 class ShipperHomeScreen extends ConsumerStatefulWidget {
@@ -33,25 +35,31 @@ class ShipperHomeScreen extends ConsumerStatefulWidget {
 class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
   ShipperTab _tab = ShipperTab.delivering;
   Timer? _autoRefreshTimer;
+  Timer? _locationTimer;
+  String _locationStatus = 'Đang lấy vị trí…';
+  bool _sendingLocation = false;
 
   @override
   void initState() {
     super.initState();
-    // Auto-refresh má»—i 30s (giáº£m táº£i máº¡ng, váº«n Ä‘á»§ real-time cho shipper).
-    _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) {
-        if (!mounted) return;
-        if (ref.read(shipperHomeControllerProvider).busyId == null) {
-          ref.read(shipperHomeControllerProvider.notifier).refresh(quiet: true);
-        }
-      },
+    // Auto-refresh mỗi 30s (giảm tải mạng, vẫn đủ real-time cho shipper).
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      if (ref.read(shipperHomeControllerProvider).busyId == null) {
+        ref.read(shipperHomeControllerProvider.notifier).refresh(quiet: true);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateLocation());
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _updateLocation(),
     );
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _locationTimer?.cancel();
     super.dispose();
   }
 
@@ -61,6 +69,47 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
 
   Future<void> _onManualRefresh() async {
     await ref.read(shipperHomeControllerProvider.notifier).refresh();
+    await _updateLocation();
+  }
+
+  Future<void> _updateLocation() async {
+    if (!mounted || _sendingLocation) return;
+    setState(() => _sendingLocation = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw Exception('Bật GPS để nhận đơn gần nhất.');
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        throw Exception('Cấp quyền vị trí để nhận đơn gần nhất.');
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+      await ref
+          .read(shipperRepositoryProvider)
+          .updateLocation(
+            position.latitude,
+            position.longitude,
+            position.accuracy,
+          );
+      if (mounted) setState(() => _locationStatus = 'Đang chia sẻ vị trí');
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => _locationStatus = e.toString().replaceFirst('Exception: ', ''),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingLocation = false);
+    }
   }
 
   @override
@@ -77,14 +126,14 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
           children: [
             const Text('Shipper'),
             Text(
-              'Xin chÃ o, ${user.name}',
+              'Xin chào, ${user.name}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'LÃ m má»›i',
+            tooltip: 'Làm mới',
             icon: state.isLoading
                 ? const SizedBox(
                     width: 18,
@@ -98,10 +147,9 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
             onPressed: state.isLoading ? null : _onManualRefresh,
           ),
           IconButton(
-            tooltip: 'ÄÄƒng xuáº¥t',
+            tooltip: 'Đăng xuất',
             icon: const Icon(Icons.logout_rounded),
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).logout(),
+            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
           ),
         ],
       ),
@@ -125,9 +173,32 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
       children: [
         _StatsBar(stats: state.stats),
         const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            const Icon(
+              Icons.location_on_outlined,
+              size: 18,
+              color: AppColors.spicyRed,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _locationStatus,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            TextButton(
+              onPressed: _sendingLocation ? null : _updateLocation,
+              child: Text(_sendingLocation ? 'Đang gửi…' : 'Cập nhật vị trí'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
         _TabBar(
           current: _tab,
           counts: (
+            nearby: state.nearbyJobs.length,
+            assigned: state.assignedOrders.length,
             delivering: state.deliveringOrders.length,
             awaiting: state.awaitingOrders.length,
             completed: state.completedOrders.length,
@@ -136,17 +207,14 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         if (state.errorMessage != null) ...[
-          _ErrorBanner(
-            message: state.errorMessage!,
-            onRetry: _onManualRefresh,
-          ),
+          _ErrorBanner(message: state.errorMessage!, onRetry: _onManualRefresh),
           const SizedBox(height: AppSpacing.sm),
         ],
         if (state.lastRefreshedAt != null)
           Padding(
             padding: const EdgeInsets.only(left: AppSpacing.xxs),
             child: Text(
-              'Cáº­p nháº­t lÃºc ${_formatTime(state.lastRefreshedAt!)}',
+              'Cập nhật lúc ${_formatTime(state.lastRefreshedAt!)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -161,7 +229,7 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
     ShipperHomeController notifier,
   ) {
     final isFirstLoad = !state.hasLoadedOnce && state.isLoading;
-    if (isFirstLoad) {
+    if (isFirstLoad && _tab != ShipperTab.nearby) {
       return [
         const Padding(
           padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
@@ -173,25 +241,48 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
     final String emptyTitle;
     final String emptyMessage;
     list = switch (_tab) {
+      ShipperTab.nearby => const <DeliveryOrder>[],
+      ShipperTab.assigned => state.assignedOrders,
       ShipperTab.delivering => state.deliveringOrders,
       ShipperTab.awaiting => state.awaitingOrders,
       ShipperTab.completed => state.completedOrders,
     };
     switch (_tab) {
+      case ShipperTab.nearby:
+        return [
+          if (!state.nearbyLoaded)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.xl),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          for (final job in state.nearbyJobs)
+            _NearbyJobCard(job: job, notifier: notifier),
+          if (state.nearbyLoaded && state.nearbyJobs.isEmpty)
+            const _EmptyState(
+              title: 'Chưa có đơn gần bạn',
+              message: 'Đơn mới sẽ hiện tại đây khi có thể nhận.',
+            ),
+        ];
+      case ShipperTab.assigned:
+        emptyTitle = 'Chưa có đơn được phân công';
+        emptyMessage = 'Đơn được quản lý giao cho bạn sẽ hiện tại đây.';
+        break;
       case ShipperTab.delivering:
-        emptyTitle = 'ChÆ°a cÃ³ Ä‘Æ¡n Ä‘ang giao';
+        emptyTitle = 'Chưa có đơn đang giao';
         emptyMessage =
-            'Chá» quáº£n lÃ½ / thu ngÃ¢n bÃ n giao Ä‘Æ¡n cho báº¡n. ÄÆ¡n má»›i sáº½ tá»± hiá»ƒn thá»‹ á»Ÿ Ä‘Ã¢y.';
+            'Chờ quản lý / thu ngân bàn giao đơn cho bạn. Đơn mới sẽ tự hiển thị ở đây.';
         break;
       case ShipperTab.awaiting:
-        emptyTitle = 'ChÆ°a cÃ³ Ä‘Æ¡n chá» khÃ¡ch xÃ¡c nháº­n';
+        emptyTitle = 'Chưa có đơn chờ khách xác nhận';
         emptyMessage =
-            'CÃ¡c Ä‘Æ¡n báº¡n Ä‘Ã£ giao sáº½ xuáº¥t hiá»‡n á»Ÿ Ä‘Ã¢y vÃ  chá» khÃ¡ch báº¥m "TÃ´i Ä‘Ã£ nháº­n hÃ ng".';
+            'Các đơn bạn đã giao sẽ xuất hiện ở đây và chờ khách bấm "Tôi đã nhận hàng".';
         break;
       case ShipperTab.completed:
-        emptyTitle = 'ChÆ°a cÃ³ Ä‘Æ¡n hoÃ n táº¥t';
+        emptyTitle = 'Chưa có đơn hoàn tất';
         emptyMessage =
-            'CÃ¡c Ä‘Æ¡n khÃ¡ch Ä‘Ã£ xÃ¡c nháº­n nháº­n hÃ ng sáº½ xuáº¥t hiá»‡n á»Ÿ Ä‘Ã¢y.';
+            'Các đơn khách đã xác nhận nhận hàng sẽ xuất hiện ở đây.';
         break;
     }
     if (list.isEmpty) {
@@ -211,7 +302,7 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ STATS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── STATS ───────────────────────
 
 class _StatsBar extends StatelessWidget {
   const _StatsBar({required this.stats});
@@ -220,44 +311,52 @@ class _StatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = stats;
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: 'Äang giao',
-            value: '${s?.delivering ?? 0}',
-            accent: AppColors.spicyRed,
-            icon: Icons.delivery_dining_rounded,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: _StatCard(
-            label: 'Chá» XN',
-            value: '${s?.awaiting ?? 0}',
-            accent: AppColors.chiliOrange,
-            icon: Icons.hourglass_top_rounded,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: _StatCard(
-            label: 'HoÃ n táº¥t',
-            value: '${s?.completedToday ?? 0}',
-            accent: AppColors.success,
-            icon: Icons.check_circle_rounded,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: _StatCard(
-            label: 'COD hÃ´m nay',
-            value: s == null ? 'â€”' : _shortMoney(s.codCollectedToday),
-            accent: AppColors.goldenYellow,
-            icon: Icons.payments_rounded,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - AppSpacing.xs) / 2;
+        return Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            SizedBox(
+              width: width,
+              child: _StatCard(
+                label: 'Đang giao',
+                value: s == null ? '—' : '${s.delivering}',
+                accent: AppColors.spicyRed,
+                icon: Icons.delivery_dining_rounded,
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: _StatCard(
+                label: 'Chờ XN',
+                value: s == null ? '—' : '${s.awaiting}',
+                accent: AppColors.chiliOrange,
+                icon: Icons.hourglass_top_rounded,
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: _StatCard(
+                label: 'Hoàn tất',
+                value: s == null ? '—' : '${s.completedToday}',
+                accent: AppColors.success,
+                icon: Icons.check_circle_rounded,
+              ),
+            ),
+            SizedBox(
+              width: width,
+              child: _StatCard(
+                label: 'COD hôm nay',
+                value: s == null ? '—' : _shortMoney(s.codCollectedToday),
+                accent: AppColors.goldenYellow,
+                icon: Icons.payments_rounded,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -285,12 +384,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border(
-          top: BorderSide(color: accent, width: 3),
-          left: BorderSide(color: AppColors.border),
-          right: BorderSide(color: AppColors.border),
-          bottom: BorderSide(color: AppColors.border),
-        ),
+        border: Border.all(color: AppColors.border),
         boxShadow: AppShadow.card,
       ),
       child: Column(
@@ -325,7 +419,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ TABS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── TABS ───────────────────────
 
 class _TabBar extends StatelessWidget {
   const _TabBar({
@@ -335,7 +429,14 @@ class _TabBar extends StatelessWidget {
   });
 
   final ShipperTab current;
-  final ({int delivering, int awaiting, int completed}) counts;
+  final ({
+    int nearby,
+    int assigned,
+    int delivering,
+    int awaiting,
+    int completed,
+  })
+  counts;
   final ValueChanged<ShipperTab> onChanged;
 
   @override
@@ -347,86 +448,137 @@ class _TabBar extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.all(AppSpacing.xxs),
-      child: Row(
-        children: [
-          _tab(context, ShipperTab.delivering, 'Äang giao', counts.delivering),
-          _tab(context, ShipperTab.awaiting, 'Chá» XN', counts.awaiting),
-          _tab(context, ShipperTab.completed, 'HoÃ n táº¥t', counts.completed),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _tab(context, ShipperTab.nearby, 'Đơn gần nhất', counts.nearby),
+            _tab(
+              context,
+              ShipperTab.assigned,
+              'Được phân công',
+              counts.assigned,
+            ),
+            _tab(
+              context,
+              ShipperTab.delivering,
+              'Đang giao',
+              counts.delivering,
+            ),
+            _tab(context, ShipperTab.awaiting, 'Chờ XN', counts.awaiting),
+            _tab(context, ShipperTab.completed, 'Hoàn tất', counts.completed),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _tab(
-    BuildContext context,
-    ShipperTab tab,
-    String label,
-    int count,
-  ) {
+  Widget _tab(BuildContext context, ShipperTab tab, String label, int count) {
     final selected = current == tab;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onChanged(tab),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.sm,
-            horizontal: AppSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.spicyRed : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: selected
-                        ? AppColors.textOnDark
-                        : AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(tab),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.spicyRed : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: selected
+                    ? AppColors.textOnDark
+                    : AppColors.textSecondary,
               ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 1,
-                ),
-                decoration: BoxDecoration(
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : AppColors.creamSoft,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                   color: selected
-                      ? Colors.white.withValues(alpha: 0.22)
-                      : AppColors.creamSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: selected
-                        ? AppColors.textOnDark
-                        : AppColors.textPrimary,
-                  ),
+                      ? AppColors.textOnDark
+                      : AppColors.textPrimary,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ DELIVERY CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── DELIVERY CARD ───────────────────────
+
+class _NearbyJobCard extends StatelessWidget {
+  const _NearbyJobCard({required this.job, required this.notifier});
+  final NearbyJob job;
+  final ShipperHomeController notifier;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(job.code, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            '${job.recipientName ?? 'Khách hàng'} — ${job.deliveryAddress ?? 'Chưa có địa chỉ'}',
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${_shortMoney(job.totalAmount)} · ${job.paymentMethod == 'COD' ? 'Thu COD' : 'Đã thanh toán'}'
+            '${job.distanceKm == null ? '' : ' · cách ${job.distanceKm!.toStringAsFixed(2)} km'}',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton(
+            onPressed: notifier.currentState.busyId != null
+                ? null
+                : () async {
+                    final ok = await notifier.accept(job.id);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Đã nhận đơn ${job.code}.'
+                              : notifier.currentState.errorMessage ??
+                                    'Không nhận được đơn.',
+                        ),
+                      ),
+                    );
+                  },
+            child: const Text('Nhận đơn'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 class _DeliveryCard extends ConsumerWidget {
   const _DeliveryCard({required this.order, required this.notifier});
@@ -505,20 +657,17 @@ class _CardHeader extends StatelessWidget {
                 color: _statusColor(order.status),
               ),
               _Pill(
-                text: order.isTakeaway ? 'MANG ÄI' : 'GIAO Táº¬N NÆ I',
+                text: order.isTakeaway ? 'MANG ĐI' : 'GIAO TẬN NƠI',
                 color: order.isTakeaway ? AppColors.warning : AppColors.info,
               ),
               _Pill(
-                text: order.paymentMethod == 'COD' ? 'COD' : 'ÄÃƒ THANH TOÃN',
+                text: order.paymentMethod == 'COD' ? 'COD' : 'ĐÃ THANH TOÁN',
                 color: order.paymentMethod == 'COD'
                     ? AppColors.chiliOrange
                     : AppColors.mutedGreen,
               ),
               if (order.deliveryIssue != null)
-                const _Pill(
-                  text: 'Sá»° Cá»',
-                  color: AppColors.warning,
-                ),
+                const _Pill(text: 'SỰ CỐ', color: AppColors.warning),
             ],
           ),
         ),
@@ -561,9 +710,7 @@ class _StepTimeline extends StatelessWidget {
                 child: Container(
                   height: 2,
                   margin: const EdgeInsets.only(top: 18),
-                  color: steps[i].done
-                      ? AppColors.spicyRed
-                      : AppColors.border,
+                  color: steps[i].done ? AppColors.spicyRed : AppColors.border,
                 ),
               ),
             _StepNode(step: steps[i]),
@@ -579,13 +726,13 @@ class _StepTimeline extends StatelessWidget {
     final delivered = order.deliveredAt != null;
     return [
       _Step(
-        label: 'Láº¥y mÃ³n',
+        label: 'Lấy món',
         time: order.pickedUpAt,
         done: pickedUp,
         active: !pickedUp,
       ),
       _Step(
-        label: order.isOnline ? 'Tá»›i nÆ¡i' : 'Mang Ä‘i',
+        label: order.isOnline ? 'Tới nơi' : 'Mang đi',
         time: order.arrivedAt,
         done: arrived || (order.isTakeaway && pickedUp),
         active: pickedUp && !arrived && order.isOnline,
@@ -595,7 +742,8 @@ class _StepTimeline extends StatelessWidget {
         label: 'Giao xong',
         time: order.deliveredAt,
         done: delivered,
-        active: (pickedUp && order.isTakeaway && !delivered) ||
+        active:
+            (pickedUp && order.isTakeaway && !delivered) ||
             (arrived && !delivered),
       ),
     ];
@@ -626,16 +774,16 @@ class _StepNode extends StatelessWidget {
     final color = step.done
         ? AppColors.spicyRed
         : step.active
-            ? AppColors.spicyRed
-            : AppColors.border;
+        ? AppColors.spicyRed
+        : AppColors.border;
     final fg = step.done || step.active
         ? AppColors.textOnDark
         : AppColors.textMuted;
-    final stepNumber = step.label == 'Láº¥y mÃ³n'
+    final stepNumber = step.label == 'Lấy món'
         ? '1'
-        : step.label == 'Tá»›i nÆ¡i' || step.label == 'Mang Ä‘i'
-            ? '2'
-            : '3';
+        : step.label == 'Tới nơi' || step.label == 'Mang đi'
+        ? '2'
+        : '3';
     return SizedBox(
       width: 76,
       child: Column(
@@ -648,8 +796,8 @@ class _StepNode extends StatelessWidget {
               color: step.done
                   ? AppColors.spicyRed
                   : step.active
-                      ? Colors.white
-                      : AppColors.creamSoft,
+                  ? Colors.white
+                  : AppColors.creamSoft,
               shape: BoxShape.circle,
               border: Border.all(
                 color: step.disabled ? AppColors.border : color,
@@ -658,11 +806,7 @@ class _StepNode extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: step.done
-                ? const Icon(
-                    Icons.check_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  )
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
                 : Text(
                     stepNumber,
                     style: TextStyle(
@@ -716,7 +860,7 @@ class _AwaitingBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'ÄÃ£ giao xong Â· chá» khÃ¡ch xÃ¡c nháº­n',
+            'Đã giao xong · chờ khách xác nhận',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: Color(0xFF0E7490),
@@ -725,7 +869,7 @@ class _AwaitingBanner extends StatelessWidget {
           ),
           SizedBox(height: 2),
           Text(
-            'ÄÆ¡n hoÃ n táº¥t khi khÃ¡ch báº¥m "TÃ´i Ä‘Ã£ nháº­n hÃ ng". Náº¿u khÃ¡ch khÃ´ng xÃ¡c nháº­n, Ä‘Æ¡n váº«n á»Ÿ tráº¡ng thÃ¡i nÃ y vÃ  khÃ´ng Ä‘Æ°á»£c tÃ­ch Ä‘iá»ƒm.',
+            'Đơn hoàn tất khi khách bấm "Tôi đã nhận hàng". Nếu khách không xác nhận, đơn vẫn ở trạng thái này và không được tích điểm.',
             style: TextStyle(
               fontSize: 12,
               color: Color(0xFF155E75),
@@ -747,13 +891,13 @@ class _RecipientSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'NgÆ°á»i nháº­n'),
+        const _SectionLabel(text: 'Người nhận'),
         const SizedBox(height: AppSpacing.xxs),
         Row(
           children: [
             Expanded(
               child: Text(
-                order.customerName ?? 'â€”',
+                order.customerName ?? '—',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -768,7 +912,7 @@ class _RecipientSection extends StatelessWidget {
         if (order.isOnline) ...[
           const SizedBox(height: 2),
           Text(
-            order.deliveryAddress ?? 'â€”',
+            order.deliveryAddress ?? '—',
             style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
           ),
           if (order.hasCoordinates) ...[
@@ -779,12 +923,12 @@ class _RecipientSection extends StatelessWidget {
               children: [
                 _GhostChip(
                   icon: Icons.map_rounded,
-                  label: 'Xem Ä‘Æ°á»ng Ä‘i',
+                  label: 'Xem đường đi',
                   onTap: () => _openMap(context),
                 ),
                 _GhostChip(
                   icon: Icons.directions_car_rounded,
-                  label: 'Má»Ÿ Google Maps',
+                  label: 'Mở Google Maps',
                   onTap: () => _openExternalMap(context),
                 ),
               ],
@@ -793,7 +937,7 @@ class _RecipientSection extends StatelessWidget {
         ] else ...[
           const SizedBox(height: 2),
           const Text(
-            'KhÃ¡ch sáº½ Ä‘áº¿n quÃ¡n nháº­n â€” khÃ´ng cáº§n giao táº­n nÆ¡i.',
+            'Khách sẽ đến quán nhận — không cần giao tận nơi.',
             style: TextStyle(
               fontSize: 12,
               fontStyle: FontStyle.italic,
@@ -811,7 +955,7 @@ class _RecipientSection extends StatelessWidget {
               border: Border.all(color: const Color(0xFFFDE68A)),
             ),
             child: Text(
-              'Ghi chÃº khÃ¡ch: ${order.note}',
+              'Ghi chú khách: ${order.note}',
               style: const TextStyle(fontSize: 12, color: Color(0xFF78350F)),
             ),
           ),
@@ -836,7 +980,7 @@ class _RecipientSection extends StatelessWidget {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('KhÃ´ng má»Ÿ Ä‘Æ°á»£c Google Maps.')),
+        const SnackBar(content: Text('Không mở được Google Maps.')),
       );
     }
   }
@@ -860,7 +1004,7 @@ class _CallButton extends StatelessWidget {
             await launchUrl(uri);
           } else {
             messenger.showSnackBar(
-              SnackBar(content: Text('KhÃ´ng gá»i Ä‘Æ°á»£c $phone')),
+              SnackBar(content: Text('Không gọi được $phone')),
             );
           }
         },
@@ -903,7 +1047,7 @@ class _ItemsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(text: 'MÃ³n trong Ä‘Æ¡n (${order.items.length})'),
+        _SectionLabel(text: 'Món trong đơn (${order.items.length})'),
         const SizedBox(height: AppSpacing.xxs),
         ...order.items.map(
           (it) => Padding(
@@ -933,7 +1077,7 @@ class _ItemsSection extends StatelessWidget {
                             borderRadius: BorderRadius.circular(AppRadius.xs),
                           ),
                           child: Text(
-                            'Cáº¥p ${it.spicyLevel}',
+                            'Cấp ${it.spicyLevel}',
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -945,7 +1089,7 @@ class _ItemsSection extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Ã— ${it.quantity}',
+                  '× ${it.quantity}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -969,10 +1113,10 @@ class _PaymentSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = order.payment;
     final statusText = p == null
-        ? 'â€”'
+        ? '—'
         : p.isPaid
-            ? 'ÄÃ£ thanh toÃ¡n'
-            : 'ChÆ°a thanh toÃ¡n';
+        ? 'Đã thanh toán'
+        : 'Chưa thanh toán';
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -988,7 +1132,7 @@ class _PaymentSection extends StatelessWidget {
             child: Row(
               children: [
                 const Text(
-                  'Thanh toÃ¡n:',
+                  'Thanh toán:',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -1044,7 +1188,7 @@ class _IssueBanner extends StatelessWidget {
           const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
-              'Sá»± cá»‘: $message',
+              'Sự cố: $message',
               style: const TextStyle(fontSize: 12, color: AppColors.danger),
             ),
           ),
@@ -1064,12 +1208,12 @@ class _MetaRow extends StatelessWidget {
       runSpacing: 2,
       children: [
         Text(
-          'BÃ n giao: ${_formatDateTime(order.handedOverAt)}',
+          'Bàn giao: ${_formatDateTime(order.handedOverAt)}',
           style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
         ),
         if (order.deliveredAt != null)
           Text(
-            'Giao lÃºc: ${_formatDateTime(order.deliveredAt)}',
+            'Giao lúc: ${_formatDateTime(order.deliveredAt)}',
             style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
       ],
@@ -1098,7 +1242,7 @@ class _Actions extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: const Text(
-          'Chá» khÃ¡ch báº¥m "TÃ´i Ä‘Ã£ nháº­n hÃ ng" Ä‘á»ƒ hoÃ n táº¥t',
+          'Chờ khách bấm "Tôi đã nhận hàng" để hoàn tất',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1119,8 +1263,8 @@ class _Actions extends StatelessWidget {
         ),
         child: Text(
           order.completedAt == null
-              ? 'ÄÃ£ hoÃ n táº¥t'
-              : 'HoÃ n táº¥t lÃºc ${_formatDateTime(order.completedAt)}',
+              ? 'Đã hoàn tất'
+              : 'Hoàn tất lúc ${_formatDateTime(order.completedAt)}',
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1150,7 +1294,7 @@ class _DeliveringActions extends StatelessWidget {
       children: [
         Expanded(
           child: _GhostButton(
-            label: 'BÃ¡o sá»± cá»‘',
+            label: 'Báo sự cố',
             icon: Icons.report_problem_rounded,
             loading: busy,
             onPressed: busy
@@ -1177,22 +1321,22 @@ class _DeliveringActions extends StatelessWidget {
   _PrimaryAction _resolveAction(bool pickedUp, bool arrived) {
     if (!pickedUp) {
       return const _PrimaryAction(
-        label: 'ÄÃ£ láº¥y mÃ³n tá»« báº¿p',
+        label: 'Đã lấy món từ bếp',
         icon: Icons.shopping_basket_rounded,
         kind: _ActionKind.pickup,
       );
     }
     if (!arrived && order.isOnline) {
       return const _PrimaryAction(
-        label: 'ÄÃ£ tá»›i Ä‘iá»ƒm giao',
+        label: 'Đã tới điểm giao',
         icon: Icons.location_on_rounded,
         kind: _ActionKind.arrived,
       );
     }
     return _PrimaryAction(
       label: order.paymentMethod == 'COD'
-          ? 'Thu COD vÃ  giao xong'
-          : 'ÄÃ£ giao xong (chá» khÃ¡ch XN)',
+          ? 'Thu COD và giao xong'
+          : 'Đã giao xong (chờ khách XN)',
       icon: Icons.check_circle_rounded,
       kind: _ActionKind.complete,
     );
@@ -1226,13 +1370,13 @@ class _DeliveringActions extends StatelessWidget {
   String _successMessage(_PrimaryAction action) {
     switch (action.kind) {
       case _ActionKind.pickup:
-        return 'ÄÃ£ xÃ¡c nháº­n láº¥y mÃ³n tá»« báº¿p.';
+        return 'Đã xác nhận lấy món từ bếp.';
       case _ActionKind.arrived:
-        return 'ÄÃ£ xÃ¡c nháº­n Ä‘Ã£ tá»›i Ä‘iá»ƒm giao.';
+        return 'Đã xác nhận đã tới điểm giao.';
       case _ActionKind.complete:
         return action.label.contains('COD')
-            ? 'ÄÃ£ thu COD vÃ  xÃ¡c nháº­n giao xong.'
-            : 'ÄÃ£ giao xong. Äang chá» khÃ¡ch xÃ¡c nháº­n.';
+            ? 'Đã thu COD và xác nhận giao xong.'
+            : 'Đã giao xong. Đang chờ khách xác nhận.';
     }
   }
 
@@ -1246,8 +1390,7 @@ class _DeliveringActions extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (ctx) => _IssueSheet(order: order, notifier: notifier),
     );
@@ -1267,7 +1410,7 @@ class _PrimaryAction {
   final _ActionKind kind;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ ISSUE SHEET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── ISSUE SHEET ───────────────────────
 
 class _IssueSheet extends StatefulWidget {
   const _IssueSheet({required this.order, required this.notifier});
@@ -1298,7 +1441,7 @@ class _IssueSheetState extends State<_IssueSheet> {
     if (ok) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ÄÃ£ bÃ¡o cÃ¡o sá»± cá»‘ cho quáº£n lÃ½.')),
+        const SnackBar(content: Text('Đã báo cáo sự cố cho quản lý.')),
       );
     } else if (widget.notifier.currentState.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1319,7 +1462,7 @@ class _IssueSheetState extends State<_IssueSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'BÃ¡o cÃ¡o sá»± cá»‘ giao hÃ ng',
+              'Báo cáo sự cố giao hàng',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -1328,7 +1471,7 @@ class _IssueSheetState extends State<_IssueSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'ÄÆ¡n ${widget.order.code} Â· tá»‘i Ä‘a 500 kÃ½ tá»±',
+              'Đơn ${widget.order.code} · tối đa 500 ký tự',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -1342,7 +1485,7 @@ class _IssueSheetState extends State<_IssueSheet> {
               maxLength: 500,
               decoration: const InputDecoration(
                 hintText:
-                    'VD: KhÃ¡ch khÃ´ng nghe mÃ¡y, sai Ä‘á»‹a chá»‰, Ä‘Ã³ng cá»­a khÃ´ng nháº­n...',
+                    'VD: Khách không nghe máy, sai địa chỉ, đóng cửa không nhận...',
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -1351,7 +1494,7 @@ class _IssueSheetState extends State<_IssueSheet> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Huá»·'),
+                    child: const Text('Huỷ'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -1359,7 +1502,7 @@ class _IssueSheetState extends State<_IssueSheet> {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.send_rounded, size: 18),
                     onPressed: _busy ? null : _submit,
-                    label: const Text('Gá»­i bÃ¡o cÃ¡o'),
+                    label: const Text('Gửi báo cáo'),
                   ),
                 ),
               ],
@@ -1371,7 +1514,7 @@ class _IssueSheetState extends State<_IssueSheet> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ COMMON WIDGETS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── COMMON WIDGETS ───────────────────────
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.text, required this.color});
@@ -1490,9 +1633,7 @@ class _PrimaryButton extends StatelessWidget {
           : Icon(icon, size: 18),
       label: Text(label),
       onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-      ),
+      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
     );
   }
 }
@@ -1560,10 +1701,7 @@ class _ErrorBanner extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: AppColors.danger),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Thá»­ láº¡i'),
-          ),
+          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
         ],
       ),
     );
@@ -1586,7 +1724,7 @@ class _EmptyState extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           alignment: Alignment.center,
-          child: const Text('ðŸ›µ', style: TextStyle(fontSize: 36)),
+          child: const Text('🛵', style: TextStyle(fontSize: 36)),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
@@ -1601,28 +1739,33 @@ class _EmptyState extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────── HELPERS ───────────────────────
 
 String _statusLabel(OrderStatus s) {
   switch (s) {
+    case OrderStatus.confirmed:
+      return 'CHỜ CHẾ BIẾN';
+    case OrderStatus.preparing:
+      return 'ĐANG CHẾ BIẾN';
+    case OrderStatus.ready:
+      return 'MÓN ĐÃ XONG';
+    case OrderStatus.readyNotifyShipper:
+      return 'ĐẾN LẤY HÀNG';
     case OrderStatus.delivering:
-      return 'ÄANG GIAO';
+      return 'ĐANG GIAO';
     case OrderStatus.delivered:
-      return 'CHá»œ KHÃCH XN';
+      return 'CHỜ KHÁCH XN';
     case OrderStatus.completed:
-      return 'HOÃ€N Táº¤T';
+      return 'HOÀN TẤT';
     case OrderStatus.cancelled:
-      return 'ÄÃƒ Há»¦Y';
+      return 'ĐÃ HỦY';
     default:
       return s.name.toUpperCase();
   }
@@ -1648,7 +1791,7 @@ String _formatTime(DateTime dt) {
 }
 
 String _formatDateTime(DateTime? dt) {
-  if (dt == null) return 'â€”';
+  if (dt == null) return '—';
   final dd = dt.day.toString().padLeft(2, '0');
   final mm = dt.month.toString().padLeft(2, '0');
   return '$dd/$mm ${_formatTime(dt)}';
