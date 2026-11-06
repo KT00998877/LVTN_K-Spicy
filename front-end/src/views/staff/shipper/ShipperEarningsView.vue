@@ -77,7 +77,7 @@ onMounted(() => { void load() })
             <div>
                 <span class="eyebrow">NHÂN VIÊN GIAO HÀNG</span>
                 <h1>Thu nhập giao hàng</h1>
-                <p>Tiền công 3.500 đ/km, tính ít nhất 3 km mỗi đơn và làm tròn đến 100 đ.</p>
+                
             </div>
             <button class="refresh" type="button" :disabled="loading" @click="load(page)">Làm mới</button>
         </header>

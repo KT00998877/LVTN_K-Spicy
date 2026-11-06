@@ -133,6 +133,11 @@ class _ShipperHomeScreenState extends ConsumerState<ShipperHomeScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Thu nhập',
+            icon: const Icon(Icons.payments_outlined),
+            onPressed: () => context.push('/shipper/earnings'),
+          ),
+          IconButton(
             tooltip: 'Làm mới',
             icon: state.isLoading
                 ? const SizedBox(

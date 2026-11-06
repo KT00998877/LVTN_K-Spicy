@@ -5,6 +5,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/api/dio_client.dart';
 import '../../orders/domain/shipper_route.dart';
 import '../domain/shipper_models.dart';
+import '../domain/shipper_earnings.dart';
 
 /// ============================================================
 /// 🚚 SHIPPER REPOSITORY — giao tiếp /api/staff/deliveries/*
@@ -24,6 +25,22 @@ import '../domain/shipper_models.dart';
 class ShipperRepository {
   ShipperRepository(this._dio);
   final Dio _dio;
+
+  Future<ShipperEarningsPage> fetchEarnings({
+    required String from,
+    required String to,
+    int page = 1,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/staff/deliveries/earnings',
+        queryParameters: {'from': from, 'to': to, 'page': page},
+      );
+      return ShipperEarningsPage.fromJson(response.data ?? const {});
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
 
   Future<List<NearbyJob>> fetchNearbyJobs() async {
     try {

@@ -23,6 +23,7 @@ import '../features/orders/presentation/shipper_route_map_screen.dart';
 import '../features/reservation/presentation/my_reservations_screen.dart';
 import '../features/reservation/presentation/reservation_booking_screen.dart';
 import '../features/shipper/shipper_home_screen.dart';
+import '../features/shipper/shipper_earnings_screen.dart';
 
 /// ============================================================
 /// 🧭 GO_ROUTER — auth guard theo role
@@ -203,6 +204,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const MyReservationsScreen(),
       ),
       GoRoute(path: '/shipper', builder: (_, __) => const ShipperHomeScreen()),
+      GoRoute(
+        path: '/shipper/earnings',
+        builder: (_, __) => const ShipperEarningsScreen(),
+      ),
     ],
     errorBuilder: (_, state) => Scaffold(
       appBar: AppBar(title: const Text('Lỗi')),

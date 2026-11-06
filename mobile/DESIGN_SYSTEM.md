@@ -8,4 +8,6 @@ Các màn hình hoặc thành phần khách hàng thêm sau này nên dùng lạ
 
 ## Shipper
 
+Màn Thu nhập mở từ nút trên AppBar shipper, dùng bộ lọc Hôm nay/Tuần này/Tháng này, hai thẻ tổng quan và danh sách tiền công từng đơn. Hiển thị quãng đường thực, quãng đường tính công, đơn giá và tiền công từ API; không cộng COD thu hộ vào thu nhập.
+
 Màn hình shipper dùng bốn thẻ thống kê theo lưới hai cột trên điện thoại, thanh tab cuộn ngang theo thứ tự đơn gần nhất → được phân công → đang giao → chờ xác nhận → hoàn tất. Giữ trạng thái vị trí và lỗi API rõ ràng; lỗi của một nguồn dữ liệu không xóa dữ liệu đã tải từ nguồn khác. Thẻ đơn giữ các bước giao, thông tin người nhận, thanh toán và hành động tương ứng với trạng thái.
