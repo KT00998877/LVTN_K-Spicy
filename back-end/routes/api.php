@@ -558,6 +558,7 @@ Route::middleware(['auth:sanctum', 'staff:MANAGER'])->prefix('staff/online-order
 Route::middleware(['auth:sanctum', 'staff:SHIPPER'])->prefix('staff/deliveries')->group(function () {
     $controller = \App\Http\Controllers\Api\OnlineOrderController::class;
     Route::get('/', [$controller, 'deliveries']);
+    Route::get('/earnings', [\App\Http\Controllers\Api\ShipperEarningsController::class, 'index']);
     Route::get('/{id}/route', [$controller, 'deliveryRoute'])->whereNumber('id'); // Chỉ đường từ quán → khách
     Route::post('/{id}/pickup',   [$controller, 'pickedUp'])->whereNumber('id');   // Bước 1: Đã lấy món
     Route::post('/{id}/arrived',  [$controller, 'arrived'])->whereNumber('id');   // Bước 2: Đã tới điểm giao

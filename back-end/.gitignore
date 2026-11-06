@@ -33,3 +33,4 @@ Thumbs.db
 !/tests/Feature/MarketingRealMenuCoverTest.php
 !/tests/Feature/TablePaymentTest.php
 !/tests/Feature/GoogleLoginTest.php
+!/tests/Feature/ShipperEarningsTest.php

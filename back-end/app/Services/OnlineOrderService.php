@@ -389,6 +389,7 @@ class OnlineOrderService
                 'status'       => 'DELIVERED',
                 'delivered_at' => now(),
             ])->save();
+            app(ShipperEarningsService::class)->record($order, $shipper);
 
             $this->event($order, $shipper, 'DELIVERED',
                 $order->order_type === 'TAKEAWAY'

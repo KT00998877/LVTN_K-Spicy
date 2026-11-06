@@ -198,7 +198,10 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
         { path: '/staff/cashier/reservations',  label: 'Đặt bàn',            roles: ['CASHIER'] },
         { path: '/staff/cashier/revenue',       label: 'Đối soát cuối ngày',  roles: ['CASHIER'] },
     ],
-    SHIPPER: [{ path: '/staff/shipper', label: 'Giao hàng', roles: ['SHIPPER'] }],
+    SHIPPER: [
+        { path: '/staff/shipper', label: 'Giao hàng', roles: ['SHIPPER'] },
+        { path: '/staff/shipper/earnings', label: 'Thu nhập', roles: ['SHIPPER'] },
+    ],
     SUPPLIER: [
         { path: '/staff/supplier/purchase-orders', label: 'Yêu cầu nhập hàng', roles: ['SUPPLIER'] },
         { path: '/staff/supplier/return-requests', label: 'Yêu cầu trả hàng', roles: ['SUPPLIER'] },
@@ -236,6 +239,7 @@ const menuItems = computed<MenuItem[]>(() => {
 })
 
 function isActive(path: string): boolean {
+    if (path === '/staff/shipper') return route.path === path
     return route.path === path || route.path.startsWith(path + '/')
 }
 

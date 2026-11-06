@@ -211,6 +211,7 @@ const router = createRouter({
             meta: { requiresStaffRole: ['SHIPPER'] as StaffRole[] },
             children: [
                 { path: '', name: 'shipper-home', component: () => import('../views/staff/shipper/ShipperHomeView.vue'), meta: { title: 'Giao hàng', subtitle: 'Đơn đang giao và lịch sử' } },
+                { path: 'earnings', name: 'shipper-earnings', component: () => import('../views/staff/shipper/ShipperEarningsView.vue'), meta: { title: 'Thu nhập', subtitle: 'Tiền công giao hàng theo từng đơn' } },
             ],
         },
         {
