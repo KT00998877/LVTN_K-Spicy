@@ -493,6 +493,12 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                     </span>
                     <span>{{ formatVND(o.payment.total) }}</span>
                 </section>
+                <section v-if="o.delivery_cash_flow" class="payment" aria-label="Tiền giao nhận">
+                    <span v-if="o.payment_method === 'COD'">Trả quán: <strong>{{ formatVND(o.delivery_cash_flow.pay_to_restaurant) }}</strong></span>
+                    <span v-else>Thu quán: <strong>{{ formatVND(o.delivery_cash_flow.collect_from_restaurant) }}</strong></span>
+                    <span v-if="o.payment_method === 'COD'">Thu khách: <strong>{{ formatVND(o.delivery_cash_flow.collect_from_customer) }}</strong></span>
+                    <span v-if="o.payment_method === 'COD' && o.delivery_cash_flow.collect_from_restaurant > 0">Thu quán: <strong>{{ formatVND(o.delivery_cash_flow.collect_from_restaurant) }}</strong></span>
+                </section>
 
                 <section v-if="o.delivery_issue" class="issue">
                     Sự cố: {{ o.delivery_issue }}
@@ -511,7 +517,7 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                             Báo cáo sự cố
                         </button>
                         <button class="btn-primary" :disabled="busyId === o.id" @click="handlePickup(o.id)">
-                            Xác nhận đã lấy món 
+                            Xác nhận đã lấy món và bàn giao tiền
                         </button>
                     </template>
 

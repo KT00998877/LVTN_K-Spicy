@@ -98,6 +98,7 @@ class DeliveryOrder {
     required this.note,
     required this.deliveryIssue,
     required this.payment,
+    this.deliveryCashFlow,
   });
 
   final int id;
@@ -126,6 +127,7 @@ class DeliveryOrder {
 
   /// Hóa đơn kèm trạng thái (do service presentation() của OnlineOrderService)
   final DeliveryPayment? payment;
+  final DeliveryCashFlow? deliveryCashFlow;
 
   String get totalLabel => _formatVnd(totalAmount);
 
@@ -170,6 +172,9 @@ class DeliveryOrder {
       note: _asString(json['note']),
       deliveryIssue: _asString(json['delivery_issue']),
       payment: payment,
+      deliveryCashFlow: json['delivery_cash_flow'] is Map
+          ? DeliveryCashFlow.fromJson(Map<String, dynamic>.from(json['delivery_cash_flow'] as Map))
+          : null,
     );
   }
 }
@@ -198,6 +203,24 @@ class DeliveryOrderItem {
       status: OrderStatus.fromApi(json['status']?.toString()),
     );
   }
+}
+
+class DeliveryCashFlow {
+  const DeliveryCashFlow({
+    required this.collectFromCustomer,
+    required this.payToRestaurant,
+    required this.collectFromRestaurant,
+  });
+
+  final double collectFromCustomer;
+  final double payToRestaurant;
+  final double collectFromRestaurant;
+
+  factory DeliveryCashFlow.fromJson(Map<String, dynamic> json) => DeliveryCashFlow(
+    collectFromCustomer: (json['collect_from_customer'] as num?)?.toDouble() ?? 0,
+    payToRestaurant: (json['pay_to_restaurant'] as num?)?.toDouble() ?? 0,
+    collectFromRestaurant: (json['collect_from_restaurant'] as num?)?.toDouble() ?? 0,
+  );
 }
 
 class DeliveryPayment {

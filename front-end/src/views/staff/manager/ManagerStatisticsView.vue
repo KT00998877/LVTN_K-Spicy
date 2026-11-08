@@ -52,10 +52,11 @@
         <section class="stats-kpis" aria-labelledby="kpi-title">
             <h2 id="kpi-title" class="visually-hidden">KPI tổng quan</h2>
             <article class="stats-kpi stats-kpi--hero">
-                <span class="stats-kpi__label">Doanh thu thực</span>
+                <span class="stats-kpi__label">Quán thực nhận sau phí shipper</span>
                 <div class="stats-kpi__value">
-                    {{ formatVND(overview?.revenue ?? 0) }}
+                    {{ formatVND(overview?.net_revenue ?? 0) }}
                 </div>
+                <span class="stats-kpi__meta">Khách thanh toán {{ formatVND(overview?.revenue ?? 0) }} · Công shipper {{ formatVND(overview?.shipper_cost ?? 0) }}</span>
                 <GrowthPill :value="overview?.growth.revenue ?? null" suffix="so với kỳ trước" />
             </article>
             <article class="stats-kpi">

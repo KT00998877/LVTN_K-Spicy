@@ -47,6 +47,7 @@ export interface GrowthMap {
 export interface OverviewData {
     revenue: number
     net_revenue: number
+    shipper_cost: number
     total_orders: number
     completed_orders: number
     cancelled_orders: number

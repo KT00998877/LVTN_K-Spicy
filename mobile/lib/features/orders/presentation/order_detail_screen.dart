@@ -5,7 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/utils/money_vnd.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../shared/widgets/common_widgets.dart';
+import '../../cart/presentation/cart_controller.dart';
+import '../data/order_repository.dart';
 import '../domain/order_models.dart';
 import 'cancel_order_dialog.dart';
 import 'order_controller.dart';
@@ -95,7 +98,8 @@ class OrderDetailScreen extends ConsumerWidget {
           if (order.canPay ||
               order.canConfirmReceipt ||
               order.canCancel ||
-              order.canTrackShipper) ...[
+              order.canTrackShipper ||
+              order.items.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             _ActionBar(order: order),
           ],
@@ -243,15 +247,36 @@ class _Hero extends StatelessWidget {
 }
 
 /// ───────────────── Action bar ─────────────────
-class _ActionBar extends ConsumerWidget {
+class _ActionBar extends ConsumerStatefulWidget {
   const _ActionBar({required this.order});
   final OrderDetail order;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ActionBar> createState() => _ActionBarState();
+}
+
+class _ActionBarState extends ConsumerState<_ActionBar> {
+  bool reordering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
     final ctrl = ref.read(orderDetailControllerProvider(order.id).notifier);
     final busy = ref.watch(orderDetailControllerProvider(order.id)).isLoading;
+    final canMutateCart = ref.watch(cartControllerProvider).canMutate;
     final buttons = <Widget>[];
+
+    if (order.items.isNotEmpty) {
+      buttons.add(
+        _primaryAction(
+          icon: Icons.replay_rounded,
+          label: reordering ? 'Đang kiểm tra món...' : 'Đặt lại',
+          color: AppColors.charcoal,
+          enabled: !busy && !reordering && canMutateCart,
+          onPressed: () => _reorder(order.id),
+        ),
+      );
+    }
 
     if (order.canPay) {
       buttons.add(
@@ -259,7 +284,7 @@ class _ActionBar extends ConsumerWidget {
           icon: Icons.payment_rounded,
           label: 'Thanh toán VNPay',
           color: AppColors.spicyRed,
-          enabled: !busy,
+          enabled: !busy && !reordering,
           onPressed: () => context.push('/orders/${order.id}/payment'),
         ),
       );
@@ -271,7 +296,7 @@ class _ActionBar extends ConsumerWidget {
           icon: Icons.check_circle_rounded,
           label: 'Tôi đã nhận hàng',
           color: AppColors.success,
-          enabled: !busy,
+          enabled: !busy && !reordering,
           onPressed: () => _confirmReceipt(context, ref, order, ctrl),
         ),
       );
@@ -283,7 +308,7 @@ class _ActionBar extends ConsumerWidget {
           icon: Icons.map_rounded,
           label: 'Theo dõi shipper',
           color: AppColors.charcoal,
-          enabled: !busy,
+          enabled: !busy && !reordering,
           onPressed: () => context.push('/orders/${order.id}/route'),
         ),
       );
@@ -295,7 +320,7 @@ class _ActionBar extends ConsumerWidget {
           icon: Icons.cancel_outlined,
           label: 'Huỷ đơn',
           color: AppColors.danger,
-          enabled: !busy,
+          enabled: !busy && !reordering,
           onPressed: () async {
             final ok = await CancelOrderDialog.show(context, order);
             if (ok == true && context.mounted) {
@@ -337,6 +362,80 @@ class _ActionBar extends ConsumerWidget {
     label: Text(label),
     onPressed: enabled ? onPressed : null,
   );
+
+  Future<void> _reorder(int orderId) async {
+    if (reordering || !ref.read(cartControllerProvider).canMutate) return;
+    setState(() => reordering = true);
+    try {
+      await ref.read(cartControllerProvider.notifier).refresh();
+      if (!mounted) return;
+      final cart = ref.read(cartControllerProvider);
+      if (!cart.canMutate || cart.errorMessage != null) {
+        throw ApiException(
+          message: cart.pendingCheckout != null
+              ? 'Hãy kiểm tra kết quả lần đặt hàng trước trong giỏ hàng.'
+              : cart.errorMessage ??
+                    'Không thể tải giỏ hàng. Vui lòng thử lại.',
+        );
+      }
+      final result = await ref.read(orderRepositoryProvider).reorder(orderId);
+      await ref.read(cartControllerProvider.notifier).refresh();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Kết quả đặt lại'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đã thêm ${result.added.length} món vào giỏ theo giá hiện tại.',
+                ),
+                for (final item in result.skipped)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text('${item.name}: ${item.reason}.'),
+                  ),
+                for (final item in result.priceChanges)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${item.name}: ${MoneyVnd.format(item.oldPrice)} → ${MoneyVnd.format(item.newPrice)}.',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Đóng'),
+            ),
+            if (result.added.isNotEmpty)
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  context.push('/cart');
+                },
+                child: const Text('Xem giỏ hàng'),
+              ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is ApiException
+          ? error.message
+          : 'Không thể đặt lại đơn. Vui lòng thử lại.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => reordering = false);
+    }
+  }
 
   Future<void> _confirmReceipt(
     BuildContext context,

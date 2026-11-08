@@ -114,6 +114,13 @@ export interface OrderDetail {
     recipient_phone?: string | null
     delivery_address?: string | null
     shipping_fee?: number
+    delivery_cash_flow?: {
+        shipper_earning: number
+        collect_from_customer: number
+        pay_to_restaurant: number
+        collect_from_restaurant: number
+        restaurant_net_amount: number
+    } | null
     payment_method?: 'COD' | 'PREPAID'
     delivery_latitude?: string | number | null
     delivery_longitude?: string | number | null

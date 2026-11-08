@@ -1131,8 +1131,10 @@ class _PaymentSection extends StatelessWidget {
         color: AppColors.creamSoft,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(children: [
           Expanded(
             child: Row(
               children: [
@@ -1165,6 +1167,20 @@ class _PaymentSection extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
+          ]),
+          if (order.deliveryCashFlow case final cash?) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              order.paymentMethod == 'COD'
+                  ? 'Trả quán: ${_shortMoney(cash.payToRestaurant)}'
+                  : 'Thu quán: ${_shortMoney(cash.collectFromRestaurant)}',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            if (order.paymentMethod == 'COD')
+              Text('Thu khách: ${_shortMoney(cash.collectFromCustomer)}'),
+            if (order.paymentMethod == 'COD' && cash.collectFromRestaurant > 0)
+              Text('Thu quán: ${_shortMoney(cash.collectFromRestaurant)}'),
+          ],
         ],
       ),
     );
@@ -1325,8 +1341,8 @@ class _DeliveringActions extends StatelessWidget {
 
   _PrimaryAction _resolveAction(bool pickedUp, bool arrived) {
     if (!pickedUp) {
-      return const _PrimaryAction(
-        label: 'Đã lấy món từ bếp',
+      return _PrimaryAction(
+        label: order.isOnline ? 'Đã lấy món và bàn giao tiền' : 'Đã lấy món từ bếp',
         icon: Icons.shopping_basket_rounded,
         kind: _ActionKind.pickup,
       );

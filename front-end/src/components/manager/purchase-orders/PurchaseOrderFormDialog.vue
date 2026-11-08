@@ -4,7 +4,7 @@
       <header class="purchase-order-dialog__header">
         <div>
           <h2>{{ editing ? `Sửa yêu cầu ${editing.code}` : 'Tạo yêu cầu nhập hàng' }}</h2>
-          <p class="purchase-order-help">Lưu bản nháp trước khi gửi Nhà cung cấp K.</p>
+          <p class="purchase-order-help">{{ suggested ? 'Số lượng gợi ý đưa tồn lên gấp đôi mức tối thiểu. Kiểm tra và sửa trước khi lưu bản nháp.' : 'Lưu bản nháp trước khi gửi Nhà cung cấp K.' }}</p>
         </div>
         <button class="purchase-order-dialog__close" type="button" aria-label="Đóng form" :disabled="saving" @click="close">×</button>
       </header>
@@ -108,6 +108,7 @@ const dialog = ref<HTMLDialogElement | null>(null)
 const errorSummary = ref<HTMLElement | null>(null)
 const editing = ref<PurchaseOrder | null>(null)
 const saving = ref(false)
+const suggested = ref(false)
 const error = ref('')
 let lineKey = 0
 
@@ -177,6 +178,7 @@ function selectIngredient(line: FormLine) {
 
 function open(order: PurchaseOrder | null = null) {
   editing.value = order
+  suggested.value = false
   error.value = ''
   form.requested_delivery_date = order?.requested_delivery_date ?? ''
   form.manager_note = order?.manager_note ?? ''
@@ -189,6 +191,32 @@ function open(order: PurchaseOrder | null = null) {
       }))
     : [newLine()]
   dialog.value?.showModal()
+}
+
+function openSuggested(): number {
+  const currentSupplierId = supplierId.value
+  const lowStock = activeIngredients.value.filter((ingredient) =>
+    ingredient.supplier_id === currentSupplierId
+    && ingredient.min_stock_level > 0
+    && ingredient.quantity_in_stock <= ingredient.min_stock_level,
+  )
+  if (!currentSupplierId || lowStock.length === 0) return 0
+  if (lowStock.length > 100) return -1
+
+  open()
+  suggested.value = true
+  form.items = lowStock.map((ingredient) => {
+    const packaging = ingredient.packagings.find((item) =>
+      item.is_active && item.supplier_id === currentSupplierId && item.is_default)
+    const conversion = packaging?.conversion_quantity ?? 1
+    return {
+      key: ++lineKey,
+      ingredient_id: ingredient.id,
+      ingredient_packaging_id: packaging?.id ?? null,
+      requested_purchase_quantity: Math.ceil((ingredient.min_stock_level * 2 - ingredient.quantity_in_stock) / conversion),
+    }
+  })
+  return form.items.length
 }
 
 function close() {
@@ -249,5 +277,5 @@ function formatQuantity(value: number) {
   return value.toLocaleString('vi-VN')
 }
 
-defineExpose({ open })
+defineExpose({ open, openSuggested })
 </script>

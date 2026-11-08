@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
-import '../../../core/utils/money_vnd.dart';
 import '../../../shared/widgets/common_widgets.dart';
 import '../data/reservation_local_cache.dart';
 import '../domain/reservation_models.dart';
@@ -225,25 +224,6 @@ class _ReservationCard extends StatelessWidget {
               ),
             ),
           ],
-
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Spacer(),
-              Text(
-                'Tổng ước tính',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                MoneyVnd.format(estimateTotal(receipt)),
-                style: const TextStyle(
-                  color: AppColors.spicyRed,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -254,7 +234,3 @@ class _ReservationCard extends StatelessWidget {
     return null;
   }
 }
-
-/// Ước tính tổng tiền dựa trên số khách (avg 80k/người).
-/// Đây là placeholder, backend không trả price cho reservation.
-double estimateTotal(ReservationReceipt r) => r.guestCount * 80000;

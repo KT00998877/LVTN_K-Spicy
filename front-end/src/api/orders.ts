@@ -13,12 +13,24 @@ import type { DeliveryRoute } from './staff'
 const ENDPOINTS = {
     myList:   '/orders/me',
     myDetail: (id: number | string) => `/orders/me/${id}`,
+    reorder: (id: number | string) => `/orders/me/${id}/reorder`,
     simulatePayment: (id: number | string) => `/orders/me/${id}/simulate-payment`,
     confirmReceipt:  (id: number | string) => `/orders/me/${id}/confirm-receipt`,
     cancel:          (id: number | string) => `/orders/me/${id}/cancel`,
     myRoute:        (id: number | string) => `/orders/me/${id}/route`,
     myShipperLocation: (id: number | string) => `/orders/me/${id}/shipper-location`,
 } as const
+
+export interface ReorderResult {
+    added: string[]
+    skipped: Array<{ name: string; reason: string }>
+    price_changes: Array<{ name: string; old_price: number; new_price: number }>
+}
+
+export async function reorderMyOrder(id: number | string): Promise<ReorderResult> {
+    const { data } = await apiClient.post<{ success: boolean; data: ReorderResult }>(ENDPOINTS.reorder(id))
+    return data.data
+}
 
 /**
  * GET /api/orders/me — danh sách đơn hàng của customer hiện tại.

@@ -813,6 +813,13 @@ export interface DeliveryOrder {
     delivery_latitude?: number | string | null
     delivery_longitude?: number | string | null
     shipping_fee: number
+    delivery_cash_flow: {
+        shipper_earning: number
+        collect_from_customer: number
+        pay_to_restaurant: number
+        collect_from_restaurant: number
+        restaurant_net_amount: number
+    } | null
     confirmed_at: string | null
     handed_over_at: string | null
     picked_up_at: string | null    // Bước 1: shipper đã lấy món

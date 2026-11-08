@@ -20,7 +20,8 @@ import { useOrderStore } from '@/stores/orders'
 import type { OrderItemStatus, OrderStatus } from '@/types/orders'
 import { createVNPay } from '@/api/payments'
 import { useAuthStore } from '@/stores/auth'
-import { getOrderRoute, getShipperLocation, type ShipperLocationInfo } from '@/api/orders'
+import { getOrderRoute, getShipperLocation, reorderMyOrder, type ReorderResult, type ShipperLocationInfo } from '@/api/orders'
+import { useCartStore } from '@/stores/cart'
 import type { DeliveryRoute } from '@/api/staff'
 import ShipperRouteMap from '@/components/ShipperRouteMap.vue'
 
@@ -39,6 +40,26 @@ const router = useRouter()
 const orderStore = useOrderStore()
 const authStore = useAuthStore()
 const appDialog = useAppDialog()
+const cartStore = useCartStore()
+const reordering = ref(false)
+const reorderResult = ref<ReorderResult | null>(null)
+const reorderError = ref('')
+
+async function reorder(): Promise<void> {
+    if (!current.value || reordering.value || !cartStore.canMutate) return
+    reordering.value = true
+    reorderResult.value = null
+    reorderError.value = ''
+    try {
+        reorderResult.value = await reorderMyOrder(current.value.id)
+        await cartStore.fetchCart(true)
+    } catch (err) {
+        reorderError.value = (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            ?? 'Không thể đặt lại đơn. Vui lòng thử lại.'
+    } finally {
+        reordering.value = false
+    }
+}
 const { current, loadingDetail, loadingPayment, loadingCancel, error } = storeToRefs(orderStore)
 
 /* ---------------- Status maps ---------------- */
@@ -491,6 +512,20 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
             </div>
 
             <template v-else>
+                <section class="detail-card" aria-label="Đặt lại đơn cũ">
+                    <button type="button" class="au-btn au-btn-primary" :disabled="reordering || !cartStore.canMutate" @click="reorder">
+                        {{ reordering ? 'Đang kiểm tra món...' : 'Đặt lại' }}
+                    </button>
+                    <p v-if="reorderError" role="alert">{{ reorderError }}</p>
+                    <div v-if="reorderResult" role="status">
+                        <p>Đã thêm {{ reorderResult.added.length }} món vào giỏ hàng theo giá hiện tại.</p>
+                        <p v-for="(item, index) in reorderResult.skipped" :key="index">{{ item.name }}: {{ item.reason }}.</p>
+                        <p v-for="(item, index) in reorderResult.price_changes" :key="index">
+                            {{ item.name }}: giá {{ formatCurrency(item.old_price) }} → {{ formatCurrency(item.new_price) }}.
+                        </p>
+                        <router-link v-if="reorderResult.added.length" to="/thanh-toan">Xem giỏ hàng</router-link>
+                    </div>
+                </section>
                 <!-- ====== Header ====== -->
                 <div class="detail-header">
                     <div>

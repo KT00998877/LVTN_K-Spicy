@@ -17,6 +17,22 @@ class ShipperEarningsService
             * self::RATE_PER_KM / 100) * 100);
     }
 
+    public function cashFlowFor(Order $order): array
+    {
+        $earning = $this->amountFor($order->delivery_distance_km !== null
+            ? (float) $order->delivery_distance_km : null);
+        $total = (int) round((float) $order->total_amount);
+
+        return [
+            'shipper_earning' => $earning,
+            'collect_from_customer' => $order->payment_method === 'COD' ? $total : 0,
+            'pay_to_restaurant' => $order->payment_method === 'COD' ? max(0, $total - $earning) : 0,
+            'collect_from_restaurant' => $order->payment_method === 'PREPAID'
+                ? $earning : max(0, $earning - $total),
+            'restaurant_net_amount' => $total - $earning,
+        ];
+    }
+
     public function record(Order $order, User $shipper): void
     {
         $actual = $order->delivery_distance_km !== null

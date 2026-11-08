@@ -191,6 +191,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->prefix('orders')->group(function () {
     Route::get('/me',         [OrderController::class, 'index']);
     Route::get('/me/{id}',    [OrderController::class, 'show'])->whereNumber('id');
+    Route::post('/me/{id}/reorder', [OrderController::class, 'reorder'])->whereNumber('id');
     // Khách hàng xem hướng dẫn đường đi của shipper đến đơn mình (chỉ đơn ONLINE của chính user).
     Route::get('/me/{id}/route', [\App\Http\Controllers\Api\OnlineOrderController::class, 'customerRoute'])->whereNumber('id');
     // Phase 2 — Vị trí shipper hiện tại (để khách biết shipper đang ở đâu).

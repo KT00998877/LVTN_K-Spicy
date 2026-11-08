@@ -5,9 +5,14 @@
         <h2>Yêu cầu nhập hàng</h2>
         <p>Lập yêu cầu, theo dõi Nhà cung cấp K và kiểm nhận hàng trước khi cộng tồn kho.</p>
       </div>
-      <button class="purchase-order-button purchase-order-button--primary" type="button" :disabled="ingredientsLoading" @click="openCreate">
-        Tạo yêu cầu
-      </button>
+      <div class="purchase-order-actions">
+        <button class="purchase-order-button" type="button" :disabled="ingredientsLoading || !ingredients.length" @click="openSuggested">
+          Gợi ý từ tồn thấp
+        </button>
+        <button class="purchase-order-button purchase-order-button--primary" type="button" :disabled="ingredientsLoading" @click="openCreate">
+          Tạo yêu cầu
+        </button>
+      </div>
     </section>
 
     <div v-if="actionError" class="purchase-order-error-summary" role="alert">
@@ -193,6 +198,18 @@ function changePage(page: number) {
 function openCreate() {
   actionError.value = ''
   formDialog.value?.open(null)
+}
+
+async function openSuggested() {
+  actionError.value = ''
+  await loadIngredients()
+  if (actionError.value) return
+  const count = formDialog.value?.openSuggested()
+  if (count === -1) {
+    actionError.value = 'Có hơn 100 nguyên liệu cần nhập. Hãy tạo yêu cầu thành nhiều bản nháp.'
+  } else if (!count) {
+    actionError.value = 'Không có nguyên liệu dưới mức tồn tối thiểu thuộc nhà cung cấp hiện tại để gợi ý.'
+  }
 }
 
 function openEdit(order: PurchaseOrder) {

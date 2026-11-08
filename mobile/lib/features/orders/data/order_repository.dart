@@ -68,6 +68,21 @@ class OrderRepository {
     }
   }
 
+  Future<ReorderResult> reorder(int id) async {
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/orders/me/$id/reorder',
+      );
+      final data = (res.data?['data'] as Map?)?.cast<String, dynamic>();
+      if (data == null) {
+        throw const ApiException(message: 'Không thể đặt lại đơn hàng.');
+      }
+      return ReorderResult.fromJson(data);
+    } on DioException catch (e) {
+      throw apiExceptionFromDio(e);
+    }
+  }
+
   /// POST /api/orders/me/{id}/confirm-receipt — xác nhận đã nhận hàng
   Future<ConfirmReceiptResult> confirmReceipt(int id) async {
     try {
@@ -128,6 +143,65 @@ class OrderListResult {
   OrderListResult({required this.items, required this.meta});
   final List<OrderSummary> items;
   final OrderListMeta meta;
+}
+
+class ReorderResult {
+  ReorderResult({
+    required this.added,
+    required this.skipped,
+    required this.priceChanges,
+  });
+  final List<String> added;
+  final List<ReorderSkipped> skipped;
+  final List<ReorderPriceChange> priceChanges;
+
+  factory ReorderResult.fromJson(Map<String, dynamic> json) => ReorderResult(
+    added: (json['added'] as List? ?? [])
+        .map((item) => item.toString())
+        .toList(),
+    skipped: (json['skipped'] as List? ?? [])
+        .map(
+          (item) =>
+              ReorderSkipped.fromJson((item as Map).cast<String, dynamic>()),
+        )
+        .toList(),
+    priceChanges: (json['price_changes'] as List? ?? [])
+        .map(
+          (item) => ReorderPriceChange.fromJson(
+            (item as Map).cast<String, dynamic>(),
+          ),
+        )
+        .toList(),
+  );
+}
+
+class ReorderSkipped {
+  ReorderSkipped({required this.name, required this.reason});
+  final String name;
+  final String reason;
+
+  factory ReorderSkipped.fromJson(Map<String, dynamic> json) => ReorderSkipped(
+    name: json['name'] as String? ?? '',
+    reason: json['reason'] as String? ?? '',
+  );
+}
+
+class ReorderPriceChange {
+  ReorderPriceChange({
+    required this.name,
+    required this.oldPrice,
+    required this.newPrice,
+  });
+  final String name;
+  final double oldPrice;
+  final double newPrice;
+
+  factory ReorderPriceChange.fromJson(Map<String, dynamic> json) =>
+      ReorderPriceChange(
+        name: json['name'] as String? ?? '',
+        oldPrice: (json['old_price'] as num).toDouble(),
+        newPrice: (json['new_price'] as num).toDouble(),
+      );
 }
 
 class ConfirmReceiptResult {

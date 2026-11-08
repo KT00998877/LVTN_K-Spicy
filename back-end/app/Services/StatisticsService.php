@@ -23,8 +23,7 @@ use Illuminate\Validation\ValidationException;
  *    Theo schema của project, invoices.status=PAID + payments.status=SUCCESS là
  *    nguồn dữ liệu chuẩn nhất. Các order CANCELLED thì invoice bị FAILED/REFUNDED
  *    nên payments của chúng cũng không tính.
- *  - "net revenue" = revenue - refunds. Nếu hệ thống chưa có refund trong period
- *    → trả bằng revenue.
+ *  - "net revenue" = revenue - refunds - tiền công shipper của đơn đã giao trong kỳ.
  */
 class StatisticsService
 {
@@ -173,12 +172,15 @@ class StatisticsService
             ->whereBetween('processed_at', $previous->utcRange())
             ->sum('amount');
 
-        // Net revenue = revenue - refunded payments trong period.
+        // Net revenue trừ tiền hoàn và công shipper đã phát sinh khi giao thành công.
         $refunded = (float) DB::table('payments')
             ->where('status', 'REFUNDED')
             ->whereBetween('processed_at', $current->utcRange())
             ->sum('amount');
-        $netRevenue = max(0.0, $revenue - $refunded);
+        $shipperCost = (float) DB::table('shipper_earnings')
+            ->whereBetween('earned_at', $current->utcRange())
+            ->sum('amount');
+        $netRevenue = $revenue - $refunded - $shipperCost;
 
         // Orders
         $totalOrders = (int) DB::table('orders')
@@ -269,6 +271,7 @@ class StatisticsService
         return [
             'revenue'          => round($revenue, 2),
             'net_revenue'      => round($netRevenue, 2),
+            'shipper_cost'     => round($shipperCost, 2),
             'total_orders'     => $totalOrders,
             'completed_orders' => $completedOrders,
             'cancelled_orders' => $cancelledOrders,

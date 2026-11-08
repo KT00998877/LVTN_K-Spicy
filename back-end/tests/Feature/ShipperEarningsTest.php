@@ -35,6 +35,28 @@ class ShipperEarningsTest extends TestCase
         ]);
     }
 
+    public function test_cash_flow_is_consistent_for_cod_and_prepaid_orders(): void
+    {
+        $service = app(ShipperEarningsService::class);
+        $shipper = User::factory()->create();
+        $order = $this->makeOrder($shipper, 'SHIP-CASH', 12 / 3.5);
+        $order->total_amount = 108000;
+        $order->shipping_fee = 8000;
+        $order->payment_method = 'COD';
+
+        $cod = $service->cashFlowFor($order);
+        $this->assertSame(12000, $cod['shipper_earning']);
+        $this->assertSame(96000, $cod['pay_to_restaurant']);
+        $this->assertSame(108000, $cod['collect_from_customer']);
+        $this->assertSame(0, $cod['collect_from_restaurant']);
+
+        $order->payment_method = 'PREPAID';
+        $prepaid = $service->cashFlowFor($order);
+        $this->assertSame(12000, $prepaid['collect_from_restaurant']);
+        $this->assertSame(0, $prepaid['collect_from_customer']);
+        $this->assertSame(96000, $prepaid['restaurant_net_amount']);
+    }
+
     public function test_shipper_sees_only_own_earnings(): void
     {
         $this->withoutMiddleware();

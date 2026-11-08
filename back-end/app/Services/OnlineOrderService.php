@@ -66,6 +66,8 @@ class OnlineOrderService
             'delivery_distance_km' => $order->delivery_distance_km,
             'points_redeemed' => (int) $order->points_redeemed,
             'shipping_fee'    => (float) $order->shipping_fee,
+            'delivery_cash_flow' => $order->order_type === 'ONLINE'
+                ? app(ShipperEarningsService::class)->cashFlowFor($order) : null,
             'payment_method'  => $order->payment_method, // 'COD' | 'PREPAID'
             'confirmed_at'     => $order->confirmed_at,
             'handed_over_at'  => $order->handed_over_at,
@@ -319,8 +321,13 @@ class OnlineOrderService
             abort_unless($order->status === 'DELIVERING', 409, 'Đơn chưa được bàn giao.');
             abort_if($order->picked_up_at, 409, 'Shipper đã xác nhận lấy hàng rồi.');
             $order->forceFill(['picked_up_at' => now()])->save();
+            $cashFlow = $order->order_type === 'ONLINE'
+                ? app(ShipperEarningsService::class)->cashFlowFor($order) : null;
+            $cashNote = $cashFlow === null ? '' : ($order->payment_method === 'COD'
+                ? '; đã trả quán '.number_format($cashFlow['pay_to_restaurant']).'đ'
+                : '; đã thu quán '.number_format($cashFlow['collect_from_restaurant']).'đ');
             $this->event($order, $shipper, 'PICKED_UP',
-                $order->order_type === 'TAKEAWAY' ? 'Shipper đã nhận hàng mang đi' : 'Shipper đã lấy hàng để giao');
+                ($order->order_type === 'TAKEAWAY' ? 'Shipper đã nhận hàng mang đi' : 'Shipper đã lấy hàng để giao').$cashNote);
         }, 3);
     }
 

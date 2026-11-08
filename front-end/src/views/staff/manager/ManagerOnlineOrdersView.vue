@@ -330,6 +330,12 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                     <div><span>Shipper</span><strong>{{ o.shipper_name || '—' }}</strong></div>
                     <div><span>Sự cố</span><strong style="color:#b91c1c;">{{ o.delivery_issue || '—' }}</strong></div>
                 </section>
+                <section v-if="o.delivery_cash_flow" class="info-grid" aria-label="Tiền bàn giao shipper">
+                    <div v-if="o.payment_method === 'COD'"><span>Shipper trả quán</span><strong>{{ formatVND(o.delivery_cash_flow.pay_to_restaurant) }}</strong></div>
+                    <div v-else><span>Trả shipper</span><strong>{{ formatVND(o.delivery_cash_flow.collect_from_restaurant) }}</strong></div>
+                    <div v-if="o.payment_method === 'COD'"><span>Shipper thu khách</span><strong>{{ formatVND(o.delivery_cash_flow.collect_from_customer) }}</strong></div>
+                    <div v-if="o.payment_method === 'COD' && o.delivery_cash_flow.collect_from_restaurant > 0"><span>Trả shipper</span><strong>{{ formatVND(o.delivery_cash_flow.collect_from_restaurant) }}</strong></div>
+                </section>
 
                 <section
                     v-if="o.cancellation_request"
@@ -484,6 +490,10 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                         </label>
                     </div>
                     <p v-else class="empty small">Chưa có shipper khả dụng.</p>
+                    <p v-if="handoverTarget.delivery_cash_flow" class="modal-sub">
+                        {{ handoverTarget.payment_method === 'COD' ? 'Shipper trả quán' : 'Quán trả shipper' }}:
+                        <strong>{{ formatVND(handoverTarget.payment_method === 'COD' ? handoverTarget.delivery_cash_flow.pay_to_restaurant : handoverTarget.delivery_cash_flow.collect_from_restaurant) }}</strong>
+                    </p>
                     <footer class="modal-actions">
                         <button type="button" class="btn-ghost" @click="handoverTarget = null">Hủy</button>
                         <button type="submit" class="btn-primary" :disabled="!handoverShipperId || busyId !== null">Bàn giao</button>

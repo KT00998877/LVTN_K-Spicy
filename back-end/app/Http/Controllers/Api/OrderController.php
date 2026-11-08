@@ -5,8 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\MenuItem;
+use App\Services\CartService;
+use App\Services\FlashSaleService;
+use App\Services\MenuAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * API cho khách hàng đã đăng nhập xem lịch sử & chi tiết đơn hàng của mình.
@@ -16,6 +21,56 @@ use Illuminate\Http\Request;
  */
 class OrderController extends Controller
 {
+    public function reorder(Request $request, int $id, CartService $cartService): JsonResponse
+    {
+        $user = $request->user();
+        $order = Order::where('customer_id', $user->id)->whereKey($id)
+            ->with('items.toppings')->firstOrFail();
+
+        $result = DB::transaction(function () use ($order, $user, $cartService) {
+            $cartService->lockCart($user);
+            $added = [];
+            $skipped = [];
+            $priceChanges = [];
+            $availability = app(MenuAvailabilityService::class);
+            foreach ($order->items as $item) {
+                if ($item->status === 'CANCELLED') continue;
+                $menu = MenuItem::with('category')->find($item->menu_item_id);
+                $quantity = (int) $item->quantity;
+                if (!$menu || !$menu->is_active || !$menu->is_available || !$menu->category?->is_active
+                    || !$availability->status($menu, $quantity)['is_available'] || $quantity < 1 || $quantity > 99) {
+                    $skipped[] = ['name' => $item->item_name, 'reason' => 'Món không còn bán hoặc số lượng không hợp lệ'];
+                    continue;
+                }
+                $toppingIds = $item->toppings->pluck('topping_menu_item_id')->map(fn ($id) => (int) $id)->all();
+                $toppings = MenuItem::with('category')->whereIn('id', $toppingIds)->get()->keyBy('id');
+                $invalidTopping = collect($toppingIds)->first(function ($toppingId) use ($toppings, $availability, $quantity) {
+                    $topping = $toppings->get($toppingId);
+                    return !$topping || !$topping->is_active || !$topping->is_available
+                        || !$topping->category?->is_active || $topping->category->slug !== 'topping-them'
+                        || !$availability->status($topping, $quantity)['is_available'];
+                });
+                if ($invalidTopping !== null) {
+                    $skipped[] = ['name' => $item->item_name, 'reason' => 'Topping đã chọn không còn bán'];
+                    continue;
+                }
+                $currentPrice = app(FlashSaleService::class)->priceFor($menu);
+                if ((float) $item->unit_price !== (float) $currentPrice) {
+                    $priceChanges[] = ['name' => $item->item_name, 'old_price' => (float) $item->unit_price, 'new_price' => (float) $currentPrice];
+                }
+                $cartService->addItem($user, [
+                    'menu_item_id' => $menu->id, 'quantity' => $quantity,
+                    'spicy_level' => max(0, min(7, (int) $item->effective_spicy_level)),
+                    'note' => $item->note, 'topping_ids' => $toppingIds,
+                ]);
+                $added[] = $item->item_name;
+            }
+            return ['added' => $added, 'skipped' => $skipped, 'price_changes' => $priceChanges];
+        });
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
     /**
      * GET /api/orders/me
      * Query: ?status=PENDING&page=1&per_page=10
