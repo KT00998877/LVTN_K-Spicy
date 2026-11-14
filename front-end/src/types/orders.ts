@@ -148,6 +148,7 @@ export interface OrderDetail {
     delivery_photos?: { id: number; url: string }[]
     payment?: OrderPaymentInfo | null
     cancellation_request?: OrderCancellationRequest | null
+    can_request_cancellation?: boolean
     events?: OrderEvent[]
 }
 

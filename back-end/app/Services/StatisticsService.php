@@ -1095,4 +1095,60 @@ class StatisticsService
             'note'   => 'Gross profit chỉ tính giá vốn nguyên liệu. Chưa bao gồm nhân công, điện nước, mặt bằng, ... KHÔNG phải lợi nhuận ròng.',
         ];
     }
+
+    /** Doanh thu và giá vốn đã ghi nhận, gom theo ngày hoàn tất đơn. */
+    public function profitLedger(Period $current): array
+    {
+        $orders = DB::table('orders')
+            ->where('status', 'COMPLETED')
+            ->whereBetween('completed_at', $current->utcRange())
+            ->get(['id', 'completed_at', 'total_amount']);
+        if ($orders->isEmpty()) {
+            return ['rows' => [], 'total' => ['orders' => 0, 'revenue' => 0, 'cost' => 0, 'profit' => 0, 'missing_cost_items' => 0, 'estimated_cost_items' => 0]];
+        }
+
+        $ids = $orders->pluck('id')->all();
+        $shipping = DB::table('shipper_earnings')->whereIn('order_id', $ids)->pluck('amount', 'order_id');
+        $itemCounts = DB::table('order_items')->whereIn('order_id', $ids)->where('status', '!=', 'CANCELLED')
+            ->selectRaw('order_id, COUNT(*) as item_count')->groupBy('order_id')->pluck('item_count', 'order_id');
+        $costs = DB::table('inventory_transactions as tx')
+            ->join('order_items as item', 'item.id', '=', 'tx.reference_id')
+            ->join('ingredients as ingredient', 'ingredient.id', '=', 'tx.ingredient_id')
+            ->where('tx.reference_type', 'order_item')
+            ->where('tx.type', 'EXPORT')
+            ->where('tx.quantity', '<', 0)
+            ->where('item.status', '!=', 'CANCELLED')
+            ->whereIn('item.order_id', $ids)
+            ->selectRaw('item.order_id, SUM(-tx.quantity * COALESCE(NULLIF(tx.unit_price, 0), NULLIF(ingredient.import_price, 0), 0)) as cost, COUNT(DISTINCT item.id) as costed_items, SUM(CASE WHEN tx.unit_price <= 0 AND ingredient.import_price <= 0 THEN 1 ELSE 0 END) as unpriced_lines, COUNT(DISTINCT CASE WHEN tx.unit_price <= 0 AND ingredient.import_price > 0 THEN item.id END) as estimated_items')
+            ->groupBy('item.order_id')->get()->keyBy('order_id');
+
+        $byDay = [];
+        foreach ($orders as $order) {
+            $date = Carbon::parse($order->completed_at, 'UTC')->setTimezone(self::TZ)->toDateString();
+            $row = $byDay[$date] ?? ['date' => $date, 'orders' => 0, 'revenue' => 0.0, 'cost' => 0.0, 'profit' => null, 'missing_cost_items' => 0, 'estimated_cost_items' => 0];
+            $cost = $costs->get($order->id);
+            $row['orders']++;
+            $row['revenue'] += (float) $order->total_amount - (float) ($shipping[$order->id] ?? 0);
+            $row['cost'] += (float) ($cost?->cost ?? 0);
+            $row['missing_cost_items'] += max(0, (int) ($itemCounts[$order->id] ?? 0) - (int) ($cost?->costed_items ?? 0))
+                + (int) ($cost?->unpriced_lines ?? 0);
+            $row['estimated_cost_items'] += (int) ($cost?->estimated_items ?? 0);
+            $byDay[$date] = $row;
+        }
+
+        krsort($byDay);
+        $total = ['orders' => 0, 'revenue' => 0.0, 'cost' => 0.0, 'profit' => null, 'missing_cost_items' => 0, 'estimated_cost_items' => 0];
+        foreach ($byDay as &$row) {
+            $row['revenue'] = round($row['revenue'], 2);
+            $row['cost'] = round($row['cost'], 2);
+            $row['profit'] = $row['missing_cost_items'] === 0 ? round($row['revenue'] - $row['cost'], 2) : null;
+            foreach (['orders', 'revenue', 'cost', 'missing_cost_items', 'estimated_cost_items'] as $key) $total[$key] += $row[$key];
+        }
+        unset($row);
+        $total['revenue'] = round($total['revenue'], 2);
+        $total['cost'] = round($total['cost'], 2);
+        $total['profit'] = $total['missing_cost_items'] === 0 ? round($total['revenue'] - $total['cost'], 2) : null;
+
+        return ['rows' => array_values($byDay), 'total' => $total];
+    }
 }

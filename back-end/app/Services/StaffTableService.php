@@ -397,9 +397,10 @@ class StaffTableService
                     throw ValidationException::withMessages(['status' => ['Bàn không còn phù hợp hoặc đã có đặt bàn trùng giờ.']]);
                 }
             }
+            $previousStatus = $r->status;
             $r->status = $status;
             $r->save();
-            return $this->formatReservation($r->fresh()->load('table'));
+            return array_merge($this->formatReservation($r->fresh()->load('table')), ['previous_status' => $previousStatus]);
         }, 3);
     }
 

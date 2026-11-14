@@ -43,7 +43,7 @@
         <div v-if="formError" ref="errorSummary" class="purchase-order-error-summary" role="alert" tabindex="-1"><strong>Chưa thể hoàn tất.</strong> {{ formError }}</div>
 
         <form v-if="order.status === 'SENT'" class="purchase-order-section" @submit.prevent="acceptOrder" novalidate>
-          <div class="purchase-order-section__heading"><div><h3>Phản hồi yêu cầu</h3><p class="purchase-order-help">Xác nhận số lượng có thể cung cấp và đơn giá theo từng đơn vị mua.</p></div></div>
+          <div class="purchase-order-section__heading"><div><h3>Phản hồi yêu cầu</h3><p class="purchase-order-help">Xác nhận số lượng có thể cung cấp. Đơn giá lấy từ bảng Giá nhập khi nhà hàng gửi yêu cầu.</p></div></div>
           <div class="purchase-order-form-grid">
             <div class="purchase-order-field"><label for="supplier-delivery-date">Ngày dự kiến giao</label><input id="supplier-delivery-date" v-model="deliveryDate" class="purchase-order-input" type="date" required :disabled="busy"></div>
             <div class="purchase-order-field"><label for="supplier-accept-note">Ghi chú</label><input id="supplier-accept-note" v-model.trim="supplierNote" class="purchase-order-input" maxlength="2000" :disabled="busy"></div>
@@ -51,7 +51,7 @@
           <div class="purchase-orders__table-wrap">
             <table class="purchase-orders__table">
               <thead><tr><th>Nguyên liệu</th><th class="is-number">Nhà hàng yêu cầu</th><th>Số chấp nhận</th><th>Đơn giá / đơn vị mua</th></tr></thead>
-              <tbody><tr v-for="line in acceptLines" :key="line.id"><td><strong>{{ line.name }}</strong><br><span class="purchase-order-muted">{{ line.unit }}</span></td><td class="is-number">{{ formatQuantity(line.requested) }}</td><td><label class="sr-only" :for="`accept-quantity-${line.id}`">Số chấp nhận {{ line.name }}</label><input :id="`accept-quantity-${line.id}`" v-model.number="line.quantity" class="purchase-order-input" type="number" min="1" :max="line.requested" step="1" required :disabled="busy"></td><td><label class="sr-only" :for="`accept-price-${line.id}`">Đơn giá {{ line.name }}</label><input :id="`accept-price-${line.id}`" v-model.number="line.price" class="purchase-order-input" type="number" min="0" step="100" required :disabled="busy"></td></tr></tbody>
+              <tbody><tr v-for="line in acceptLines" :key="line.id"><td><strong>{{ line.name }}</strong><br><span class="purchase-order-muted">{{ line.unit }}</span></td><td class="is-number">{{ formatQuantity(line.requested) }}</td><td><label class="sr-only" :for="`accept-quantity-${line.id}`">Số chấp nhận {{ line.name }}</label><input :id="`accept-quantity-${line.id}`" v-model.number="line.quantity" class="purchase-order-input" type="number" min="1" :max="line.requested" step="1" required :disabled="busy"></td><td class="is-number">{{ formatMoney(line.price) }}</td></tr></tbody>
             </table>
           </div>
           <div class="purchase-order-actions"><button class="purchase-order-button purchase-order-button--primary" type="submit" :disabled="busy">{{ busy ? 'Đang xác nhận…' : 'Chấp nhận yêu cầu' }}</button></div>
@@ -59,12 +59,12 @@
         </form>
 
         <form v-else-if="order.status === 'SUPPLIER_ACCEPTED'" class="purchase-order-section" @submit.prevent="shipOrder" novalidate>
-          <div class="purchase-order-section__heading"><div><h3>Xác nhận gửi hàng</h3><p class="purchase-order-help">Nhập mã chứng từ và thông tin lô trước khi chuyển hàng cho nhà hàng.</p></div></div>
+          <div class="purchase-order-section__heading"><div><h3>Xác nhận gửi hàng</h3><p class="purchase-order-help">Kiểm tra thông tin lô trước khi chuyển hàng cho nhà hàng. Mã phiếu xuất được tạo tự động khi gửi hàng.</p></div></div>
           <div class="purchase-order-form-grid">
-            <div class="purchase-order-field"><label for="supplier-document-code">Mã phiếu xuất / chứng từ</label><input id="supplier-document-code" v-model.trim="documentCode" class="purchase-order-input" maxlength="100" required :disabled="busy"></div>
+            <div class="purchase-order-field"><span>Mã phiếu xuất</span><strong>{{ `PX-${String(order.id).padStart(5, '0')}` }}</strong></div>
             <div class="purchase-order-field"><label for="supplier-ship-note">Ghi chú giao hàng</label><input id="supplier-ship-note" v-model.trim="supplierNote" class="purchase-order-input" maxlength="2000" :disabled="busy"></div>
           </div>
-          <div class="purchase-orders__table-wrap"><table class="purchase-orders__table"><thead><tr><th>Nguyên liệu</th><th class="is-number">Đã chấp nhận</th><th>Số gửi</th><th>Mã lô</th><th>Hạn sử dụng</th></tr></thead><tbody><tr v-for="line in shipLines" :key="line.id"><td><strong>{{ line.name }}</strong><br><span class="purchase-order-muted">{{ line.unit }}</span></td><td class="is-number">{{ formatQuantity(line.accepted) }}</td><td><label class="sr-only" :for="`ship-quantity-${line.id}`">Số gửi {{ line.name }}</label><input :id="`ship-quantity-${line.id}`" v-model.number="line.quantity" class="purchase-order-input" type="number" min="1" :max="line.accepted" step="1" required :disabled="busy"></td><td><label class="sr-only" :for="`ship-lot-${line.id}`">Mã lô {{ line.name }}</label><input :id="`ship-lot-${line.id}`" v-model.trim="line.lot" class="purchase-order-input" maxlength="60" :disabled="busy"></td><td><label class="sr-only" :for="`ship-expiry-${line.id}`">Hạn sử dụng {{ line.name }}</label><input :id="`ship-expiry-${line.id}`" v-model="line.expiry" class="purchase-order-input" type="date" :disabled="busy"></td></tr></tbody></table></div>
+          <div class="purchase-orders__table-wrap"><table class="purchase-orders__table"><thead><tr><th>Nguyên liệu</th><th class="is-number">Đã chấp nhận</th><th>Số gửi</th><th>Mã lô tự tạo</th><th>Hạn sử dụng</th></tr></thead><tbody><tr v-for="line in shipLines" :key="line.id"><td><strong>{{ line.name }}</strong><br><span class="purchase-order-muted">{{ line.unit }}</span></td><td class="is-number">{{ formatQuantity(line.accepted) }}</td><td><label class="sr-only" :for="`ship-quantity-${line.id}`">Số gửi {{ line.name }}</label><input :id="`ship-quantity-${line.id}`" v-model.number="line.quantity" class="purchase-order-input" type="number" min="1" :max="line.accepted" step="1" required :disabled="busy"></td><td><strong>{{ `ML_${String(line.id).padStart(5, '0')}` }}</strong></td><td><label class="sr-only" :for="`ship-expiry-${line.id}`">Hạn sử dụng {{ line.name }}</label><select :id="`ship-expiry-${line.id}`" v-model.number="line.expiryMonths" class="purchase-order-select" :disabled="busy"><option v-for="option in expiryOptions" :key="option.months" :value="option.months">{{ option.label }}</option></select></td></tr></tbody></table></div>
           <div class="purchase-order-actions"><button class="purchase-order-button purchase-order-button--primary" type="submit" :disabled="busy">{{ busy ? 'Đang ghi nhận…' : 'Xác nhận đã gửi hàng' }}</button></div>
         </form>
 
@@ -85,7 +85,14 @@ import { useAppDialog } from '@/composables/useAppDialog'
 import { purchaseOrderError, supplierPurchaseOrdersApi, type PurchaseOrder, type PurchaseOrderStatus } from '@/api/purchaseOrders'
 
 interface AcceptLine { id: number; name: string; unit: string; requested: number; quantity: number; price: number }
-interface ShipLine { id: number; name: string; unit: string; accepted: number; quantity: number; lot: string; expiry: string }
+type ExpiryMonths = 1 | 2 | 3 | 4 | 5 | 6 | 12 | 24
+interface ShipLine { id: number; name: string; unit: string; accepted: number; quantity: number; expiryMonths: ExpiryMonths }
+const expiryOptions: Array<{ months: ExpiryMonths; label: string }> = [
+  { months: 1, label: '1 tháng' }, { months: 2, label: '2 tháng' },
+  { months: 3, label: '3 tháng' }, { months: 4, label: '4 tháng' },
+  { months: 5, label: '5 tháng' }, { months: 6, label: '6 tháng' },
+  { months: 12, label: '1 năm' }, { months: 24, label: '2 năm' },
+]
 
 const emit = defineEmits<{ updated: [order: PurchaseOrder] }>()
 const appDialog = useAppDialog()
@@ -100,24 +107,23 @@ const formError = ref('')
 const deliveryDate = ref('')
 const supplierNote = ref('')
 const rejectionReason = ref('')
-const documentCode = ref('')
 const acceptLines = ref<AcceptLine[]>([])
 const shipLines = ref<ShipLine[]>([])
 
 async function open(selected: PurchaseOrder) { orderId.value = selected.id; order.value = selected; formError.value = ''; rejectionReason.value = ''; syncForm(); dialog.value?.showModal(); await reload() }
 async function reload() { if (!orderId.value) return; loading.value = true; loadError.value = ''; try { order.value = (await supplierPurchaseOrdersApi.get(orderId.value)).data.data; syncForm() } catch (error) { loadError.value = purchaseOrderError(error) } finally { loading.value = false } }
-function syncForm() { if (!order.value) return; deliveryDate.value = order.value.supplier_delivery_date || order.value.requested_delivery_date || ''; supplierNote.value = order.value.supplier_note || ''; documentCode.value = order.value.supplier_document_code || ''; acceptLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, requested: item.requested_purchase_quantity, quantity: item.supplier_accepted_quantity ?? item.requested_purchase_quantity, price: item.purchase_unit_price ?? 0 })); shipLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, accepted: item.supplier_accepted_quantity ?? 0, quantity: item.shipped_purchase_quantity ?? item.supplier_accepted_quantity ?? 0, lot: item.supplier_lot_code || '', expiry: item.expiry_date || '' })) }
+function syncForm() { if (!order.value) return; deliveryDate.value = order.value.supplier_delivery_date || order.value.requested_delivery_date || ''; supplierNote.value = order.value.supplier_note || ''; acceptLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, requested: item.requested_purchase_quantity, quantity: item.supplier_accepted_quantity ?? item.requested_purchase_quantity, price: item.purchase_unit_price ?? 0 })); shipLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, accepted: item.supplier_accepted_quantity ?? 0, quantity: item.shipped_purchase_quantity ?? item.supplier_accepted_quantity ?? 0, expiryMonths: 1 })) }
 function close() { if (!busy.value) dialog.value?.close() }
 function onCancel(event: Event) { if (busy.value) event.preventDefault() }
 async function showError(error: unknown) { formError.value = error instanceof Error ? error.message : purchaseOrderError(error); await nextTick(); errorSummary.value?.focus() }
 
 async function acceptOrder() {
   if (!order.value || busy.value) return
-  const invalid = !deliveryDate.value || acceptLines.value.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > line.requested || !Number.isFinite(line.price) || line.price < 0)
-  if (invalid) return showError(new Error('Ngày giao, số chấp nhận nguyên dương không vượt yêu cầu và đơn giá không âm là bắt buộc.'))
+  const invalid = !deliveryDate.value || acceptLines.value.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > line.requested)
+  if (invalid) return showError(new Error('Ngày giao và số chấp nhận nguyên dương không vượt yêu cầu là bắt buộc.'))
   if (!await appDialog.confirm({ title: `Chấp nhận ${order.value.code}?`, message: 'Số lượng, đơn giá và ngày giao sẽ được gửi cho nhà hàng. Sau khi xác nhận, bạn không thể sửa phản hồi này.', confirmLabel: 'Chấp nhận yêu cầu' })) return
   busy.value = true; formError.value = ''
-  try { order.value = (await supplierPurchaseOrdersApi.accept(order.value.id, { supplier_delivery_date: deliveryDate.value, supplier_note: supplierNote.value || null, items: acceptLines.value.map((line) => ({ purchase_order_item_id: line.id, supplier_accepted_quantity: line.quantity, purchase_unit_price: line.price })) })).data.data; syncForm(); emit('updated', order.value) } catch (error) { await showError(error) } finally { busy.value = false }
+  try { order.value = (await supplierPurchaseOrdersApi.accept(order.value.id, { supplier_delivery_date: deliveryDate.value, supplier_note: supplierNote.value || null, items: acceptLines.value.map((line) => ({ purchase_order_item_id: line.id, supplier_accepted_quantity: line.quantity })) })).data.data; syncForm(); emit('updated', order.value) } catch (error) { await showError(error) } finally { busy.value = false }
 }
 
 async function rejectOrder() {
@@ -130,11 +136,11 @@ async function rejectOrder() {
 
 async function shipOrder() {
   if (!order.value || busy.value) return
-  const invalid = !documentCode.value || shipLines.value.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > line.accepted)
-  if (invalid) return showError(new Error('Mã chứng từ và số gửi nguyên dương không vượt số đã chấp nhận là bắt buộc.'))
+  const invalid = shipLines.value.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > line.accepted)
+  if (invalid) return showError(new Error('Số gửi phải là số nguyên dương và không vượt số đã chấp nhận.'))
   if (!await appDialog.confirm({ title: `Gửi hàng cho ${order.value.code}?`, message: 'Thông tin chứng từ và số lượng gửi sẽ được chuyển cho nhà hàng để kiểm nhận.', confirmLabel: 'Xác nhận gửi hàng' })) return
   busy.value = true; formError.value = ''
-  try { order.value = (await supplierPurchaseOrdersApi.ship(order.value.id, { supplier_document_code: documentCode.value, supplier_note: supplierNote.value || null, items: shipLines.value.map((line) => ({ purchase_order_item_id: line.id, shipped_purchase_quantity: line.quantity, supplier_lot_code: line.lot || null, expiry_date: line.expiry || null })) })).data.data; syncForm(); emit('updated', order.value) } catch (error) { await showError(error) } finally { busy.value = false }
+  try { order.value = (await supplierPurchaseOrdersApi.ship(order.value.id, { supplier_note: supplierNote.value || null, items: shipLines.value.map((line) => ({ purchase_order_item_id: line.id, shipped_purchase_quantity: line.quantity, expiry_months: line.expiryMonths })) })).data.data; syncForm(); emit('updated', order.value) } catch (error) { await showError(error) } finally { busy.value = false }
 }
 
 function statusLabel(value: PurchaseOrderStatus) { return ({ DRAFT: 'Bản nháp', SENT: 'Chờ phản hồi', SUPPLIER_ACCEPTED: 'Đã chấp nhận', SUPPLIER_REJECTED: 'Đã từ chối', SHIPPED: 'Đã gửi hàng', RECEIVED: 'Nhà hàng đã nhận', CANCELLED: 'Đã hủy' } as Record<PurchaseOrderStatus, string>)[value] }

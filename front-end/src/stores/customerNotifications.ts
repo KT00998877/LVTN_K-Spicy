@@ -47,8 +47,10 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
     const latest = ref<PromoNotification | null>(null)
 
     let echo: Echo<'reverb'> | null = null
+    let retry: ReturnType<typeof setInterval> | undefined
     let generation = 0
     let revision = 0
+    let initialized = false
     let audio: AudioContext | undefined
     const seen = new Set<string>()
 
@@ -62,11 +64,14 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
             if (generation !== currentGeneration) return
             if (revision !== currentRevision) return
             const incoming = response.data.data.data
+            const newItems = nextPage === 1 && initialized ? incoming.filter(item => !seen.has(item.id)) : []
             for (const item of incoming) seen.add(item.id)
+            initialized = true
             const merged = nextPage === 1 ? incoming : [...items.value, ...incoming]
             items.value = [...new Map(merged.map(item => [item.id, item])).values()]
             unreadCount.value = response.data.unread_count
             error.value = ''
+            if (newItems.length) { latest.value = newItems[0] ?? null; playSound() }
         } catch {
             if (generation === currentGeneration) error.value = 'Chưa tải được thông báo. Hệ thống sẽ tự thử lại.'
         } finally {
@@ -126,10 +131,13 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         revision++
         echo?.disconnect()
         echo = null
+        if (retry) clearInterval(retry)
+        retry = undefined
         connected.value = false
         loading.value = false
         items.value = []
         seen.clear()
+        initialized = false
         latest.value = null
         unreadCount.value = 0
         error.value = ''
@@ -144,6 +152,15 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         stop()
         const currentGeneration = generation
         void fetchPage()
+
+        let lastPoll = 0
+        retry = setInterval(() => {
+            if (currentGeneration !== generation || !navigator.onLine) return
+            if (!connected.value || Date.now() - lastPoll >= 10000) {
+                lastPoll = Date.now()
+                void fetchPage()
+            }
+        }, 3000)
 
         const key = import.meta.env.VITE_REVERB_APP_KEY
         if (!key) return

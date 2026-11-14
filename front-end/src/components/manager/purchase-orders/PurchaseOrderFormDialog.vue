@@ -33,7 +33,7 @@
           <div class="purchase-order-section__heading">
             <div>
               <legend class="purchase-order-field__label">Nguyên liệu cần nhập</legend>
-              <p class="purchase-order-help">Chọn đơn vị mua và nhập số lượng cần đặt.</p>
+              <p class="purchase-order-help">Chọn đơn vị mua và nhập số lượng cần đặt. <RouterLink to="/staff/manager/supplier-prices">Xem giá nhập</RouterLink></p>
             </div>
           </div>
 
@@ -47,23 +47,28 @@
                     <option v-for="ingredient in outOfStockIngredients" :key="ingredient.id" :value="ingredient.id">HẾT HÀNG · {{ ingredient.code }} · {{ ingredient.name }}</option>
                   </optgroup>
                   <optgroup v-if="availableIngredients.length" label="Còn hàng">
-                    <option v-for="ingredient in availableIngredients" :key="ingredient.id" :value="ingredient.id">{{ ingredient.code }} · {{ ingredient.name }} · tồn {{ formatQuantity(ingredient.quantity_in_stock) }} {{ ingredient.unit }}</option>
+                    <option v-for="ingredient in availableIngredients" :key="ingredient.id" :value="ingredient.id">{{ ingredient.code }} · {{ ingredient.name }} · tồn {{ formatQuantity(ingredient.unit === 'gram' ? ingredient.quantity_in_stock / 1000 : ingredient.quantity_in_stock) }} {{ ingredient.unit === 'gram' ? 'kg' : ingredient.unit }}</option>
                   </optgroup>
                 </select>
               </div>
               <div class="purchase-order-field">
                 <label :for="`po-packaging-${line.key}`">Quy cách mua</label>
                 <select :id="`po-packaging-${line.key}`" v-model="line.ingredient_packaging_id" class="purchase-order-select">
-                  <option :value="null">{{ ingredientUnit(line) || 'Đơn vị tồn kho' }}</option>
+                  <option v-if="!packagingOptions(line).length" :value="null">{{ ingredientUnit(line) || 'Đơn vị tồn kho' }}</option>
                   <option v-for="packaging in packagingOptions(line)" :key="packaging.id" :value="packaging.id">
-                    {{ packaging.purchase_unit }} ({{ formatQuantity(packaging.conversion_quantity) }} {{ ingredientUnit(line) }})
+                    {{ packaging.purchase_unit }}<template v-if="ingredientUnit(line) !== 'gram'"> ({{ formatQuantity(packaging.conversion_quantity) }} {{ ingredientUnit(line) }})</template>
                   </option>
                 </select>
               </div>
               <div class="purchase-order-field">
                 <label :for="`po-quantity-${line.key}`">Số lượng ({{ purchaseUnit(line) }})</label>
                 <input :id="`po-quantity-${line.key}`" v-model.number="line.requested_purchase_quantity" class="purchase-order-input" type="number" min="1" step="1" required />
-                <span v-if="selectedPackaging(line)" class="purchase-order-help">= {{ formatQuantity(stockQuantity(line)) }} {{ ingredientUnit(line) }} tồn kho</span>
+                <span v-if="selectedPackaging(line) && ingredientUnit(line) !== 'gram'" class="purchase-order-help">= {{ formatQuantity(stockQuantity(line)) }} {{ ingredientUnit(line) }} tồn kho</span>
+              </div>
+              <div class="purchase-order-field purchase-order-line__price">
+                <span class="purchase-order-field__label">Giá nhập</span>
+                <strong>{{ linePrice(line) === null ? 'Chưa cập nhật' : formatMoney(linePrice(line)!) }} <span v-if="linePrice(line) !== null">/ {{ purchaseUnit(line) }}</span></strong>
+                <span v-if="linePrice(line) !== null" class="purchase-order-help">Tạm tính {{ formatMoney(linePrice(line)! * line.requested_purchase_quantity) }}</span>
               </div>
               <button class="purchase-order-button purchase-order-button--quiet purchase-order-button--danger" type="button" :disabled="form.items.length === 1" :aria-label="`Xóa dòng ${index + 1}`" @click="removeLine(index)">
                 Xóa
@@ -86,6 +91,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { Ingredient, IngredientPackaging } from '@/api/ingredients'
 import {
   purchaseOrderError,
@@ -152,7 +158,8 @@ function ingredientFor(line: FormLine) {
 }
 
 function packagingOptions(line: FormLine): IngredientPackaging[] {
-  return ingredientFor(line)?.packagings.filter((packaging) => packaging.is_active) ?? []
+  return ingredientFor(line)?.packagings.filter((packaging) => packaging.is_active
+    && (ingredientUnit(line) !== 'gram' || (packaging.purchase_unit === 'kg' && packaging.conversion_quantity === 1000))) ?? []
 }
 
 function ingredientUnit(line: FormLine): string {
@@ -171,8 +178,14 @@ function stockQuantity(line: FormLine): number {
   return (Number(line.requested_purchase_quantity) || 0) * (selectedPackaging(line)?.conversion_quantity ?? 1)
 }
 
+function linePrice(line: FormLine): number | null {
+  return selectedPackaging(line)?.supplier_price ?? (line.ingredient_packaging_id ? null : ingredientFor(line)?.supplier_price ?? null)
+}
+
+const formatMoney = (value: number) => `${Number(value).toLocaleString('vi-VN')} đ`
+
 function selectIngredient(line: FormLine) {
-  const defaultPackaging = packagingOptions(line).find((packaging) => packaging.is_default)
+  const defaultPackaging = packagingOptions(line).find((packaging) => packaging.is_default) ?? packagingOptions(line)[0]
   line.ingredient_packaging_id = defaultPackaging?.id ?? null
 }
 
@@ -207,7 +220,8 @@ function openSuggested(): number {
   suggested.value = true
   form.items = lowStock.map((ingredient) => {
     const packaging = ingredient.packagings.find((item) =>
-      item.is_active && item.supplier_id === currentSupplierId && item.is_default)
+      item.is_active && item.supplier_id === currentSupplierId && item.is_default && (ingredient.unit !== 'gram' || (item.purchase_unit === 'kg' && item.conversion_quantity === 1000)))
+      ?? (ingredient.unit === 'gram' ? ingredient.packagings.find((item) => item.is_active && item.supplier_id === currentSupplierId && item.purchase_unit === 'kg' && item.conversion_quantity === 1000) : undefined)
     const conversion = packaging?.conversion_quantity ?? 1
     return {
       key: ++lineKey,

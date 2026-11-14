@@ -34,3 +34,13 @@ Thumbs.db
 !/tests/Feature/TablePaymentTest.php
 !/tests/Feature/GoogleLoginTest.php
 !/tests/Feature/ShipperEarningsTest.php
+!/tests/Feature/IngredientRemovalTest.php
+!/tests/Feature/SupplierPricesSeederTest.php
+!/tests/Feature/SpicyRecipeSeederTest.php
+!/tests/Feature/RecipeSupplierPriceTest.php
+!/tests/Feature/NonKitchenOrderItemTest.php
+!/tests/Feature/ReorderCancelledOrderTest.php
+!/tests/Feature/CartRemovalTest.php
+!/tests/Feature/ShipperAssignmentVisibilityTest.php
+!/tests/Feature/ProfitLedgerTest.php
+!/tests/Feature/ReservationNotificationsTest.php

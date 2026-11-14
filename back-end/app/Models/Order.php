@@ -54,6 +54,8 @@ class Order extends Model
             'placed_at'     => 'datetime',
             'completed_at'  => 'datetime',
             'confirmed_at'  => 'datetime',
+            'shipper_accepted_at' => 'datetime',
+            'shipper_arrived_restaurant_at' => 'datetime',
             'handed_over_at' => 'datetime',
             'picked_up_at' => 'datetime',
             'arrived_at'    => 'datetime',

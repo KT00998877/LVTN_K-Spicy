@@ -60,6 +60,14 @@ class PurchaseOrderService
                 throw ValidationException::withMessages(['supplier_id' => 'Nhà cung cấp không còn hoạt động.']);
             }
 
+            foreach ($order->items as $item) {
+                $price = $this->supplierPrice($item);
+                if ($price === null || $price <= 0) {
+                    throw ValidationException::withMessages(['items' => "Nhà cung cấp chưa cập nhật giá nhập cho nguyên liệu {$item->ingredient_id}."]);
+                }
+                $item->update(['purchase_unit_price' => $price]);
+            }
+
             $order->update([
                 'status' => PurchaseOrder::STATUS_SENT,
                 'sent_by' => $actor->id,
@@ -107,9 +115,13 @@ class PurchaseOrderService
                         'items' => "Số lượng chấp nhận của {$item->ingredient_id} vượt số lượng yêu cầu.",
                     ]);
                 }
+                $price = $item->purchase_unit_price ?? $this->supplierPrice($item);
+                if ($price === null || $price <= 0) {
+                    throw ValidationException::withMessages(['items' => "Chưa có giá nhập cho nguyên liệu {$item->ingredient_id}."]);
+                }
                 $item->update([
                     'supplier_accepted_quantity' => $accepted,
-                    'purchase_unit_price' => $input['purchase_unit_price'],
+                    'purchase_unit_price' => $price,
                     'supplier_note' => $input['supplier_note'] ?? null,
                 ]);
             }
@@ -151,8 +163,9 @@ class PurchaseOrderService
             $this->assertSupplierOwnership($order, $actor);
             $this->assertStatus($order, PurchaseOrder::STATUS_SUPPLIER_ACCEPTED);
 
+            $documentCode = sprintf('PX-%05d', $order->id);
             $duplicateDocument = PurchaseOrder::where('supplier_id', $order->supplier_id)
-                ->where('supplier_document_code', $data['supplier_document_code'])
+                ->where('supplier_document_code', $documentCode)
                 ->whereKeyNot($order->id)
                 ->exists();
             if ($duplicateDocument) {
@@ -175,15 +188,15 @@ class PurchaseOrderService
                 }
                 $item->update([
                     'shipped_purchase_quantity' => $shipped,
-                    'supplier_lot_code' => $input['supplier_lot_code'] ?? null,
-                    'expiry_date' => $input['expiry_date'] ?? null,
+                    'supplier_lot_code' => sprintf('ML_%05d', $item->id),
+                    'expiry_date' => now('Asia/Ho_Chi_Minh')->addMonthsNoOverflow((int) $input['expiry_months'])->toDateString(),
                     'supplier_note' => $input['supplier_note'] ?? $item->supplier_note,
                 ]);
             }
 
             $order->update([
                 'status' => PurchaseOrder::STATUS_SHIPPED,
-                'supplier_document_code' => $data['supplier_document_code'],
+                'supplier_document_code' => $documentCode,
                 'supplier_note' => $data['supplier_note'] ?? $order->supplier_note,
                 'shipped_by' => $actor->id,
                 'shipped_at' => now(),
@@ -335,6 +348,11 @@ class PurchaseOrderService
             }
 
             $packaging = null;
+            if (empty($input['ingredient_packaging_id']) && ($ingredient->unit === 'gram'
+                || IngredientPackaging::where('ingredient_id', $ingredient->id)
+                    ->where('supplier_id', $supplier->id)->where('is_active', true)->exists())) {
+                throw ValidationException::withMessages(['items' => 'Nguyên liệu này phải đặt theo quy cách mua của nhà cung cấp.']);
+            }
             if (! empty($input['ingredient_packaging_id'])) {
                 $packaging = IngredientPackaging::whereKey($input['ingredient_packaging_id'])
                     ->where('ingredient_id', $ingredient->id)
@@ -346,6 +364,9 @@ class PurchaseOrderService
                         'items' => 'Quy cách mua không thuộc nguyên liệu hoặc nhà cung cấp đã chọn.',
                     ]);
                 }
+                if ($ingredient->unit === 'gram' && ($packaging->purchase_unit !== 'kg' || (int) $packaging->conversion_quantity !== 1000)) {
+                    throw ValidationException::withMessages(['items' => 'Nguyên liệu tính tồn theo gram chỉ được đặt mua theo kg.']);
+                }
             }
 
             $order->items()->create([
@@ -356,6 +377,14 @@ class PurchaseOrderService
                 'requested_purchase_quantity' => $input['requested_purchase_quantity'],
             ]);
         }
+    }
+
+    private function supplierPrice(PurchaseOrderItem $item): ?float
+    {
+        $price = $item->ingredient_packaging_id
+            ? IngredientPackaging::whereKey($item->ingredient_packaging_id)->value('supplier_price')
+            : Ingredient::whereKey($item->ingredient_id)->value('supplier_price');
+        return $price === null ? null : (float) $price;
     }
 
     private function assertSupplierOwnership(PurchaseOrder $order, User $actor): void

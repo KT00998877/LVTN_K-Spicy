@@ -181,6 +181,12 @@ class OnlineOrderController extends Controller
         return $this->detail($id);
     }
 
+    public function arrivedRestaurant(Request $request, int $id)
+    {
+        $this->service->arrivedRestaurant($request->user(), $id);
+        return $this->detail($id);
+    }
+
     /**
      * POST /api/staff/online-orders/{id}/arrived
      * Shipper xác nhận đã tới điểm giao (chỉ ONLINE).
@@ -300,8 +306,7 @@ class OnlineOrderController extends Controller
 
     /**
      * POST /api/orders/me/{id}/cancel
-     * Khách hàng tự huỷ đơn ONLINE/TAKEAWAY của chính mình.
-     * Chỉ cho phép khi đơn đang PENDING (chưa nhà hàng xác nhận).
+     * Khách tự huỷ đơn PENDING hoặc gửi yêu cầu để quản lý duyệt khi đơn đã CONFIRMED.
      */
     public function customerCancel(Request $request, int $id)
     {

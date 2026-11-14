@@ -154,7 +154,7 @@ def detect_intent(message: str) -> str:
     # Specific actions take precedence over dish names and generic price words.
     if cart_mention:
         return "add_to_cart" if matches_whole_word(message, "thêm", tokens) else "get_cart"
-    if any(matches_whole_word(message, word, tokens) for word in ("khuyến mãi", "voucher", "giảm giá")):
+    if "flash sale" in normalized or "flash-sale" in normalized or any(matches_whole_word(message, word, tokens) for word in ("khuyến mãi", "voucher", "giảm giá")):
         return "get_promotion"
     # A question about the process ("đặt bàn như thế nào") is answered in
     # words; a booking request opens the form. Check the question first —
@@ -635,7 +635,7 @@ class BusinessToolService:
             'get_menu': {'menu_lookup', 'menu_item_detail'},
             'get_price': {'menu_lookup', 'menu_item_detail'},
             'add_to_cart': {'menu_lookup', 'menu_item_detail', 'cart_add_item'},
-            'get_promotion': {'promotion_list', 'voucher_preview'},
+            'get_promotion': {'promotion_list', 'flash_sale_list', 'voucher_preview'},
             'make_reservation': {'reservation_options'},
             'reservation_info': {'reservation_options'},
             'get_cart': {'cart_view'},
@@ -709,6 +709,18 @@ class BusinessToolService:
         if intent == "get_cart" and not compound:
             answer = await self._read_only_fallback(message, user_id, user_token)
             return answer or {"intent": "error", "reply": "Chưa lấy được giỏ hàng. Vui lòng thử lại.", "model": "live-api"}
+
+        normalized_message = normalize_diacritics(message)
+        if not compound and intent == "get_promotion" and (
+            "flash sale" in normalized_message or "flash-sale" in normalized_message
+            or "mon nao" in normalized_message or "mon gi" in normalized_message
+        ):
+            result = await self._tool_executor.execute(
+                tool_name="flash_sale_list", arguments={}, user_id=user_id, user_token=user_token,
+            )
+            if not result.success:
+                return {"intent": "error", "reply": "Chưa lấy được danh sách món flash sale. Vui lòng thử lại.", "model": "live-api"}
+            return {"intent": intent, "reply": self._format_tool_result("flash_sale_list", result.data), "model": "live-api"}
 
         if not compound and intent in {"unknown", "get_menu"} and is_high_spice_preference(message):
             result = await self._tool_executor.execute(
@@ -1022,10 +1034,22 @@ Với các thông tin chung (địa chỉ, giờ mở cửa), bạn có thể tr
 
     def _format_tool_result(self, tool_name: str, result: Any) -> str:
         """Format tool result for display."""
-        if not result:
+        if result is None:
             return ""
 
         payload = self._unwrap_data(result)
+
+        if tool_name == "flash_sale_list":
+            items = payload if isinstance(payload, list) else []
+            if not items:
+                return "Hiện chưa có món nào đang flash sale."
+            lines = ["Các món đang flash sale:"]
+            for item in items[:10]:
+                sale = item.get("flash_sale") or {}
+                price = f"{sale.get('price', 0):,.0f}".replace(",", ".")
+                original = f"{sale.get('original_price', 0):,.0f}".replace(",", ".")
+                lines.append(f"- {item.get('name', 'Món ăn')}: {price}đ (giá gốc {original}đ)")
+            return "\n".join(lines)
 
         # Menu lookup — Laravel returns a LIST of items for GET /api/menu
         if tool_name == "menu_lookup":

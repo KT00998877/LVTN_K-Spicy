@@ -178,17 +178,18 @@
                     <p>Chọn một món hoặc nhập chủ đề. AI sẽ viết bài dài để bạn xem và chỉnh trước khi đăng.</p>
                 </div>
                 <div class="grid">
-                    <label class="field">
+                    <label class="field span-2">
+                        <span>Đăng ở mục tin</span>
+                        <select v-model="form.news_section">
+                            <option value="NEWS">Tin mới</option>
+                            <option value="PROMOTION">Tin khuyến mãi</option>
+                            <option value="OPENING">Tin khai trương</option>
+                        </select>
+                    </label>
+                    <label class="field span-2">
                         <span>Giọng văn</span>
                         <select v-model="form.tone">
                             <option v-for="t in (store.context?.tones ?? [])" :key="t" :value="t">{{ toneLabel(t) }}</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Chiến dịch liên quan (nếu có)</span>
-                        <select v-model="form.campaign_id">
-                            <option :value="null">— Không gắn —</option>
-                            <option v-for="c in (store.context?.campaigns ?? [])" :key="c.id" :value="c.id">{{ c.name }}</option>
                         </select>
                     </label>
                     <label class="field span-2">
@@ -233,7 +234,7 @@
                 </header>
 
                 <h2 class="review-title">{{ store.current.subject }}</h2>
-                <p class="review-meta">Giọng văn: <strong>{{ toneLabel(store.current.tone) }}</strong> · {{ store.current.versions?.length ?? 0 }} bản viết</p>
+                <p class="review-meta">Mục đăng: <strong>{{ blogSectionLabel(String(store.current.context_payload?.news_section ?? 'NEWS')) }}</strong> · Giọng văn: <strong>{{ toneLabel(store.current.tone) }}</strong> · {{ store.current.versions?.length ?? 0 }} bản viết</p>
                 <p class="review-guidance">Đọc kỹ thông tin món, giá và ưu đãi. Bạn có thể sửa nội dung trước khi xuất bản.</p>
                 <div class="cover-picker">
                     <label for="marketing-cover-item">Ảnh bìa từ thực đơn</label>
@@ -481,15 +482,15 @@ const form = reactive<{
     content_type: 'POST' | 'STORY' | 'REEL_SCRIPT' | 'BLOG_ARTICLE' | 'EMAIL_BLAST'
     tone: 'FUN' | 'WARM' | 'PREMIUM' | 'CASUAL' | 'PUNCHY'
     subject: string
-    campaign_id: number | null
     menu_item_id: number | null
+    news_section: 'NEWS' | 'OPENING' | 'PROMOTION'
 }>({
     channel: 'BLOG',
     content_type: 'BLOG_ARTICLE',
     tone: 'WARM',
     subject: '',
-    campaign_id: null,
     menu_item_id: null,
+    news_section: 'NEWS',
 })
 
 onMounted(async () => {
@@ -647,8 +648,8 @@ async function onCreate() {
         content_type: form.content_type,
         tone: form.tone,
         subject: form.subject,
-        campaign_id: form.campaign_id,
         menu_item_id: form.menu_item_id,
+        news_section: form.news_section,
     }
     try {
         const created = await store.create(payload)

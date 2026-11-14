@@ -45,9 +45,10 @@ class DailyStockSheetController extends Controller
         $comparisonComplete = !$previous || ($expected['missing_recipe_items'] === 0 && $expected['legacy_items'] === 0);
         $items = $sheet?->status === 'CLOSED'
             ? DB::table('daily_stock_sheet_items as si')->join('ingredients as i', 'i.id', '=', 'si.ingredient_id')
+                ->leftJoin('inventory_transactions as adjustment', 'adjustment.id', '=', 'si.inventory_transaction_id')
                 ->where('si.daily_stock_sheet_id', $sheet->id)
                 ->leftJoin('ingredient_categories as ic', 'ic.id', '=', 'i.ingredient_category_id')
-                ->select('si.*', 'i.code', 'i.name', 'i.unit', 'ic.name as category_name')
+                ->select('si.*', 'i.code', 'i.name', 'i.unit', 'ic.name as category_name', 'adjustment.stock_before as system_stock_before')
                 ->orderBy('ic.sort_order')->orderBy('i.name')->get()
                 ->map(fn ($row) => $this->withExpected($this->presentItem($row) + ['sources' => $changes[$row->ingredient_id]['sources'] ?? []], $expected, $comparisonComplete, (bool) $previous))->all()
             : $ingredients->map(function ($ingredient) use ($saved, $opening, $changes, $previous, $expected, $comparisonComplete) {
@@ -58,6 +59,7 @@ class DailyStockSheetController extends Controller
                 return $this->withExpected([
                     'ingredient_id' => $id, 'code' => $ingredient->code, 'name' => $ingredient->name,
                     'unit' => $ingredient->unit, 'category_name' => $ingredient->category?->name,
+                    'system_stock_qty' => (int) $ingredient->quantity_in_stock,
                     'opening_qty' => $start,
                     'incoming_qty' => $movement['incoming'], 'outgoing_qty' => $movement['outgoing'],
                     'consumption_qty' => $movement['consumption'],
@@ -279,6 +281,8 @@ class DailyStockSheetController extends Controller
             'ingredient_id' => (int) $row->ingredient_id, 'code' => $row->code,
             'name' => $row->name, 'unit' => $row->unit,
             'category_name' => $row->category_name ?? null,
+            'system_stock_qty' => $row->inventory_transaction_id === null
+                ? (int) $row->counted_qty : ($row->system_stock_before === null ? null : (int) $row->system_stock_before),
             'opening_qty' => $row->opening_qty === null ? null : (int) $row->opening_qty,
             'incoming_qty' => (int) $row->incoming_qty, 'outgoing_qty' => (int) $row->outgoing_qty,
             'consumption_qty' => (int) ($row->consumption_qty ?? 0),

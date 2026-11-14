@@ -154,14 +154,18 @@ class CartController extends Controller
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-        $this->cartService->removeItem($user, $id);
+        return DB::transaction(function () use ($request, $id) {
+            /** @var User $user */
+            $user = $request->user();
+            $this->cartService->removeItem($user, $id);
+            $cart = $this->cartService->lockCart($user);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Đã xóa món khỏi giỏ hàng',
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã xóa món khỏi giỏ hàng',
+                'data' => $this->cartService->formatCart($cart),
+            ]);
+        });
     }
 
     /**

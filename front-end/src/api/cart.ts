@@ -79,8 +79,9 @@ export async function updateCartItem(
 /**
  * DELETE /api/cart/items/{id} — xóa 1 item khỏi cart.
  */
-export async function removeFromCart(id: number): Promise<void> {
-    await apiClient.delete(ENDPOINTS.cartItem(id))
+export async function removeFromCart(id: number): Promise<CartResponse['data']> {
+    const { data } = await apiClient.delete<CartResponse>(ENDPOINTS.cartItem(id))
+    return data.data
 }
 
 /**

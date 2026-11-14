@@ -18,7 +18,9 @@ class StaffNotificationService
     public function orderConfirmed(Order $order): void
     {
         if ($order->order_type !== 'ONLINE') return;
-        $this->sendRole($order, 'KITCHEN', 'ONLINE_ORDER_CONFIRMED', 'Bạn có đơn hàng trực tuyến mới', '/staff/kitchen/queue');
+        if ($order->items()->whereHas('menuItem.category', fn ($category) => $category->whereIn('slug', ['mi-cay-han-quoc', 'mon-phu']))->exists()) {
+            $this->sendRole($order, 'KITCHEN', 'ONLINE_ORDER_CONFIRMED', 'Bạn có đơn hàng trực tuyến mới', '/staff/kitchen/queue');
+        }
         if ($order->shipper_id) {
             $this->send($order, (int) $order->shipper_id, 'SHIPPER_ASSIGNED', 'Bạn có đơn hàng mới từ K-SPICY', '/staff/shipper');
         }

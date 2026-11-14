@@ -119,7 +119,8 @@ class ShipperDispatchService
             $order = Order::lockForUpdate()->findOrFail($orderId);
 
             abort_unless($order->order_type === 'ONLINE', 422, 'Đơn này không phải đơn giao hàng.');
-            abort_unless($order->status === 'CONFIRMED', 409, 'Đơn chưa ở trạng thái chờ nhận.');
+            abort_unless(in_array($order->status, ['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'], true), 409,
+                'Đơn không còn ở trạng thái chờ nhận.');
 
             // Đơn đã có shipper khác nhận rồi → từ chối.
             if ($order->shipper_id && (int) $order->shipper_id !== (int) $shipper->id) {

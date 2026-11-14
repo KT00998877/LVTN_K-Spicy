@@ -164,6 +164,15 @@ class ToolRegistry:
             laravel_endpoint="/api/vouchers",
             laravel_method="GET"
         ))
+
+        self.register(ToolSpec(
+            name="flash_sale_list",
+            description="Get menu dishes with an active flash sale, current discounted prices and end times.",
+            parameters={"type": "object", "properties": {}, "required": []},
+            requires_auth=False,
+            laravel_endpoint="/api/menu/flash-sales",
+            laravel_method="GET"
+        ))
         
         self.register(ToolSpec(
             name="reservation_options",

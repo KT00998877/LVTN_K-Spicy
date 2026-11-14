@@ -7,6 +7,7 @@ use App\Http\Requests\StoreReservationRequest;
 use App\Http\Requests\UpdateReservationRequest;
 use App\Models\Reservation;
 use App\Services\ReservationService;
+use App\Services\ReservationNotificationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,16 +21,25 @@ class ReservationController extends Controller
         ])]);
     }
 
-    public function store(StoreReservationRequest $request, ReservationService $service): JsonResponse
+    public function store(StoreReservationRequest $request, ReservationService $service, ReservationNotificationService $notifications): JsonResponse
     {
         $data = $request->validated();
         $data['customer_id'] = $request->user('sanctum')?->id;
         $reservation = $service->create($data);
+        if ($reservation->wasRecentlyCreated) $notifications->created($reservation);
 
         return response()->json([
             'success' => true,
             'data' => $this->format($reservation),
         ], $reservation->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function status(Request $request): JsonResponse
+    {
+        $data = $request->validate(['request_key' => ['required', 'uuid']]);
+        $status = Reservation::where('request_key', $data['request_key'])->value('status');
+        abort_if($status === null, 404);
+        return response()->json(['data' => ['status' => $status]]);
     }
 
     public function mine(Request $request): JsonResponse

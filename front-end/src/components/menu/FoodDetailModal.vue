@@ -28,6 +28,7 @@ const props = defineProps<{
         price_formatted: string
         default_spicy: number
         image_url: string
+        category_slug?: string
         description?: string
         /** Gợi ý combo nước uống do quản lý cấu hình (Phase 3). */
         suggestions?: MenuSuggestion[]
@@ -101,6 +102,7 @@ const SPICY_GROUPS = {
 
 // ===== COMPUTED =====
 const isEditMode = computed(() => !!props.cartItem)
+const isSpicyNoodle = computed(() => props.menuItem?.category_slug === 'mi-cay-han-quoc')
 const title = computed(() => isEditMode.value ? 'Cập nhật món' : 'Tùy chỉnh món')
 
 const selectedSpicyInfo = computed<SpicyLevelConfig>(
@@ -112,9 +114,9 @@ const selectedGroupInfo = computed(() =>
 )
 
 const selectedToppingPrice = computed(() => 
-    toppings.value
+    isSpicyNoodle.value ? toppings.value
         .filter(t => selectedToppingIds.value.includes(t.id))
-        .reduce((sum, t) => sum + t.price, 0)
+        .reduce((sum, t) => sum + t.price, 0) : 0
 )
 
 const basePrice = computed(() => 
@@ -159,7 +161,7 @@ const availableSuggestions = computed(() =>
 const addingComboId = ref<number | null>(null)
 
 const selectedToppings = computed(() =>
-    toppings.value.filter(t => selectedToppingIds.value.includes(t.id))
+    isSpicyNoodle.value ? toppings.value.filter(t => selectedToppingIds.value.includes(t.id)) : []
 )
 
 // ===== ACTIONS =====
@@ -196,12 +198,12 @@ async function loadToppings() {
 function resetForm() {
     if (props.cartItem) {
         quantity.value = props.cartItem.quantity
-        spicyLevel.value = props.cartItem.spicy_level
+        spicyLevel.value = isSpicyNoodle.value ? props.cartItem.spicy_level : 0
         note.value = props.cartItem.note ?? ''
-        selectedToppingIds.value = [...(props.cartItem.topping_ids ?? [])]
+        selectedToppingIds.value = isSpicyNoodle.value ? [...(props.cartItem.topping_ids ?? [])] : []
     } else if (props.menuItem) {
         quantity.value = 1
-        spicyLevel.value = props.menuItem.default_spicy ?? 0
+        spicyLevel.value = isSpicyNoodle.value ? (props.menuItem.default_spicy ?? 0) : 0
         note.value = ''
         selectedToppingIds.value = []
     } else {
@@ -219,9 +221,9 @@ function handleSubmit() {
     emit('submit', {
         menu_item_id: menuId,
         quantity: quantity.value,
-        spicy_level: spicyLevel.value,
+        spicy_level: isSpicyNoodle.value ? spicyLevel.value : 0,
         note: note.value.trim(),
-        topping_ids: [...selectedToppingIds.value],
+        topping_ids: isSpicyNoodle.value ? [...selectedToppingIds.value] : [],
     })
 }
 
@@ -238,9 +240,9 @@ function handleAddCombo(suggestion: MenuSuggestion) {
         main: {
             menu_item_id: menuId,
             quantity: quantity.value,
-            spicy_level: spicyLevel.value,
+            spicy_level: isSpicyNoodle.value ? spicyLevel.value : 0,
             note: note.value.trim(),
-            topping_ids: [...selectedToppingIds.value],
+            topping_ids: isSpicyNoodle.value ? [...selectedToppingIds.value] : [],
         },
         suggestion_id: suggestion.id,
     })
@@ -249,7 +251,7 @@ function handleAddCombo(suggestion: MenuSuggestion) {
 watch(() => props.visible, (val) => {
     if (val) {
         resetForm()
-        void loadToppings()
+        if (isSpicyNoodle.value) void loadToppings()
     } else {
         addingComboId.value = null
     }
@@ -257,7 +259,7 @@ watch(() => props.visible, (val) => {
 watch(() => props.loading, (loading, wasLoading) => {
     if (wasLoading && !loading) addingComboId.value = null
 })
-useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () => props.visible && !props.loading && !loadingToppings.value)
+useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () => props.visible && isSpicyNoodle.value && !props.loading && !loadingToppings.value)
 </script>
 
 <template>
@@ -306,7 +308,7 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
                                 
                                 <!-- Spicy Badge (only when selected > 0) -->
                                 <div
-                                    v-if="spicyLevel > 0"
+                                    v-if="isSpicyNoodle && spicyLevel > 0"
                                     class="spicy-badge"
                                     :style="{ backgroundColor: selectedSpicyInfo.color }"
                                 >
@@ -355,7 +357,7 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
                             <!-- Scrollable Content -->
                             <div class="section-content">
                                 <!-- ===== SPICY LEVEL SELECTOR ===== -->
-                                <section class="customize-group">
+                                <section v-if="isSpicyNoodle" class="customize-group">
                                     <div class="group-label-row">
                                         <h3 class="group-label">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="label-icon">
@@ -413,7 +415,7 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
                                 </section>
 
                                 <!-- ===== TOPPINGS ===== -->
-                                <section class="customize-group">
+                                <section v-if="isSpicyNoodle" class="customize-group">
                                     <div class="group-label-row">
                                         <h3 class="group-label">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="label-icon">

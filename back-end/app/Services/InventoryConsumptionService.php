@@ -242,7 +242,7 @@ class InventoryConsumptionService
         $recipes = DB::table('menu_item_ingredient as r')
             ->join('ingredients as i', 'i.id', '=', 'r.ingredient_id')
             ->whereIn('r.menu_item_id', array_keys($menuIds))
-            ->get(['r.menu_item_id', 'r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit', 'i.name'])
+            ->get(['r.menu_item_id', 'r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit', 'i.name', 'i.code'])
             ->groupBy('menu_item_id');
 
         $stock = Ingredient::whereIn('id',
@@ -273,7 +273,8 @@ class InventoryConsumptionService
                     }
                     $id = (int) $line->ingredient_id;
                     $required[$id] = ($required[$id] ?? 0)
-                        + (int) ceil((int) $line->quantity_required * (float) $line->waste_factor * $part['multiplier']);
+                        + (int) ceil((int) $line->quantity_required * (float) $line->waste_factor * $part['multiplier']
+                            * $item->recipeSpicyMultiplier((int) $part['menu_item_id'], $line->code));
                 }
             }
 
@@ -382,7 +383,7 @@ class InventoryConsumptionService
             $rows = DB::table('menu_item_ingredient as r')
                 ->join('ingredients as i', 'i.id', '=', 'r.ingredient_id')
                 ->where('r.menu_item_id', $part['menu_item_id'])
-                ->select('r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit')
+                ->select('r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit', 'i.code')
                 ->get();
             if ($rows->isEmpty()) continue;
             $found = true;
@@ -390,7 +391,8 @@ class InventoryConsumptionService
                 if ($row->unit_override !== null && $row->unit_override !== $row->unit) return null;
                 $id = (int) $row->ingredient_id;
                 $required[$id] = ($required[$id] ?? 0)
-                    + (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']);
+                    + (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']
+                        * $item->recipeSpicyMultiplier((int) $part['menu_item_id'], $row->code));
             }
         }
 

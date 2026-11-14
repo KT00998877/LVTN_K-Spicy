@@ -55,13 +55,12 @@ const ManagerRecipeView      = () => import('../views/staff/manager/ManagerRecip
 const ManagerStockImportsView       = () => import('../views/staff/manager/ManagerStockImportsView.vue')
 const ManagerPurchaseOrdersView     = () => import('../views/staff/manager/ManagerPurchaseOrdersView.vue')
 const ManagerStockTransactionsView  = () => import('../views/staff/manager/ManagerStockTransactionsView.vue')
-const ManagerStocktakeView          = () => import('../views/staff/manager/ManagerStocktakeView.vue')
 // Phase F — Tiêu hao món bán + yêu cầu nhập kho từ bếp
-const ManagerConsumptionView        = () => import('../views/staff/manager/ManagerConsumptionView.vue')
 // Phase 3 — Combo nước uống (gợi ý món do quản lý cấu hình)
 const ManagerSuggestionsView        = () => import('../views/staff/manager/ManagerSuggestionsView.vue')
 const ManagerDeliveryRatingView    = () => import('../views/staff/manager/ManagerDeliveryRatingView.vue')
 const SupplierPurchaseOrdersView   = () => import('../views/staff/supplier/SupplierPurchaseOrdersView.vue')
+const SupplierPricesView           = () => import('../views/staff/SupplierPricesView.vue')
 const SupplierReturnRequestsView   = () => import('../views/staff/supplier/SupplierReturnRequestsView.vue')
 
 const router = createRouter({
@@ -221,6 +220,7 @@ const router = createRouter({
             children: [
                 { path: '', redirect: '/staff/supplier/purchase-orders' },
                 { path: 'purchase-orders', name: 'supplier-purchase-orders', component: SupplierPurchaseOrdersView, meta: { title: 'Yêu cầu nhập hàng', subtitle: 'Phản hồi và xác nhận gửi hàng cho K-SPICY' } },
+                { path: 'prices', name: 'supplier-prices', component: SupplierPricesView, meta: { title: 'Giá nhập', subtitle: 'Cập nhật giá nguyên liệu cung cấp' } },
                 { path: 'return-requests', name: 'supplier-return-requests', component: SupplierReturnRequestsView, meta: { title: 'Yêu cầu trả hàng', subtitle: 'Phản hồi và xác nhận hàng nhà hàng trả' } },
             ],
         },
@@ -241,10 +241,11 @@ const router = createRouter({
                 { path: 'ingredients/manager', name: 'manager-ingredients-crud', component: ManagerIngredientsView, meta: { title: 'Quản lý nguyên liệu', subtitle: 'CRUD nguyên liệu — Phase 2' } },
                 { path: 'recipes', name: 'manager-recipes', component: ManagerRecipeView, meta: { title: 'Công thức món ăn', subtitle: 'Định lượng nguyên liệu theo món' } },
                 { path: 'purchase-orders', name: 'manager-purchase-orders', component: ManagerPurchaseOrdersView, meta: { title: 'Yêu cầu nhập hàng', subtitle: 'Theo dõi Nhà cung cấp K và kiểm nhận hàng giao' } },
+                { path: 'supplier-prices', name: 'manager-supplier-prices', component: SupplierPricesView, meta: { title: 'Giá nhập', subtitle: 'Xem giá do nhà cung cấp cập nhật' } },
                 { path: 'stock-imports', name: 'manager-stock-imports', component: ManagerStockImportsView, meta: { title: 'Phiếu nhập kho', subtitle: 'DRAFT → CONFIRMED, có audit history' } },
                 { path: 'stock-transactions', name: 'manager-stock-transactions', component: ManagerStockTransactionsView, meta: { title: 'Lịch sử giao dịch kho', subtitle: 'IMPORT · EXPORT · WASTE · ADJUSTMENT' } },
-                { path: 'stocktake', name: 'manager-stocktake', component: ManagerStocktakeView, meta: { title: 'Kiểm kê kho', subtitle: 'OPEN → COMPLETED, tạo ADJUSTMENT khi hoàn tất' } },
-                { path: 'consumption', name: 'manager-consumption', component: ManagerConsumptionView, meta: { title: 'Tiêu hao món bán', subtitle: 'Đã bán món nào trừ bao nhiêu nguyên liệu' } },
+                { path: 'stocktake', redirect: '/staff/manager/inventory' },
+                { path: 'consumption', redirect: '/staff/manager/inventory' },
                 { path: 'daily-stock', name: 'manager-daily-stock', component: DailyStockSheetView, meta: { title: 'Sổ kho hằng ngày', subtitle: 'Xem số bếp đã chốt' } },
                 { path: 'categories', name: 'manager-categories', component: ManagerMenuView, meta: { title: 'Danh mục món ăn', subtitle: 'Phân nhóm và sắp xếp thực đơn' } },
                 { path: 'dashboard', name: 'manager-dashboard', component: ManagerDashboardView, meta: { title: 'Dashboard',           subtitle: 'Tổng quan hoạt động nhà hàng' } },

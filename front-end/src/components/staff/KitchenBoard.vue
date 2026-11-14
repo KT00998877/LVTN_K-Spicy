@@ -336,7 +336,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                 <div class="item-details">
                                     <span class="item-name">{{ entry.item.menu_item_name }}</span>
                                     <div class="item-modifiers">
-                                        <span v-if="entry.item.spicy_level !== null && entry.item.spicy_level !== undefined"
+                                        <span v-if="entry.item.category_slug === 'mi-cay-han-quoc' && entry.item.spicy_level !== null && entry.item.spicy_level !== undefined"
                                             class="modifier spicy-badge">
                                             {{ spicyLabel(entry.item.spicy_level) }}
                                         </span>

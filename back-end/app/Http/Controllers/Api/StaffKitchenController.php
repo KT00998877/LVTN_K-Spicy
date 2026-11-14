@@ -44,11 +44,10 @@ class StaffKitchenController extends Controller
         }
 
         // Lấy order_items không bị huỷ, join order để lấy table_code
-        $items = OrderItem::with(['order.tableSession.table', 'menuItem', 'toppings.topping'])
+        $items = OrderItem::with(['order.tableSession.table', 'menuItem.category', 'toppings.topping'])
             ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['COMPLETED', 'CANCELLED', 'DELIVERING'])
                 ->where(fn ($q) => $q->where('order_type', '!=', 'ONLINE')->orWhereNotNull('confirmed_at')))
-            ->where(fn ($q) => $q->whereHas('order', fn ($order) => $order->where('order_type', '!=', 'DINE_IN'))
-                ->orWhereDoesntHave('menuItem.category', fn ($category) => $category->where('slug', 'do-uong')))
+            ->whereHas('menuItem.category', fn ($category) => $category->whereIn('slug', ['mi-cay-han-quoc', 'mon-phu']))
             ->whereIn('status', $statusArray)
             ->where('status', '!=', 'CANCELLED')
             ->orderBy('created_at')
@@ -73,6 +72,7 @@ class StaffKitchenController extends Controller
                 'id'            => (int) $i->id,
                 'menu_item_id'  => (int) $i->menu_item_id,
                 'menu_item_name'=> $i->item_name,
+                'category_slug' => $i->menuItem?->category?->slug,
                 'menu_item_image'=> $i->menuItem?->image_url,
                 'unit_price'    => (float) $i->unit_price,
                 'quantity'      => (int) $i->quantity,

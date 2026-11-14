@@ -10,12 +10,22 @@ class InventorySeeder extends Seeder
     public function run(): void
     {
         $categoryMap = [];
-        foreach ([
-            'Mì và tinh bột', 'Thịt tươi', 'Hải sản tươi', 'Hàng chế biến sẵn',
-            'Rau củ', 'Sốt và gia vị', 'Đồ uống', 'Nguyên liệu pha chế',
-        ] as $order => $name) {
+        foreach (
+            [
+                'Mì và tinh bột',
+                'Thịt tươi',
+                'Hải sản tươi',
+                'Hàng chế biến sẵn',
+                'Rau củ',
+                'Sốt và gia vị',
+                'Đồ uống',
+                'Nguyên liệu pha chế',
+            ] as $order => $name
+        ) {
             DB::table('ingredient_categories')->updateOrInsert(['name' => $name], [
-                'sort_order' => $order + 1, 'is_active' => true, 'updated_at' => now(),
+                'sort_order' => $order + 1,
+                'is_active' => true,
+                'updated_at' => now(),
             ]);
             $categoryMap[$name] = DB::table('ingredient_categories')->where('name', $name)->value('id');
         }
@@ -35,28 +45,48 @@ class InventorySeeder extends Seeder
         $supplierId = (int) DB::table('suppliers')->where('code', 'SUPPLIER_K')->value('id');
 
         $scaledIngredientCodes = [
-            'NL003', 'NL004', 'NL006', 'NL010', 'NL011', 'NL012', 'NL013', 'NL014',
-            'NL016', 'NL017', 'NL019', 'NL026', 'NL027', 'NL028', 'NL029', 'NL034',
-            'NL035', 'NL036', 'NL037', 'NL038', 'NL039', 'NL040', 'NL041',
-            'NL008', 'NL009', 'NL018', 'NL024', 'NL025', 'NL030', 'NL031', 'NL032',
+            'NL003',
+            'NL004',
+            'NL006',
+            'NL010',
+            'NL011',
+            'NL012',
+            'NL013',
+            'NL014',
+            'NL016',
+            'NL017',
+            'NL019',
+            'NL026',
+            'NL027',
+            'NL028',
+            'NL029',
+            'NL034',
+            'NL035',
+            'NL036',
+            'NL008',
+            'NL009',
+            'NL018',
+            'NL024',
+            'NL025',
+            'NL030',
+            'NL031',
         ];
-        $volumeIngredientCodes = ['NL024', 'NL031', 'NL032'];
+        $volumeIngredientCodes = ['NL024', 'NL031'];
 
         $ingredients = [
             // Mì và gạo
-            ['code' => 'NL001', 'name' => 'Mì tươi (gói)',          'unit' => 'gói', 'quantity_in_stock' => 300, 'min_stock_level' => 80,  'import_price' => 8000,   'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL002', 'name' => 'Mì Ý (gói)',              'unit' => 'gói', 'quantity_in_stock' => 100, 'min_stock_level' => 30,  'import_price' => 10000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL001', 'name' => 'Mì Hàn',          'unit' => 'gói', 'quantity_in_stock' => 300, 'min_stock_level' => 80,  'import_price' => 8000,   'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
 
             // Thịt
             ['code' => 'NL003', 'name' => 'Thịt bò',                  'unit' => 'kg',  'quantity_in_stock' => 25,  'min_stock_level' => 8,   'import_price' => 320000, 'supplier' => 'Chợ đầu mối Bình Điền'],
             ['code' => 'NL004', 'name' => 'Thịt gà',                  'unit' => 'kg',  'quantity_in_stock' => 30,  'min_stock_level' => 10,  'import_price' => 120000, 'supplier' => 'Chợ đầu mối Bình Điền'],
-            ['code' => 'NL005', 'name' => 'Chả cá Hàn Quốc',          'unit' => 'cục', 'quantity_in_stock' => 0,   'min_stock_level' => 0,   'import_price' => 0,      'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'], // 1 bịch = 24 cục; chưa biết giá/cục.
+            ['code' => 'NL005', 'name' => 'Chả cá Hàn Quốc',          'unit' => 'cục', 'quantity_in_stock' => 240, 'min_stock_level' => 48,  'import_price' => 0,      'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'], // 1 bịch = 24 cục; chưa biết giá/cục.
             ['code' => 'NL006', 'name' => 'Tôm sú',                   'unit' => 'kg',  'quantity_in_stock' => 15,  'min_stock_level' => 5,   'import_price' => 450000, 'supplier' => 'Chợ đầu mối Bình Điền'],
-            ['code' => 'NL007', 'name' => 'Xúc xích Hàn Quốc',        'unit' => 'cây', 'quantity_in_stock' => 0,   'min_stock_level' => 0,   'import_price' => 7000,   'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'], // 1 bịch = 5 cây, 35.000đ/bịch.
+            ['code' => 'NL007', 'name' => 'Xúc xích Hàn Quốc',        'unit' => 'cây', 'quantity_in_stock' => 100, 'min_stock_level' => 20,  'import_price' => 7000,   'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'], // 1 bịch = 5 cây, 35.000đ/bịch.
 
             // Gia vị cay
             ['code' => 'NL008', 'name' => 'Ớt Gochujang (hộp)',       'unit' => 'hộp', 'quantity_in_stock' => 40, 'min_stock_level' => 10,  'import_price' => 75000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL009', 'name' => 'Bột ớt Hàn Quốc cấp 5',    'unit' => 'gói', 'quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 45000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL009', 'name' => 'Bột ớt Hàn Quốc',          'unit' => 'gói', 'quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 45000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL010', 'name' => 'Tỏi',                      'unit' => 'kg',  'quantity_in_stock' => 10, 'min_stock_level' => 3,   'import_price' => 60000,  'supplier' => 'Chợ đầu mối Bình Điền'],
             ['code' => 'NL011', 'name' => 'Gừng',                     'unit' => 'kg',  'quantity_in_stock' => 5,  'min_stock_level' => 2,   'import_price' => 80000,  'supplier' => 'Chợ đầu mối Bình Điền'],
 
@@ -64,21 +94,20 @@ class InventorySeeder extends Seeder
             ['code' => 'NL012', 'name' => 'Rau cải thảo',             'unit' => 'kg',  'quantity_in_stock' => 15, 'min_stock_level' => 5,   'import_price' => 25000,  'supplier' => 'Công ty CP Rau sạch Đà Lạt'],
             ['code' => 'NL013', 'name' => 'Hành tây',                 'unit' => 'kg',  'quantity_in_stock' => 10, 'min_stock_level' => 3,   'import_price' => 30000,  'supplier' => 'Công ty CP Rau sạch Đà Lạt'],
             ['code' => 'NL014', 'name' => 'Cà rốt',                   'unit' => 'kg',  'quantity_in_stock' => 12, 'min_stock_level' => 4,   'import_price' => 22000,  'supplier' => 'Công ty CP Rau sạch Đà Lạt'],
-            ['code' => 'NL015', 'name' => 'Trứng gà',                 'unit' => 'quả', 'quantity_in_stock' => 200,'min_stock_level' => 80,  'import_price' => 3500,   'supplier' => 'Chợ đầu mối Bình Điền'],
+            ['code' => 'NL015', 'name' => 'Trứng gà',                 'unit' => 'quả', 'quantity_in_stock' => 200, 'min_stock_level' => 80,  'import_price' => 3500,   'supplier' => 'Chợ đầu mối Bình Điền'],
             ['code' => 'NL016', 'name' => 'Phô mai mozzarella',       'unit' => 'kg',  'quantity_in_stock' => 10, 'min_stock_level' => 3,   'import_price' => 180000, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
 
             // Gạo và bánh cho món phụ
-            ['code' => 'NL017', 'name' => 'Gạo tẻ',                   'unit' => 'kg',  'quantity_in_stock' => 200,'min_stock_level' => 50,  'import_price' => 25000,  'supplier' => 'Chợ đầu mối Bình Điền'],
+            ['code' => 'NL017', 'name' => 'Gạo tẻ',                   'unit' => 'kg',  'quantity_in_stock' => 200, 'min_stock_level' => 50,  'import_price' => 25000,  'supplier' => 'Chợ đầu mối Bình Điền'],
             ['code' => 'NL018', 'name' => 'Rong biển cuộn kimbap',    'unit' => 'gói', 'quantity_in_stock' => 50, 'min_stock_level' => 15,  'import_price' => 60000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL019', 'name' => 'Bột mì',                   'unit' => 'kg',  'quantity_in_stock' => 30, 'min_stock_level' => 10,  'import_price' => 25000,  'supplier' => 'Chợ đầu mối Bình Điền'],
 
             // Đồ uống
-            ['code' => 'NL020', 'name' => 'Coca Cola lon',             'unit' => 'lon', 'quantity_in_stock' => 200,'min_stock_level' => 50,  'import_price' => 10000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL021', 'name' => 'Pepsi lon',                 'unit' => 'lon', 'quantity_in_stock' => 150,'min_stock_level' => 50,  'import_price' => 10000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL022', 'name' => 'Soju chai',                 'unit' => 'chai','quantity_in_stock' => 60, 'min_stock_level' => 20,  'import_price' => 65000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL023', 'name' => 'Nước suối',                 'unit' => 'chai','quantity_in_stock' => 240,'min_stock_level' => 60,  'import_price' => 4000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL024', 'name' => 'Sữa tươi (hộp)',           'unit' => 'hộp', 'quantity_in_stock' => 100,'min_stock_level' => 30,  'import_price' => 9000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL025', 'name' => 'Trà đen (gói)',            'unit' => 'gói', 'quantity_in_stock' => 200,'min_stock_level' => 50,  'import_price' => 8000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL020', 'name' => 'Coca Cola lon',             'unit' => 'lon', 'quantity_in_stock' => 200, 'min_stock_level' => 50,  'import_price' => 10000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL021', 'name' => 'Pepsi lon',                 'unit' => 'lon', 'quantity_in_stock' => 150, 'min_stock_level' => 50,  'import_price' => 10000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL022', 'name' => 'Soju chai',                 'unit' => 'chai', 'quantity_in_stock' => 60, 'min_stock_level' => 20,  'import_price' => 65000,  'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL024', 'name' => 'Sữa tươi (hộp)',           'unit' => 'hộp', 'quantity_in_stock' => 100, 'min_stock_level' => 30,  'import_price' => 9000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL025', 'name' => 'Trà đen (gói)',            'unit' => 'gói', 'quantity_in_stock' => 200, 'min_stock_level' => 50,  'import_price' => 8000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
             ['code' => 'NL026', 'name' => 'Trân châu',                 'unit' => 'kg',  'quantity_in_stock' => 10, 'min_stock_level' => 3,   'import_price' => 85000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
 
             // Hải sản bổ sung (cho biến thể mực / bạch tuộc)
@@ -88,41 +117,37 @@ class InventorySeeder extends Seeder
             // Nguyên liệu cho món phụ mới
             ['code' => 'NL029', 'name' => 'Bắp ngô',                   'unit' => 'kg',  'quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 30000,  'supplier' => 'Công ty CP Rau sạch Đà Lạt'],
             ['code' => 'NL030', 'name' => 'Đào (lon)',                 'unit' => 'lon', 'quantity_in_stock' => 50, 'min_stock_level' => 15,  'import_price' => 18000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL031', 'name' => 'Siro dâu',                  'unit' => 'chai','quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 65000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL032', 'name' => 'Siro việt quất',            'unit' => 'chai','quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 65000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL033', 'name' => 'Soda',                      'unit' => 'chai','quantity_in_stock' => 60, 'min_stock_level' => 20,  'import_price' => 7000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL034', 'name' => 'Đá bào',                    'unit' => 'kg',  'quantity_in_stock' => 30, 'min_stock_level' => 10,  'import_price' => 10000,  'supplier' => 'Chợ đầu mối Bình Điền'],
+            ['code' => 'NL031', 'name' => 'Siro dâu',                  'unit' => 'chai', 'quantity_in_stock' => 20, 'min_stock_level' => 5,   'import_price' => 65000,  'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL033', 'name' => 'Soda',                      'unit' => 'chai', 'quantity_in_stock' => 60, 'min_stock_level' => 20,  'import_price' => 7000,   'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
 
-            // Nguyên liệu bán thành phẩm và đồ uống còn thiếu trong công thức rà soát.
-            // Khởi tạo 0; bếp đếm tồn thực tế trước khi dùng cho cảnh báo hết món.
-            ['code' => 'NL035', 'name' => 'Bánh gạo tokbokki',         'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL036', 'name' => 'Kim chi thành phẩm',         'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL037', 'name' => 'Gà viên thành phẩm',         'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL038', 'name' => 'Tôm viên thành phẩm',        'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL039', 'name' => 'Chả mực thành phẩm',         'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL040', 'name' => 'Bạch tuộc viên thành phẩm', 'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL041', 'name' => 'Bò viên thành phẩm',         'unit' => 'kg',   'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+
+            // Chỉ ba món Mandu, 7-Up và Sting được seed hết hàng để kiểm thử.
+            ['code' => 'NL035', 'name' => 'Bánh gạo tokbokki',         'unit' => 'kg',   'quantity_in_stock' => 20, 'min_stock_level' => 5, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL036', 'name' => 'Kim chi thành phẩm',         'unit' => 'kg',   'quantity_in_stock' => 10, 'min_stock_level' => 2, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL042', 'name' => 'Mandu thành phẩm',           'unit' => 'cái',  'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             ['code' => 'NL043', 'name' => '7-Up lon',                   'unit' => 'lon',  'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
             ['code' => 'NL044', 'name' => 'Sting lon',                  'unit' => 'lon',  'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL045', 'name' => 'Trà xanh (gói)',             'unit' => 'gói',  'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
-            ['code' => 'NL046', 'name' => 'Soju vị táo',               'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL047', 'name' => 'Soju vị đào',               'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL048', 'name' => 'Soju vị dâu',               'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
-            ['code' => 'NL049', 'name' => 'Soju vị việt quất',         'unit' => 'chai', 'quantity_in_stock' => 0, 'min_stock_level' => 0, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL045', 'name' => 'Trà xanh (gói)',             'unit' => 'gói',  'quantity_in_stock' => 50, 'min_stock_level' => 10, 'import_price' => 0, 'supplier' => 'Công ty TNHH Đồ uống Sài Gòn'],
+            ['code' => 'NL046', 'name' => 'Soju vị táo',               'unit' => 'chai', 'quantity_in_stock' => 24, 'min_stock_level' => 6, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL047', 'name' => 'Soju vị đào',               'unit' => 'chai', 'quantity_in_stock' => 24, 'min_stock_level' => 6, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL048', 'name' => 'Soju vị dâu',               'unit' => 'chai', 'quantity_in_stock' => 24, 'min_stock_level' => 6, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
+            ['code' => 'NL049', 'name' => 'Soju vị việt quất',         'unit' => 'chai', 'quantity_in_stock' => 24, 'min_stock_level' => 6, 'import_price' => 0, 'supplier' => 'Công ty TNHH Thực phẩm Hàn Quốc K-Food'],
             // Nguyên liệu tráng miệng: lưu trực tiếp theo gram/ml.
             ['code' => 'NL050', 'name' => 'Dâu tây tươi',              'unit' => 'gram', 'quantity_in_stock' => 5000, 'min_stock_level' => 1000, 'import_price' => 0.12],
             ['code' => 'NL051', 'name' => 'Đậu đỏ ngọt',               'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.08],
-            ['code' => 'NL052', 'name' => 'Sữa đặc',                   'unit' => 'ml',   'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.07],
+            ['code' => 'NL052', 'name' => 'Sữa đặc',                   'unit' => 'ml',  'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.07],
             ['code' => 'NL053', 'name' => 'Đường nâu',                 'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.04],
             ['code' => 'NL054', 'name' => 'Bột quế',                   'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.20],
             ['code' => 'NL055', 'name' => 'Men nở',                    'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.10],
-            ['code' => 'NL056', 'name' => 'Dầu ăn',                    'unit' => 'ml',   'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.05],
+            ['code' => 'NL056', 'name' => 'Dầu ăn',                    'unit' => 'ml',  'quantity_in_stock' => 2000, 'min_stock_level' => 400, 'import_price' => 0.05],
             ['code' => 'NL057', 'name' => 'Óc chó',                    'unit' => 'gram', 'quantity_in_stock' => 1000, 'min_stock_level' => 200, 'import_price' => 0.30],
             ['code' => 'NL058', 'name' => 'Xoài tươi',                 'unit' => 'gram', 'quantity_in_stock' => 3000, 'min_stock_level' => 500, 'import_price' => 0.05],
             ['code' => 'NL059', 'name' => 'Bánh gạo ngọt',             'unit' => 'gram', 'quantity_in_stock' => 1500, 'min_stock_level' => 300, 'import_price' => 0.12],
-        ];
+            ['code' => 'NL060', 'name' => 'nấm kim châm',               'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.25],
+            ['code' => 'NL061', 'name' => 'súp lơ',                  'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.20],
+            ['code' => 'NL062', 'name' => 'bắp cải',                  'unit' => 'gram', 'quantity_in_stock' => 500, 'min_stock_level' => 100, 'import_price' => 0.15],
 
+        ];
         $ingredientIds = [];
         foreach ($ingredients as $i) {
             $existing = DB::table('ingredients')->where('code', $i['code'])->first();
@@ -155,16 +180,18 @@ class InventorySeeder extends Seeder
             ]);
         }
 
+        DB::table('ingredients')->where('code', 'NL009')->where('name', 'Bột ớt Hàn Quốc cấp 5')
+            ->update(['name' => 'Bột ớt Hàn Quốc', 'updated_at' => now()]);
+
         // Map code -> id helper
-        $id = fn (string $code) => $ingredientIds[$code] ?? null;
-        $stockQuantity = static fn (string $code, float|int $quantity): int => in_array($code, $scaledIngredientCodes, true)
+        $id = fn(string $code) => $ingredientIds[$code] ?? null;
+        $stockQuantity = static fn(string $code, float|int $quantity): int => in_array($code, $scaledIngredientCodes, true)
             ? (int) round($quantity * 1000)
             : (int) round($quantity);
         /** Theo plan mục 4: NL trọng yếu để tự báo hết món (mì, thịt/hải sản, chả/viên, bánh gạo, phô mai, đồ uống đóng chai/lon).
          *  Rau/gia vị có lượng linh hoạt KHÔNG tự làm món hết. */
         $criticalCodes = [
             'NL001', // Mì tươi
-            'NL002', // Mì Ý
             'NL003', // Thịt bò
             'NL004', // Thịt gà
             'NL005', // Chả cá
@@ -174,59 +201,74 @@ class InventorySeeder extends Seeder
             'NL017', // Gạo tẻ (dùng cho kimbap, makkoli)
             'NL035', // Bánh gạo tokbokki
             'NL036', // Kim chi thành phẩm
-            'NL037', // Gà viên thành phẩm
-            'NL038', // Tôm viên thành phẩm
-            'NL039', // Chả mực thành phẩm
-            'NL040', // Bạch tuộc viên thành phẩm
-            'NL041', // Bò viên thành phẩm
             'NL042', // Mandu thành phẩm
-            'NL050', 'NL051', 'NL057', 'NL058', 'NL059', // Nguyên liệu chính của món tráng miệng
+            'NL050',
+            'NL051',
+            'NL057',
+            'NL058',
+            'NL059', // Nguyên liệu chính của món tráng miệng
             // Đồ uống đóng chai/lon (bị thiếu thì món "Hết đồ uống" hợp lý).
-            'NL020', 'NL021', 'NL022', 'NL023', 'NL024',
-            'NL043', 'NL044', 'NL025', 'NL045',
-            'NL046', 'NL047', 'NL048', 'NL049',
+            'NL020',
+            'NL021',
+            'NL022',
+            'NL024',
+            'NL043',
+            'NL044',
+            'NL025',
+            'NL045',
+            'NL046',
+            'NL047',
+            'NL048',
+            'NL049',
         ];
-        $isCritical = static fn (string $code): bool => in_array($code, $criticalCodes, true);
+        $isCritical = static fn(string $code): bool => in_array($code, $criticalCodes, true);
 
-        foreach ([
-            ['code' => 'NL005', 'unit' => 'bịch', 'conversion' => 24],
-            ['code' => 'NL007', 'unit' => 'bịch', 'conversion' => 5],
-        ] as $package) {
+        foreach (
+            [
+                ['code' => 'NL005', 'unit' => 'bịch', 'conversion' => 24],
+                ['code' => 'NL007', 'unit' => 'bịch', 'conversion' => 5],
+            ] as $package
+        ) {
             DB::table('ingredient_packagings')->updateOrInsert([
-                'ingredient_id' => $id($package['code']), 'supplier_id' => $supplierId,
+                'ingredient_id' => $id($package['code']),
+                'supplier_id' => $supplierId,
                 'purchase_unit' => $package['unit'],
             ], [
                 'conversion_quantity' => $package['conversion'],
-                'is_default' => true, 'is_active' => true,
+                'is_default' => true,
+                'is_active' => true,
                 'updated_at' => now(),
             ]);
         }
+
 
         $menuItems = DB::table('menu_items')->select('id', 'slug', 'size', 'recipe_managed_at')->get()->keyBy('slug');
 
         // Định nghĩa 1 phần "mì cay base" cho size NHỎ.
         // Size LỚN nhân x1.5 phần chung; chả cá và xúc xích có số cục/cây riêng theo cỡ.
         $proteinRecipes = [
-            'bo'         => ['NL003' => 0.15],
-            'ga'         => ['NL004' => 0.15],
+            'bo'         => ['NL003' => 0.075],
+            'ga'         => ['NL004' => 0.075],
             'cha-ca'     => [],
-            'hai-san'    => ['NL006' => 0.15],
-            'muc'        => ['NL027' => 0.15],
-            'bach-tuoc'  => ['NL028' => 0.15],
+            'hai-san'    => ['NL006' => 0.075],
+            'muc'        => ['NL027' => 0.075],
+            'bach-tuoc'  => ['NL028' => 0.075],
             'xuc-xich'   => [],
+            'thap-cam'   => ['NL003' => 0.03, 'NL006' => 0.03],
         ];
         $countableRecipes = [
             'cha-ca' => ['nho' => ['NL005' => 8], 'lon' => ['NL005' => 12]],
             'xuc-xich' => ['nho' => ['NL007' => 2], 'lon' => ['NL007' => 2, 'NL005' => 5]],
+            'thap-cam' => ['nho' => ['NL005' => 2, 'NL007' => 1], 'lon' => ['NL005' => 3, 'NL007' => 2]],
         ];
 
         // Phần nguyên liệu chung cho mọi mì cay (mì + gia vị cay + rau + trứng)
         $baseCommonSmall = [
             'NL001' => 1,
-            'NL008' => 0.05,
-            'NL012' => 0.10,
-            'NL015' => 1,
-            'NL010' => 0.01,
+            'NL008' => 0.005,
+            'NL009' => 0.002, // 20gram cho mỗi cấp cay ở phần nhỏ.
+            'NL012' => 0.005,
+            'NL010' => 0.001,
         ];
 
         foreach ($proteinRecipes as $proteinSlug => $proteinMap) {
@@ -238,10 +280,28 @@ class InventorySeeder extends Seeder
                     continue;
                 }
                 if ($menuItem->recipe_managed_at !== null || DB::table('menu_item_ingredient')->where('menu_item_id', $menuItem->id)->exists()) {
+                    DB::table('menu_item_ingredient')->updateOrInsert([
+                        'menu_item_id' => $menuItem->id,
+                        'ingredient_id' => $id('NL001'),
+                    ], [
+                        'quantity_required' => $sizeKey === 'LARGE' ? 2 : 1,
+                        'waste_factor' => 1.000,
+                        'availability_required' => true,
+                        'updated_at' => now(),
+                    ]);
+                    DB::table('menu_item_ingredient')->insertOrIgnore([
+                        'menu_item_id' => $menuItem->id,
+                        'ingredient_id' => $id('NL009'),
+                        'quantity_required' => $sizeKey === 'LARGE' ? 6 : 5,
+                        'waste_factor' => 1.000,
+                        'availability_required' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                     continue;
                 }
 
-                $multiplier = $sizeKey === 'LARGE' ? 1.5 : 1.0;
+                $multiplier = $sizeKey === 'LARGE' ? 1.2 : 1.0;
 
                 $ingredients = [];
                 foreach ($baseCommonSmall as $code => $qty) {
@@ -253,6 +313,7 @@ class InventorySeeder extends Seeder
                 foreach ($countableRecipes[$proteinSlug][$sizeLabel] ?? [] as $code => $qty) {
                     $ingredients[$code] = $stockQuantity($code, $qty);
                 }
+                $ingredients['NL001'] = $sizeKey === 'LARGE' ? 2 : 1;
 
                 foreach ($ingredients as $code => $qty) {
                     DB::table('menu_item_ingredient')->insertOrIgnore([
@@ -274,21 +335,21 @@ class InventorySeeder extends Seeder
             'them-pho-mai'       => [$id('NL016') => 0.05],
             'them-bo'            => [$id('NL003') => 0.05],
             'them-ga'            => [$id('NL004') => 0.10],
-            'them-tom'           => [$id('NL006') => 0.08],
+            'them-tom'           => [$id('NL006') => 0.05],
             'them-muc'           => [$id('NL027') => 0.05],
             'them-bach-tuoc'     => [$id('NL028') => 0.05],
+            'them-kim-chi'       => [$id('NL036') => 0.05],
             'them-cha-ca'        => [$id('NL005') => 5],
-            'them-mi-y'          => [$id('NL002') => 1],
             'them-xuc-xich'      => [$id('NL007') => 1],
-            'them-rau-thap-cam'  => [$id('NL012') => 0.10, $id('NL013') => 0.05, $id('NL014') => 0.05],
+            'them-rau'           => [$id('NL012') => 0.02, $id('NL060') => 20, $id('NL061') => 20, $id('NL062') => 20],
             'them-tokbokki'      => [$id('NL035') => 0.15, $id('NL008') => 0.02],
 
             // Món phụ
             'kimbap-truyen-thong'   => [$id('NL018') => 0.10, $id('NL017') => 0.20, $id('NL014') => 0.05, $id('NL013') => 0.05],
             'kimbap-chien'          => [$id('NL018') => 0.10, $id('NL017') => 0.20, $id('NL019') => 0.05, $id('NL014') => 0.05],
             'kimbap-pho-mai'        => [$id('NL018') => 0.10, $id('NL017') => 0.20, $id('NL014') => 0.05, $id('NL016') => 0.03],
-            'tokbokki-pho-mai'      => [$id('NL035') => 0.30, $id('NL016') => 0.08, $id('NL008') => 0.03],
-            'tokbokki-cay-cap-3'    => [$id('NL035') => 0.30, $id('NL008') => 0.08, $id('NL009') => 0.04],
+            'tokbokki-pho-mai'      => [$id('NL035') => 0.30, $id('NL016') => 0.08, $id('NL008') => 0.02],
+            'tokbokki-cay-cap-3'    => [$id('NL035') => 0.30, $id('NL008') => 0.08, $id('NL009') => 0.02],
             'cha-gio-re-han-quoc'   => [$id('NL019') => 0.10, $id('NL004') => 0.10],
             'ga-ran-han-quoc'       => [$id('NL004') => 0.25, $id('NL010') => 0.02, $id('NL011') => 0.01],
             'ga-ran-sot-cay'        => [$id('NL004') => 0.25, $id('NL008') => 0.06, $id('NL010') => 0.02],
@@ -303,16 +364,18 @@ class InventorySeeder extends Seeder
             // Đồ uống
             'tra-sua-tran-chau'        => [$id('NL024') => 0.5, $id('NL025') => 0.01, $id('NL026') => 0.05],
             'tra-sua-han-quoc-chuseok' => [$id('NL024') => 0.5, $id('NL025') => 0.015, $id('NL026') => 0.05, $id('NL030') => 0.10],
-            'tra-xanh-dao'             => [$id('NL025') => 0.005, $id('NL030') => 0.10],
-            'soju-han-quoc'            => [$id('NL022') => 1],
-            'soju-vi-dao'              => [$id('NL022') => 1, $id('NL030') => 0.10],
-            'nuoc-gao-han-quoc-makkoli'=> [$id('NL017') => 0.05],
+            'tra-dao'             => [$id('NL025') => 0.005, $id('NL030') => 0.10],
+            'nuoc-gao-han-quoc-makkoli' => [$id('NL017') => 0.05],
             'soda-dau'                 => [$id('NL033') => 1, $id('NL031') => 0.03],
-            'soda-viet-quat'           => [$id('NL033') => 1, $id('NL032') => 0.03],
             'coca-cola'                => [$id('NL020') => 1],
             'pepsi'                    => [$id('NL021') => 1],
-            'nuoc-suoi'                => [$id('NL023') => 1],
             'sua-hop-nho'              => [$id('NL024') => 1],
+            '7-up'                     => [$id('NL043') => 1],
+            'sting'                    => [$id('NL044') => 1],
+            'soju-vi-tao'                => [$id('NL046') => 1],
+            'soju-vi-dao'                => [$id('NL047') => 1],
+            'soju-vi-dau'                => [$id('NL048') => 1],
+            'soju-vi-viet-quat'          => [$id('NL049') => 1],
         ];
 
         foreach ($recipes as $slug => $items) {
@@ -345,13 +408,13 @@ class InventorySeeder extends Seeder
     {
         $number = (int) substr($code, 2);
         return match (true) {
-            in_array($number, [1, 2, 17, 18, 19, 35, 59], true) => 'Mì và tinh bột',
+            in_array($number, [1, 17, 18, 19, 35, 59], true) => 'Mì và tinh bột',
             in_array($number, [3, 4], true) => 'Thịt tươi',
             in_array($number, [6, 27, 28], true) => 'Hải sản tươi',
-            in_array($number, [5, 7, 15, 37, 38, 39, 40, 41, 42], true) => 'Hàng chế biến sẵn',
+            in_array($number, [5, 7, 15, 42], true) => 'Hàng chế biến sẵn',
             in_array($number, [12, 13, 14, 29, 36, 50, 58], true) => 'Rau củ',
             in_array($number, [8, 9, 10, 11, 16, 53, 54, 55, 56, 57], true) => 'Sốt và gia vị',
-            in_array($number, [20, 21, 22, 23, 43, 44, 46, 47, 48, 49], true) => 'Đồ uống',
+            in_array($number, [20, 21, 22, 43, 44, 46, 47, 48, 49], true) => 'Đồ uống',
             default => 'Nguyên liệu pha chế',
         };
     }

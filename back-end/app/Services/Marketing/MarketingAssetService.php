@@ -223,15 +223,21 @@ class MarketingAssetService
         }
         $content = app(\App\Services\BlogService::class)->sanitizeHtml($content);
 
-        // Map category từ context nếu không truyền override.
+        // Mục tin đã chọn khi tạo bản thảo quyết định nơi bài xuất hiện trên website.
+        $selectedSection = ((array) $asset->context_payload)['news_section'] ?? null;
         $category = $options['category'] ?? null;
         if (!$category) {
             $ctx = (array) $asset->context_payload;
-            $category = !empty($ctx['promotion_id']) ? 'PROMOTION' : 'NEWS';
+            $category = match ($selectedSection) {
+                'PROMOTION' => 'PROMOTION',
+                'OPENING' => 'EVENT',
+                'NEWS' => 'NEWS',
+                default => !empty($ctx['promotion_id']) ? 'PROMOTION' : 'NEWS',
+            };
         }
         $category = strtoupper((string) $category);
 
-        $newsSection = $options['news_section'] ?? null;
+        $newsSection = $options['news_section'] ?? $selectedSection;
         if (!$newsSection) {
             $newsSection = match ($category) {
                 'PROMOTION' => 'PROMOTION',

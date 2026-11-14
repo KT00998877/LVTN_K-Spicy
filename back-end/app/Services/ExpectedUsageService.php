@@ -23,14 +23,15 @@ class ExpectedUsageService
             $recipe = DB::table('menu_item_ingredient as r')
                 ->leftJoin('ingredients as i', 'i.id', '=', 'r.ingredient_id')
                 ->where('r.menu_item_id', $part['menu_item_id'])
-                ->select('r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit')->get();
+                ->select('r.ingredient_id', 'r.quantity_required', 'r.waste_factor', 'r.unit_override', 'i.unit', 'i.code')->get();
             if ($recipe->isEmpty()) {
                 $lines[] = ['missing_recipe' => true];
             }
             foreach ($recipe as $row) {
                 $lines[] = [
                     'ingredient_id' => (int) $row->ingredient_id,
-                    'quantity' => (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']),
+                    'quantity' => (int) ceil((int) $row->quantity_required * (float) $row->waste_factor * $part['multiplier']
+                        * $item->recipeSpicyMultiplier((int) $part['menu_item_id'], $row->code)),
                     'unit' => $row->unit,
                     'comparable' => $row->unit !== null && ($row->unit_override === null || $row->unit_override === $row->unit),
                 ];

@@ -48,6 +48,10 @@ export async function createReservation(form: ReservationForm, requestKey: strin
     return response.data.data
 }
 
+export async function getReservationStatus(requestKey: string): Promise<ReservationStatus> {
+    return (await apiClient.get<{ data: { status: ReservationStatus } }>('/reservations/status', { params: { request_key: requestKey } })).data.data.status
+}
+
 export async function fetchMyReservations(): Promise<ReservationListResponse> {
     return (await apiClient.get<ReservationListResponse>('/reservations/me')).data
 }

@@ -8,7 +8,7 @@ import type { StaffSession } from '@/stores/staff'
 export const STAFF_LIVE_EVENT = 'staff:live-update'
 export interface StaffNotification {
     id: string
-    data: { event: string; order_id: number; order_code: string; message: string; url: string }
+    data: { event: string; order_id?: number; reservation_id?: number; order_code: string; message: string; url: string }
     read_at: string | null
     created_at: string
 }

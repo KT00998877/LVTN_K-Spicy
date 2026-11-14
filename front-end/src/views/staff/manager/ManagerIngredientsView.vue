@@ -100,6 +100,7 @@
         <!-- =========================================================
              LOADING / ERROR
              ========================================================= -->
+        <p v-if="deleteError" class="mgr-alert mgr-alert--error" role="alert">{{ deleteError }}</p>
         <div v-if="store.loading && !store.list.length" class="mgr-state mgr-state--loading">
             <span class="mgr-spinner"></span>
             <p>Đang tải dữ liệu nguyên liệu…</p>
@@ -161,6 +162,7 @@
                         <td>
                             <div class="mgr-rowactions">
                                 <button class="mgr-linkbtn" @click="openEdit(row)">Chỉnh sửa</button>
+                                <button v-if="row.is_active" class="mgr-linkbtn mgr-linkbtn--danger" :disabled="deletingId === row.id" @click="removeIngredient(row)">{{ deletingId === row.id ? 'Đang xóa…' : 'Xóa' }}</button>
                             </div>
                         </td>
                     </tr>
@@ -325,6 +327,8 @@ const categoryDialog = ref<HTMLDialogElement | null>(null)
 const editingId = ref<number | null>(null)
 const refreshing = ref(false)
 const formError = ref('')
+const deleteError = ref('')
+const deletingId = ref<number | null>(null)
 const blocking = ref<{ can_deactivate: boolean; data: { id: number; name: string; code: string | null }[] } | null>(null)
 const supplierOptions = ref<{ id: number; name: string; is_active: boolean }[]>([])
 const categoryOptions = ref<IngredientCategory[]>([])
@@ -472,6 +476,20 @@ async function openEdit(row: Ingredient) {
         blocking.value = await store.blockingReferences(row.id)
     } catch {
         blocking.value = null
+    }
+}
+
+async function removeIngredient(row: Ingredient) {
+    if (!window.confirm(`Xóa ${row.name} khỏi danh sách sử dụng? Lịch sử kho và chứng từ vẫn được giữ.`)) return
+    deletingId.value = row.id
+    deleteError.value = ''
+    try {
+        await ingredientsApi.remove(row.id)
+        await refresh()
+    } catch (err: any) {
+        deleteError.value = Object.values(err?.response?.data?.errors || {}).flat().join(' ') || err?.response?.data?.message || 'Không xóa được nguyên liệu.'
+    } finally {
+        deletingId.value = null
     }
 }
 

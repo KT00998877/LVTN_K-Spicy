@@ -88,6 +88,7 @@ function handleOrder() {
         price_formatted: p.price_formatted,
         default_spicy: p.spicy_level ?? 2,
         image_url: p.image_url,
+        category_slug: p.category_slug,
     })
 }
 function handleDetail() {

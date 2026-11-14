@@ -25,6 +25,7 @@ import {
     type InventoryStatsData,
     type TopIngredientsData,
     type FoodCostData,
+    type ProfitLedgerData,
     type StatisticsPeriod,
     type StatisticsQuery,
 } from '@/api/statistics'
@@ -46,6 +47,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
         topProducts: null as TopProductsData | null,
         lowProducts: null as LowProductsData | null,
         foodCost: null as FoodCostData | null,
+        profitLedger: null as ProfitLedgerData | null,
         categories: null as CategoryStatsData | null,
         payments: null as PaymentStatsData | null,
         customers: null as CustomerStatsData | null,
@@ -64,6 +66,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
             topProducts: false,
             lowProducts: false,
             foodCost: false,
+            profitLedger: false,
             categories: false,
             payments: false,
             customers: false,
@@ -105,6 +108,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 state.topProducts !== null ||
                 state.lowProducts !== null ||
                 state.foodCost !== null ||
+                state.profitLedger !== null ||
                 state.categories !== null ||
                 state.payments !== null ||
                 state.customers !== null ||
@@ -166,6 +170,9 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
         },
         async fetchFoodCost(quiet = false): Promise<void> {
             await this._run('foodCost', quiet, () => statistics.foodCost(this.queryBase))
+        },
+        async fetchProfitLedger(quiet = false): Promise<void> {
+            await this._run('profitLedger', quiet, () => statistics.profitLedger(this.queryBase))
         },
         async fetchCategories(quiet = false): Promise<void> {
             await this._run('categories', quiet, () => statistics.categories(this.queryBase))
@@ -237,6 +244,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 this.fetchTopProducts(quiet),
                 this.fetchLowProducts(quiet),
                 this.fetchFoodCost(quiet),
+                this.fetchProfitLedger(quiet),
                 this.fetchCategories(quiet),
                 this.fetchPayments(quiet),
                 this.fetchOrderTypeRevenue(quiet),
@@ -258,6 +266,7 @@ export const useManagerStatisticsStore = defineStore('managerStatistics', {
                 topProducts: () => this.fetchTopProducts(false),
                 lowProducts: () => this.fetchLowProducts(false),
                 foodCost: () => this.fetchFoodCost(false),
+                profitLedger: () => this.fetchProfitLedger(false),
                 categories: () => this.fetchCategories(false),
                 payments: () => this.fetchPayments(false),
                 orderTypeRevenue: () => this.fetchOrderTypeRevenue(false),

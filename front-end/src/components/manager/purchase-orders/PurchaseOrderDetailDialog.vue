@@ -106,7 +106,7 @@
                     </td>
                     <td>
                       <label class="purchase-order-muted" :for="`lot-${line.id}`">Mã lô</label>
-                      <input :id="`lot-${line.id}`" v-model.trim="line.supplier_lot_code" class="purchase-order-input" maxlength="60" :disabled="receiptLocked || busy" />
+                      <input :id="`lot-${line.id}`" v-model.trim="line.supplier_lot_code" class="purchase-order-input" maxlength="60" readonly />
                       <label class="purchase-order-muted" :for="`expiry-${line.id}`">Hạn sử dụng</label>
                       <input :id="`expiry-${line.id}`" v-model="line.expiry_date" class="purchase-order-input" type="date" :disabled="receiptLocked || busy" />
                     </td>

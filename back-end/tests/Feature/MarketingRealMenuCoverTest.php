@@ -85,4 +85,25 @@ class MarketingRealMenuCoverTest extends TestCase
         $this->assertSame('Khám phá gà rán Hàn Quốc', $blog->title);
         $this->assertStringContainsString('<h2>Hương vị</h2>', $blog->content);
     }
+
+    public function test_blog_draft_uses_the_news_section_selected_for_the_asset(): void
+    {
+        foreach (['NEWS' => 'NEWS', 'PROMOTION' => 'PROMOTION', 'OPENING' => 'EVENT'] as $section => $category) {
+            $asset = MarketingAsset::create([
+                'subject' => 'Bài thử ' . $section,
+                'context_payload' => ['news_section' => $section],
+            ]);
+            $version = MarketingAssetVersion::create([
+                'asset_id' => $asset->id,
+                'version_number' => 1,
+                'headline' => 'Bài thử ' . $section,
+                'body' => 'Nội dung thử',
+            ]);
+
+            $blog = app(MarketingAssetService::class)->pushToBlog($asset, $version, [], 1);
+
+            $this->assertSame($section, $blog->news_section);
+            $this->assertSame($category, $blog->category);
+        }
+    }
 }

@@ -26,7 +26,7 @@ import { useStaffNotificationsStore } from '@/stores/staffNotifications'
 const staffStore = useStaffStore()
 const notifications = useStaffNotificationsStore()
 watch(() => staffStore.session, session => {
-    if (session && session.roles.some(role => ['MANAGER', 'KITCHEN', 'SHIPPER'].includes(role))) notifications.start(session)
+    if (session && session.roles.some(role => ['MANAGER', 'KITCHEN', 'SHIPPER', 'CASHIER'].includes(role))) notifications.start(session)
     else notifications.stop()
 }, { immediate: true })
 onUnmounted(() => notifications.stop())

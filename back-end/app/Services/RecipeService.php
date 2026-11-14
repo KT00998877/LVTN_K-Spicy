@@ -25,10 +25,11 @@ class RecipeService
     /** Lấy recipe đầy đủ của 1 menu_item. */
     public function get(int $menuItemId): array
     {
-        $mi = MenuItem::with(['recipes.ingredient'])->findOrFail($menuItemId);
+        $mi = MenuItem::with(['recipes.ingredient.packagings'])->findOrFail($menuItemId);
 
         $lines = $mi->recipes->map(function (MenuItemIngredient $r) {
             $ing = $r->ingredient;
+            $unitPrice = $ing ? $this->unitPrice($ing) : 0;
             return [
                 'id'                 => (int) $r->id,
                 'ingredient_id'      => (int) $r->ingredient_id,
@@ -43,7 +44,8 @@ class RecipeService
                 'availability_required' => (bool) $r->availability_required,
                 'effective_quantity' => (int) ceil((int) $r->quantity_required * (float) $r->waste_factor),
                 'display_unit'       => (string) ($r->unit_override ?: ($ing?->unit ?? '')),
-                'line_cost'          => $ing ? round((float) $r->quantity_required * (float) $ing->import_price, 2) : 0,
+                'unit_price'         => $unitPrice,
+                'line_cost'          => round((float) $r->quantity_required * $unitPrice, 2),
             ];
         })->values()->all();
 
@@ -65,6 +67,25 @@ class RecipeService
             'lines' => $lines,
             'summary' => $this->summarize($mi, $lines),
         ];
+    }
+
+    /** Quy đổi bảng giá nhà cung cấp về một đơn vị tồn kho để tính cost công thức. */
+    private function unitPrice(Ingredient $ingredient): float
+    {
+        $packaging = $ingredient->packagings
+            ->where('is_active', true)
+            ->where('supplier_id', $ingredient->supplier_id)
+            ->whereNotNull('supplier_price')
+            ->sortByDesc('is_default')
+            ->first();
+
+        if ($packaging && (int) $packaging->conversion_quantity > 0) {
+            return (float) $packaging->supplier_price / (int) $packaging->conversion_quantity;
+        }
+
+        return $ingredient->supplier_price === null
+            ? (float) $ingredient->import_price
+            : (float) $ingredient->supplier_price;
     }
 
     /**

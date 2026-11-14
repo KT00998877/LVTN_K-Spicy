@@ -98,8 +98,6 @@ const badgeKeyByPath: Record<string, ManagerBadgeKey> = {
     '/staff/manager/online-orders': 'online_orders',
     '/staff/manager/purchase-orders': 'purchase_orders',
     '/staff/manager/stock-imports': 'stock_imports',
-    '/staff/manager/stocktake': 'stocktakes',
-    '/staff/manager/consumption': 'stock_requests',
     '/staff/manager/inventory': 'out_of_stock',
     '/staff/manager/live-chat': 'live_chat',
 }
@@ -130,10 +128,9 @@ const managerGroups = [
         { path: '/staff/manager/ingredients', label: 'Nguyên liệu' },
         { path: '/staff/manager/inventory', label: 'Kho hàng' },
         { path: '/staff/manager/purchase-orders', label: 'Yêu cầu nhập hàng' },
+        { path: '/staff/manager/supplier-prices', label: 'Xem giá nhập' },
         { path: '/staff/manager/stock-imports', label: 'Phiếu nhập kho' },
         { path: '/staff/manager/stock-transactions', label: 'Lịch sử giao dịch kho' },
-        { path: '/staff/manager/stocktake', label: 'Kiểm kê kho' },
-        { path: '/staff/manager/consumption', label: 'Tiêu hao món bán' },
         { path: '/staff/manager/daily-stock', label: 'Sổ kho hằng ngày' },
     ] },
     { id: 'sales', label: 'Đơn hàng & hóa đơn', items: [
@@ -204,6 +201,7 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
     ],
     SUPPLIER: [
         { path: '/staff/supplier/purchase-orders', label: 'Yêu cầu nhập hàng', roles: ['SUPPLIER'] },
+        { path: '/staff/supplier/prices', label: 'Giá nhập', roles: ['SUPPLIER'] },
         { path: '/staff/supplier/return-requests', label: 'Yêu cầu trả hàng', roles: ['SUPPLIER'] },
     ],
     MANAGER: [

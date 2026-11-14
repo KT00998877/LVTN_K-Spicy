@@ -76,6 +76,8 @@ class OnlineOrderService
             'delivered_at'    => $order->delivered_at,
             'customer_received_at' => $order->customer_received_at,
             'shipper_id'      => $order->shipper_id,
+            'shipper_accepted_at' => $order->shipper_accepted_at?->toIso8601String(),
+            'shipper_arrived_restaurant_at' => $order->shipper_arrived_restaurant_at?->toIso8601String(),
             'shipper_name'    => $order->shipper_id ? User::whereKey($order->shipper_id)->value('name') : null,
             'delivery_issue'  => $order->delivery_issue,
             'points_awarded'  => (int) ($order->points_awarded ?? 0),
@@ -103,6 +105,8 @@ class OnlineOrderService
                 'approved_at' => $cancellation->approved_at?->toIso8601String(),
                 'refunded_at' => $cancellation->refunded_at?->toIso8601String(),
             ] : null,
+            'can_request_cancellation' => $order->status === 'READY_NOTIFY_SHIPPER'
+                && !$order->items()->whereHas('menuItem.category', fn ($category) => $category->whereIn('slug', ['mi-cay-han-quoc', 'mon-phu']))->exists(),
             'events' => DB::table('order_events')->where('order_id', $order->id)->orderBy('id')
                 ->get(['event', 'status', 'note', 'created_at'])->all(),
         ];
@@ -268,10 +272,20 @@ class OnlineOrderService
             $changes = ['status' => 'CONFIRMED', 'confirmed_at' => now(), 'confirmed_by' => $actor?->id];
             if ($order->order_type === 'ONLINE') $changes['shipper_id'] = $shipperId;
             $order->forceFill($changes)->save();
+            $stockActor = $actor ?? User::findOrFail($order->customer_id);
+            foreach ($order->items()->with('menuItem.category')->where('status', '!=', 'CANCELLED')->get() as $item) {
+                app(NonKitchenItemService::class)->complete($item, $stockActor);
+            }
+            if (!$order->items()->where('status', 'PENDING')->exists()) {
+                $order->forceFill(['status' => 'READY_NOTIFY_SHIPPER'])->save();
+            }
             $this->event($order, $actor, 'CONFIRMED');
             if ($order->order_type === 'ONLINE') {
                 $this->event($order, $actor, 'SHIPPER_ASSIGNED', 'Phân công shipper #'.$shipperId);
                 app(StaffNotificationService::class)->orderConfirmed($order);
+                if ($order->status === 'READY_NOTIFY_SHIPPER') {
+                    app(StaffNotificationService::class)->kitchenReady($order);
+                }
             }
         }, 3);
     }
@@ -294,6 +308,8 @@ class OnlineOrderService
                 409, 'Còn món chưa hoàn thành.');
             abort_if($order->order_type === 'ONLINE' && $order->shipper_id !== null && $order->shipper_id !== $shipperId,
                 409, 'Vui lòng bàn giao cho shipper đã được phân công.');
+            abort_if($order->order_type === 'ONLINE' && !$order->shipper_arrived_restaurant_at,
+                409, 'Shipper cần xác nhận đã đến nhà hàng trước khi bàn giao.');
             User::where('is_active', true)->whereHas('roles', fn ($q) => $q->where('code', 'SHIPPER'))
                 ->findOrFail($shipperId);
             $order->forceFill([
@@ -328,6 +344,20 @@ class OnlineOrderService
                 : '; đã thu quán '.number_format($cashFlow['collect_from_restaurant']).'đ');
             $this->event($order, $shipper, 'PICKED_UP',
                 ($order->order_type === 'TAKEAWAY' ? 'Shipper đã nhận hàng mang đi' : 'Shipper đã lấy hàng để giao').$cashNote);
+        }, 3);
+    }
+
+    public function arrivedRestaurant(User $shipper, int $id): void
+    {
+        DB::transaction(function () use ($shipper, $id) {
+            $order = $this->lockDeliveryForShipper($id, $shipper->id);
+            abort_unless($order->order_type === 'ONLINE' && $order->status === 'READY_NOTIFY_SHIPPER', 409,
+                'Chỉ xác nhận đến nhà hàng khi đơn đã sẵn sàng bàn giao.');
+            abort_unless($order->shipper_accepted_at, 409, 'Bạn cần nhận đơn trước.');
+            if ($order->shipper_arrived_restaurant_at) return;
+
+            $order->forceFill(['shipper_arrived_restaurant_at' => now()])->save();
+            $this->event($order, $shipper, 'SHIPPER_ARRIVED_RESTAURANT', 'Shipper đã đến nhà hàng nhận đơn');
         }, 3);
     }
 
@@ -518,8 +548,27 @@ class OnlineOrderService
                 ->findOrFail($orderId);
 
             if ($order->status === 'CANCELLED') return;
-            abort_unless($order->status === 'PENDING', 409,
-                'Chỉ có thể huỷ đơn khi nhà hàng chưa xác nhận.');
+            $readyWithoutKitchen = $order->status === 'READY_NOTIFY_SHIPPER'
+                && !$order->items()->whereHas('menuItem.category', fn ($category) => $category->whereIn('slug', ['mi-cay-han-quoc', 'mon-phu']))->exists();
+            abort_unless(in_array($order->status, ['PENDING', 'CONFIRMED'], true) || $readyWithoutKitchen, 409,
+                'Đơn đang được xử lý. Vui lòng liên hệ quản lý để hủy đơn.');
+
+            if ($order->status === 'CONFIRMED' || $readyWithoutKitchen) {
+                $request = OrderCancellationRequest::firstOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'requested_by' => $customer->id,
+                        'reason' => $reason,
+                        'status' => OrderCancellationRequest::STATUS_PENDING,
+                        'requested_at' => now(),
+                    ],
+                );
+                if ($request->wasRecentlyCreated) {
+                    $this->event($order, $customer, 'CANCEL_REQUESTED', '[Khách yêu cầu hủy] '.$reason);
+                    app(StaffNotificationService::class)->orderCancellationRequested($order);
+                }
+                return;
+            }
 
             $invoice = $this->invoice($order);
 
@@ -605,9 +654,14 @@ class OnlineOrderService
 
             abort_unless($request->status === OrderCancellationRequest::STATUS_PENDING, 409,
                 'Yêu cầu hủy không còn chờ duyệt.');
-            abort_unless($order->status === 'PENDING', 409,
-                'Chỉ có thể duyệt hủy khi đơn chưa được nhà hàng xác nhận.');
+            $readyWithoutKitchen = $order->status === 'READY_NOTIFY_SHIPPER'
+                && !$order->items()->whereHas('menuItem.category', fn ($category) => $category->whereIn('slug', ['mi-cay-han-quoc', 'mon-phu']))->exists();
+            abort_unless(in_array($order->status, ['PENDING', 'CONFIRMED'], true) || $readyWithoutKitchen, 409,
+                'Đơn đã bắt đầu xử lý. Vui lòng liên hệ quản lý để hủy đơn.');
 
+            foreach ($order->items()->whereNotNull('inventory_deducted_at')->get() as $item) {
+                app(InventoryConsumptionService::class)->restoreForItem($item, $manager, 'Hủy đơn trước khi chế biến');
+            }
             $order->items()->update([
                 'status' => 'CANCELLED',
                 'cancelled_by' => $manager->id,
@@ -619,6 +673,16 @@ class OnlineOrderService
                 'cancelled_at' => now(),
                 'cancellation_reason' => $request->reason,
             ]);
+            $invoice = $this->invoice($order);
+            $needsRefund = $order->payment_method === 'PREPAID' && DB::table('payments')
+                ->where('invoice_id', $invoice->id)->where('provider', 'vnpay')
+                ->where('status', 'SUCCESS')->where('is_simulated', false)->exists();
+            if (!$needsRefund && $order->payment_method === 'PREPAID') {
+                DB::table('payments')->where('invoice_id', $invoice->id)->where('status', 'SUCCESS')
+                    ->update(['status' => 'REFUNDED', 'updated_at' => now()]);
+                DB::table('invoices')->where('id', $invoice->id)
+                    ->update(['status' => 'REFUNDED', 'paid_amount' => 0, 'updated_at' => now()]);
+            }
             $request->update([
                 'status' => OrderCancellationRequest::STATUS_APPROVED,
                 'approved_by' => $manager->id,

@@ -159,6 +159,25 @@ class IngredientService
         return $rows->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name, 'code' => $r->slug])->all();
     }
 
+    /** Ẩn nguyên liệu khỏi sử dụng, giữ nguyên lịch sử kho và chứng từ. */
+    public function remove(int $id): void
+    {
+        DB::transaction(function () use ($id) {
+            $ingredient = Ingredient::lockForUpdate()->findOrFail($id);
+            if ($ingredient->quantity_in_stock > 0) {
+                throw ValidationException::withMessages([
+                    'ingredient' => 'Nguyên liệu còn tồn kho. Hãy xử lý hết tồn trước khi xóa.',
+                ]);
+            }
+            if ($this->blockingReferences($id) !== []) {
+                throw ValidationException::withMessages([
+                    'ingredient' => 'Nguyên liệu đang có trong công thức món. Hãy gỡ khỏi công thức trước khi xóa.',
+                ]);
+            }
+            $ingredient->update(['is_active' => false]);
+        });
+    }
+
     /**
      * Format response 1 ingredient.
      *
@@ -174,6 +193,7 @@ class IngredientService
             'quantity_in_stock'   => (int) $i->quantity_in_stock,
             'min_stock_level'     => (int) $i->min_stock_level,
             'import_price'        => (float) $i->import_price,
+            'supplier_price'      => $i->supplier_price === null ? null : (float) $i->supplier_price,
             'import_date'         => $i->import_date?->toDateString(),
             'expiry_date'         => $i->expiry_date?->toDateString(),
             'supplier_id'         => $i->supplier_id ? (int) $i->supplier_id : null,
@@ -184,6 +204,7 @@ class IngredientService
                 'id' => (int) $p->id, 'supplier_id' => $p->supplier_id ? (int) $p->supplier_id : null,
                 'supplier_name' => $p->supplier?->name, 'purchase_unit' => $p->purchase_unit,
                 'conversion_quantity' => (int) $p->conversion_quantity,
+                'supplier_price' => $p->supplier_price === null ? null : (float) $p->supplier_price,
                 'is_default' => (bool) $p->is_default, 'is_active' => (bool) $p->is_active,
             ])->all(),
             'is_active'           => (bool) $i->is_active,

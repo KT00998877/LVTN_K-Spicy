@@ -153,12 +153,15 @@ class StaffTableController extends Controller
     /**
      * PATCH /api/staff/reservations/{id}/status
      */
-    public function updateReservationStatus(Request $request, int $id): JsonResponse
+    public function updateReservationStatus(Request $request, int $id, \App\Services\ReservationNotificationService $notifications): JsonResponse
     {
         $data = $request->validate([
             'status' => ['required', 'string'],
         ]);
         $row = $this->service->updateReservationStatus($id, $data['status']);
+        if (in_array($data['status'], ['CONFIRMED', 'CANCELLED'], true)) {
+            $notifications->decided(\App\Models\Reservation::findOrFail($id), $row['previous_status']);
+        }
         return response()->json([
             'success' => true,
             'data'    => $row,

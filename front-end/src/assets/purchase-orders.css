@@ -253,12 +253,15 @@
 }
 .purchase-order-line {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) minmax(150px, 1fr) minmax(130px, .8fr) auto;
-  align-items: end;
+  grid-template-columns: minmax(190px, 2fr) minmax(145px, 1fr) minmax(125px, .8fr) minmax(155px, 1fr) auto;
+  align-items: start;
   gap: var(--space-3);
   padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
+.purchase-order-line__price strong { min-height: 44px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+.purchase-order-line__price strong span { font-weight: var(--weight-regular); margin-left: .25em; }
+.purchase-order-line > button { align-self: center; }
 .purchase-order-select--out { border-color: var(--status-error-text); color: var(--status-error-text); font-weight: var(--weight-semibold); }
 .purchase-order-add-line { align-self: flex-start; min-width: 44px; font-size: var(--font-size-product); }
 
@@ -368,6 +371,7 @@
   .purchase-order-form-grid { grid-template-columns: 1fr; }
   .purchase-order-form-grid__wide { grid-column: auto; }
   .purchase-order-line { grid-template-columns: 1fr; }
+  .purchase-order-line > button { align-self: start; }
   .purchase-order-timeline { grid-template-columns: 1fr 1fr; }
   .purchase-order-summary { grid-template-columns: 1fr 1fr; }
 }

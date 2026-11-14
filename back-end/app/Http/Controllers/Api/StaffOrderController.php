@@ -49,9 +49,9 @@ class StaffOrderController extends Controller
             'items.*.spicy_level' => ['sometimes', 'integer', 'min:0', 'max:7'],
             'items.*.note' => ['nullable', 'string', 'max:200'],
         ]);
-        $order = DB::transaction(function () use ($id, $data) {
+        $order = DB::transaction(function () use ($id, $data, $request) {
             foreach ($data['items'] as $item) {
-                $this->service->addItem($id, $item);
+                $this->service->addItem($id, $item, $request->user());
             }
             return $this->service->getOrderDetail($id);
         });
@@ -169,7 +169,7 @@ class StaffOrderController extends Controller
             'topping_ids'  => ['sometimes', 'array'],
             'topping_ids.*'=> ['integer', 'exists:menu_items,id'],
         ]);
-        $order = $this->service->addItem($id, $data);
+        $order = $this->service->addItem($id, $data, $request->user());
         return response()->json([
             'success' => true,
             'data'    => $order,

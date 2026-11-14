@@ -163,6 +163,10 @@ export const useDeliveriesStore = defineStore('deliveries', {
             return this._guard(id, () => deliveries.pickup(id))
         },
 
+        async arrivedRestaurant(id: number): Promise<DeliveryOrder | null> {
+            return this._guard(id, () => deliveries.arrivedRestaurant(id))
+        },
+
         /** Bước 2: Xác nhận đã tới điểm giao (chỉ ONLINE) */
         async arrived(id: number): Promise<DeliveryOrder | null> {
             return this._guard(id, () => deliveries.arrived(id))

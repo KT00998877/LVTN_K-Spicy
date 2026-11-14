@@ -126,6 +126,7 @@ class InventoryConsumptionTest extends TestCase
             $table->string('item_name', 150);
             $table->decimal('unit_price', 12, 2)->default(0);
             $table->unsignedSmallInteger('quantity')->default(1);
+            $table->unsignedTinyInteger('spicy_level_override')->nullable();
             $table->decimal('subtotal', 14, 2)->default(0);
             $table->enum('status', ['PENDING', 'PREPARING', 'READY', 'SERVED', 'CANCELLED'])->default('PENDING');
             $table->timestamp('started_at')->nullable();
@@ -233,6 +234,33 @@ class InventoryConsumptionTest extends TestCase
         $this->assertSame([], $result['shortages']);
         // 2 phần × 50g = 100g trừ từ 100g còn 0.
         $this->assertSame(0.0, (float) Ingredient::find($noodles->id)->quantity_in_stock);
+    }
+
+    public function test_mi_cay_tru_bot_ot_theo_cap_cay(): void
+    {
+        [$kitchen, $menu] = $this->fixture(stock: 100, required: 10);
+        $chili = Ingredient::create([
+            'code' => 'NL009', 'name' => 'Bột ớt Hàn Quốc', 'unit' => 'gram',
+            'quantity_in_stock' => 100, 'min_stock_level' => 0, 'import_price' => 180,
+        ]);
+        MenuItemIngredient::create([
+            'menu_item_id' => $menu->id, 'ingredient_id' => $chili->id,
+            'quantity_required' => 2, 'waste_factor' => 1,
+        ]);
+
+        foreach ([0, 3, 7] as $level) {
+            $item = $this->orderItem($menu, quantity: 1);
+            $item->forceFill([
+                'spicy_level_override' => $level,
+                'recipe_snapshot' => null,
+                'recipe_captured_at' => null,
+            ])->save();
+            app(\App\Services\ExpectedUsageService::class)->capture($item, now());
+            $item->save();
+            $this->assertTrue($this->service()->deductForItem($item, $kitchen)['deducted']);
+        }
+
+        $this->assertSame(80.0, (float) $chili->fresh()->quantity_in_stock);
     }
 
     public function test_tru_mot_lan_duy_nhat_ke_du_bep_bam_nhieu_lan(): void

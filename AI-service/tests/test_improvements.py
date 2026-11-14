@@ -34,12 +34,27 @@ def test_negated_write_is_not_routed_as_cart_add():
     assert detect_intent("Thêm mì cay bò vào giỏ") == "add_to_cart"
     assert detect_intent("Toi muon xem gio hang") == "get_cart"
     assert detect_intent("Cho tôi xem voucher đang có") == "get_promotion"
+    assert detect_intent("Món nào đang flash-sale?") == "get_promotion"
     assert detect_intent("Quán mở cửa lúc mấy giờ?") == "get_info"
     assert detect_intent("dia chi") == "get_info"
     assert detect_intent("dia chi quan") == "get_info"
     assert detect_intent("sdt") == "get_info"
     assert retrieval_query("dia chi") == "địa chỉ nhà hàng K-Spicy"
     assert retrieval_query("sdt") == "số điện thoại hotline nhà hàng K-Spicy"
+
+
+async def test_dish_promotion_question_uses_live_flash_sales():
+    class Executor:
+        async def execute(self, **kwargs):
+            assert kwargs["tool_name"] == "flash_sale_list"
+            return ToolResult(tool="flash_sale_list", success=True, data={"data": [
+                {"name": "Mì cay bò", "flash_sale": {"price": 49000, "original_price": 59000}}
+            ]})
+
+    service = BusinessToolService(tool_executor=Executor())
+    result = await service.process_with_tools("Món nào đang khuyến mãi?")
+    assert "Mì cay bò" in result["reply"]
+    assert "49.000đ" in result["reply"]
 
 
 async def test_tool_guards_auth_arguments_and_confirmation():

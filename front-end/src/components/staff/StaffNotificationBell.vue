@@ -27,10 +27,10 @@ async function openOrder(item: StaffNotification) {
         panel.value?.close()
         await router.push(item.data.url)
         await nextTick()
-        window.dispatchEvent(new Event('staff:focus-order'))
+        if (item.data.order_id) window.dispatchEvent(new Event('staff:focus-order'))
         toast.value = null
     } catch {
-        actionError.value = 'Chưa mở được đơn hàng. Vui lòng thử lại.'
+        actionError.value = 'Chưa mở được thông báo. Vui lòng thử lại.'
         if (!panel.value?.open) panel.value?.showModal()
     } finally { opening.value = false }
 }
@@ -49,7 +49,7 @@ async function openOrder(item: StaffNotification) {
             <p v-if="store.soundEnabled" class="hint">Âm báo được cho phép sau khi bạn tương tác với trang.</p>
             <p v-if="store.error || actionError" class="error" role="alert">{{ actionError || store.error }}</p>
             <p v-if="store.loading && !store.items.length" role="status">Đang tải thông báo…</p>
-            <p v-else-if="!store.items.length" class="empty">Chưa có thông báo đơn hàng.</p>
+            <p v-else-if="!store.items.length" class="empty">Chưa có thông báo.</p>
             <ul v-else>
                 <li v-for="item in store.items" :key="item.id">
                     <button class="notification" :class="{ unread: !item.read_at }" :disabled="opening" @click="openOrder(item)">

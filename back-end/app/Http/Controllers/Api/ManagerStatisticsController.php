@@ -125,4 +125,10 @@ class ManagerStatisticsController extends Controller
         [$current] = StatisticsService::resolvePeriod($request->all());
         return response()->json(['success' => true, 'data' => $this->stats->foodCost($current)]);
     }
+
+    public function profitLedger(Request $request): JsonResponse
+    {
+        [$current] = StatisticsService::resolvePeriod($request->all());
+        return response()->json(['success' => true, 'data' => $this->stats->profitLedger($current)]);
+    }
 }

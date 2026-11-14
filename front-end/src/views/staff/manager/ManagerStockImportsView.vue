@@ -6,9 +6,6 @@
         <h2>Phiếu nhập kho</h2>
         <p>Quản lý phiếu nhập theo trạng thái DRAFT → CONFIRMED. Chỉ phiếu đã xác nhận mới cộng tồn kho.</p>
       </div>
-      <div class="header-actions">
-        <button class="manager-button primary" :disabled="loading" @click="openCreate">Tạo phiếu nhập</button>
-      </div>
     </header>
 
     <div class="metrics">
@@ -85,14 +82,14 @@
     <dialog ref="dialog" @cancel="onDialogCancel">
       <form @submit.prevent="onSubmit">
         <header>
-          <h3>{{ dialogMode === 'create' ? 'Tạo phiếu nhập' : dialogMode === 'edit' ? 'Sửa phiếu nhập' : 'Chi tiết phiếu nhập' }}</h3>
+          <h3>{{ dialogMode === 'edit' ? 'Sửa phiếu nhập' : 'Chi tiết phiếu nhập' }}</h3>
           <button type="button" :disabled="saving" @click="closeDialog">Đóng</button>
         </header>
         <div class="form-body">
           <p v-if="formError" class="manager-notice error" role="alert">{{ formError }}</p>
           <fieldset :disabled="dialogMode === 'view' || saving">
             <div class="row">
-              <label>Mã phiếu<input v-model="form.code" :readonly="dialogMode !== 'create'" placeholder="Tự sinh nếu bỏ trống" maxlength="30" /></label>
+              <label>Mã phiếu<input v-model="form.code" readonly maxlength="30" /></label>
               <label>Nhà cung cấp
                 <select v-model.number="form.supplier_id">
                   <option :value="null">Chưa chọn</option>
@@ -172,7 +169,7 @@
         <footer>
           <button type="button" class="manager-button" :disabled="saving" @click="closeDialog">Đóng</button>
           <button v-if="dialogMode !== 'view'" type="submit" class="manager-button primary" :disabled="saving">
-            {{ saving ? 'Đang lưu…' : dialogMode === 'create' ? 'Tạo phiếu' : 'Cập nhật' }}
+            {{ saving ? 'Đang lưu…' : 'Cập nhật' }}
           </button>
         </footer>
       </form>
@@ -211,7 +208,7 @@ const receiveDialog = ref<HTMLDialogElement | null>(null)
 const pendingImport = ref<StockImport | null>(null)
 const receivedAt = ref('')
 const receiveError = ref('')
-const dialogMode = ref<'create' | 'edit' | 'view'>('create')
+const dialogMode = ref<'edit' | 'view'>('view')
 const saving = ref(false)
 const formError = ref('')
 const viewRow = ref<StockImport | null>(null)
@@ -306,30 +303,10 @@ async function loadLookups() {
   } catch (e) { console.warn(e) }
 }
 
-function resetForm() {
-  Object.assign(form, {
-    code: null,
-    supplier_id: null,
-    imported_at: new Date().toISOString().slice(0, 10),
-    supplier_document_code: '',
-    note: '',
-    items: [],
-  })
-}
-
 function addLine() {
   form.items.push({ ingredient_id: 0, ingredient_packaging_id: null, purchase_quantity: null, purchase_unit_price: null, quantity: 1, unit_price: 0, expiry_date: null, supplier_lot_code: null, note: null })
 }
 function removeLine(idx: number) { form.items.splice(idx, 1) }
-
-function openCreate() {
-  dialogMode.value = 'create'
-  resetForm()
-  if (form.items.length === 0) addLine()
-  viewRow.value = null
-  formError.value = ''
-  dialog.value?.showModal()
-}
 
 function openEdit(row: StockImport) {
   dialogMode.value = 'edit'
@@ -412,9 +389,7 @@ async function onSubmit() {
         note: l.note || null,
       })),
     }
-    if (dialogMode.value === 'create') {
-      await store.createImport(payload)
-    } else if (dialogMode.value === 'edit' && viewRow.value) {
+    if (dialogMode.value === 'edit' && viewRow.value) {
       await store.updateImport(viewRow.value.id, payload)
     }
     dialog.value?.close()

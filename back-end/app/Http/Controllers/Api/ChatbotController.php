@@ -237,8 +237,12 @@ class ChatbotController extends Controller
             return $this->messageResponse($previous);
         }
 
-        // Build request to AI Service
-
+        // Món flash sale cần dữ liệu hiện tại, kể cả khi AI Service còn chạy bản cũ.
+        $flashSaleReply = $this->flashSaleReply($message);
+        if ($flashSaleReply !== null) {
+            $aiResponse = ['intent' => 'get_promotion', 'reply' => $flashSaleReply];
+            $aiContent = $flashSaleReply;
+        } else {
         try {
             $response = $this->callAiService(
                 $session,
@@ -305,6 +309,7 @@ class ChatbotController extends Controller
                 'message' => 'Chưa kết nối được trợ lý. Vui lòng thử lại.',
                 'request_id' => $requestId,
             ], 504);
+        }
         }
 
 
@@ -857,6 +862,27 @@ class ChatbotController extends Controller
     /**
      * Call AI Service with chat message.
      */
+    private function flashSaleReply(string $message): ?string
+    {
+        $query = strtolower(Str::ascii($message));
+        if (!preg_match('/\b(mon nao|mon gi|flash[ -]?sale)\b/', $query)
+            || !preg_match('/\b(khuyen mai|giam gia|flash[ -]?sale)\b/', $query)) {
+            return null;
+        }
+
+        $items = app(MenuController::class)->flashSales()->getData(true)['data'];
+        if (!$items) return 'Hiện chưa có món nào đang flash sale.';
+
+        $lines = ['Các món đang flash sale:'];
+        foreach (array_slice($items, 0, 10) as $item) {
+            $sale = $item['flash_sale'];
+            $lines[] = sprintf('- %s: %sđ (giá gốc %sđ)', $item['name'],
+                number_format($sale['price'], 0, ',', '.'),
+                number_format($sale['original_price'], 0, ',', '.'));
+        }
+        return implode("\n", $lines);
+    }
+
     private function callAiService(
         ChatSession $session,
         string $message,

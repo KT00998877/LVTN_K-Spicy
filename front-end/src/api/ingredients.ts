@@ -13,6 +13,7 @@ export interface Ingredient {
     quantity_in_stock: number
     min_stock_level: number
     import_price: number
+    supplier_price: number | null
     import_date: string | null
     expiry_date: string | null
     supplier_id: number | null
@@ -26,7 +27,7 @@ export interface Ingredient {
     created_at: string | null
     updated_at: string | null
 }
-export interface IngredientPackaging { id: number; supplier_id: number | null; supplier_name: string | null; purchase_unit: string; conversion_quantity: number; is_default: boolean; is_active: boolean }
+export interface IngredientPackaging { id: number; supplier_id: number | null; supplier_name: string | null; purchase_unit: string; conversion_quantity: number; supplier_price: number | null; is_default: boolean; is_active: boolean }
 export interface IngredientCategory { id: number; name: string; sort_order: number; is_active: boolean; ingredients_count: number }
 
 export interface IngredientListResponse {
@@ -68,6 +69,7 @@ export interface RecipeLine {
     availability_required: boolean
     effective_quantity?: number
     display_unit?: string
+    unit_price?: number
     line_cost?: number
 }
 
@@ -140,7 +142,7 @@ export const ingredientsApi = {
     async createCategory(name: string): Promise<IngredientCategory> {
         return (await apiClient.post<{ data: IngredientCategory }>('/staff/manager/ingredients/categories', { name })).data.data
     },
-    async savePackaging(ingredientId: number, payload: Omit<IngredientPackaging, 'id' | 'supplier_name'>): Promise<Ingredient> {
+    async savePackaging(ingredientId: number, payload: Omit<IngredientPackaging, 'id' | 'supplier_name' | 'supplier_price'>): Promise<Ingredient> {
         return (await apiClient.post<{ data: Ingredient }>(`/staff/manager/ingredients/${ingredientId}/packagings`, payload)).data.data
     },
 
@@ -157,6 +159,10 @@ export const ingredientsApi = {
     async update(id: number, payload: IngredientPayload): Promise<Ingredient> {
         const res = await apiClient.patch<{ success: boolean; data: Ingredient }>(`/staff/manager/ingredients/${id}`, payload)
         return res.data.data
+    },
+
+    async remove(id: number): Promise<void> {
+        await apiClient.delete(`/staff/manager/ingredients/${id}`)
     },
 
     async blockingReferences(id: number): Promise<BlockingReferences> {

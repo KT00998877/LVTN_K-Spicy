@@ -96,6 +96,7 @@ async function openItem(item: MenuItemCard) {
         price_formatted: item.price_formatted,
         default_spicy: item.spicy_level,
         image_url: item.image_url,
+        category_slug: item.category_slug,
         suggestions: item.suggestions ?? [],
     })
 }

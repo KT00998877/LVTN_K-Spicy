@@ -72,6 +72,7 @@ export interface CreateAssetPayload {
     campaign_id?: number | null
     menu_item_id?: number | null
     promotion_id?: number | null
+    news_section?: 'NEWS' | 'OPENING' | 'PROMOTION'
 }
 
 export interface ListAssetsParams {

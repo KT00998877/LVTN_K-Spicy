@@ -260,6 +260,21 @@ export interface FoodCostData {
     note: string
 }
 
+export interface ProfitLedgerRow {
+    date: string
+    orders: number
+    revenue: number
+    cost: number
+    profit: number | null
+    missing_cost_items: number
+    estimated_cost_items: number
+}
+
+export interface ProfitLedgerData {
+    rows: ProfitLedgerRow[]
+    total: Omit<ProfitLedgerRow, 'date'>
+}
+
 /* ====================== Query builder ====================== */
 
 export interface StatisticsQuery {
@@ -354,5 +369,8 @@ export const statistics = {
     /** GET /api/staff/manager/statistics/food-cost */
     foodCost(q?: StatisticsQuery): Promise<FoodCostData> {
         return get<FoodCostData>('/staff/manager/statistics/food-cost', q)
+    },
+    profitLedger(q?: StatisticsQuery): Promise<ProfitLedgerData> {
+        return get<ProfitLedgerData>('/staff/manager/statistics/profit-ledger', q)
     },
 }

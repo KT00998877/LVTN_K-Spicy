@@ -135,6 +135,7 @@ function openItem(item: GalleryItem) {
         price_formatted: item.item.price_formatted,
         default_spicy: item.item.spicy_level ?? 0,
         image_url: item.item.image_url,
+        category_slug: item.item.category_slug,
     })
 }
 

@@ -91,17 +91,17 @@ class CategoriesAndMenuItemsSeeder extends Seeder
         // ===== BƯỚC 4: Topping thêm =====
         $toppings = [
             ['name' => 'Thêm trứng',           'price' => 10000, 'preparation_minutes' => 2, 'image_key' => 'bo-them'],
-            ['name' => 'Thêm gà',         'price' => 20000, 'preparation_minutes' => 3, 'image_key' => 'ga-them'],
+            ['name' => 'Thêm gà',         'price' => 30000, 'preparation_minutes' => 3, 'image_key' => 'ga-them'],
             ['name' => 'Thêm tôm ',        'price' => 25000, 'preparation_minutes' => 3, 'image_key' => 'tom-them'],
             ['name' => 'Thêm mực',         'price' => 28000, 'preparation_minutes' => 3, 'image_key' => 'muc-them'],
             ['name' => 'Thêm bạch tuộc',  'price' => 30000, 'preparation_minutes' => 3, 'image_key' => 'bach-tuot-them'],
-            ['name' => 'Thêm chả cá',          'price' => 15000, 'preparation_minutes' => 2, 'image_key' => 'cha-ca-them'],
+            ['name' => 'Thêm chả cá',          'price' => 25000, 'preparation_minutes' => 2, 'image_key' => 'cha-ca-them'],
             ['name' => 'Thêm bò ',         'price' => 20000, 'preparation_minutes' => 3, 'image_key' => 'bo-them'],
-            ['name' => 'Thêm xúc xích',        'price' => 12000, 'preparation_minutes' => 2, 'image_key' => 'xuc-xich-them'],
-            ['name' => 'Thêm kim chi',         'price' => 12000, 'preparation_minutes' => 2, 'image_key' => 'kim-chi-them'],
-            ['name' => 'Thêm phô mai',         'price' => 15000, 'preparation_minutes' => 2, 'image_key' => 'pho-mai-them'],
-            ['name' => 'Thêm rau',             'price' => 12000, 'preparation_minutes' => 2, 'image_key' => 'rau-them'],
-            ['name' => 'Thêm tokbokki',        'price' => 18000, 'preparation_minutes' => 3, 'image_key' => 'tokbokki-them'],
+            ['name' => 'Thêm xúc xích',        'price' => 20000, 'preparation_minutes' => 2, 'image_key' => 'xuc-xich-them'],
+            ['name' => 'Thêm kim chi',         'price' => 20000, 'preparation_minutes' => 2, 'image_key' => 'kim-chi-them'],
+            ['name' => 'Thêm phô mai',         'price' => 25000, 'preparation_minutes' => 2, 'image_key' => 'pho-mai-them'],
+            ['name' => 'Thêm rau',             'price' => 20000, 'preparation_minutes' => 2, 'image_key' => 'rau-them'],
+            ['name' => 'Thêm tokbokki',        'price' => 28000, 'preparation_minutes' => 3, 'image_key' => 'tokbokki-them'],
         ];
         $this->insertItemsByCategory($toppings, $categoryIds['topping-them']);
 
@@ -110,8 +110,8 @@ class CategoriesAndMenuItemsSeeder extends Seeder
             ['name' => 'Kimbap truyền thống',         'price' => 45000, 'preparation_minutes' => 8,  'image_key' => 'kimbap-truyen-thong'],
             ['name' => 'Kimbap chiên',                'price' => 55000, 'preparation_minutes' => 10, 'image_key' => 'kimbap-chien'],
             ['name' => 'Kimbap phô mai',              'price' => 55000, 'preparation_minutes' => 10, 'image_key' => 'kimbap-pho-mai'],
-            ['name' => 'Tokbokki phô mai',            'price' => 65000, 'preparation_minutes' => 10, 'image_key' => 'tokbokki-pho-mai'],
-            ['name' => 'Tokbokki cay cấp 3',          'price' => 55000, 'preparation_minutes' => 10, 'image_key' => 'tokbokki-them'],
+            ['name' => 'Tokbokki phô mai',            'price' => 75000, 'preparation_minutes' => 10, 'image_key' => 'tokbokki-pho-mai'],
+            ['name' => 'Tokbokki cay cấp 3',          'price' => 75000, 'preparation_minutes' => 10, 'image_key' => 'tokbokki-them'],
             ['name' => 'Gà rán Hàn Quốc',             'price' => 75000, 'preparation_minutes' => 12, 'image_key' => 'ga-ran-han-quoc'],
             ['name' => 'Gà rán sốt cay',              'price' => 79000, 'preparation_minutes' => 12, 'image_key' => 'ga-ran-sot-cay'],
             ['name' => 'Mandu (bánh xếp) chiên',      'price' => 50000, 'preparation_minutes' => 8,  'image_key' => 'mandu-chien'],
@@ -134,7 +134,7 @@ class CategoriesAndMenuItemsSeeder extends Seeder
             ['name' => 'Trà sữa Hàn Quốc (Chuseok)',       'price' => 49000, 'preparation_minutes' => 5, 'image_key' => 'tra-sua-han-quoc'],
             ['name' => 'Trà đào',                     'price' => 35000, 'preparation_minutes' => 4, 'image_key' => 'tra-dao'],
             // Soju
-            ['name' => 'Soju Hàn Quốc (vị táo)',           'price' => 85000, 'preparation_minutes' => 1, 'image_key' => 'soju-tao'],
+            ['name' => 'Soju vị táo',           'price' => 95000, 'preparation_minutes' => 1, 'image_key' => 'soju-tao'],
             ['name' => 'Soju vị đào',                      'price' => 95000, 'preparation_minutes' => 1, 'image_key' => 'soju-dao'],
             ['name' => 'Soju vị dâu',                      'price' => 95000, 'preparation_minutes' => 1, 'image_key' => 'soju-dau'],
             ['name' => 'Soju vị việt quất',                'price' => 95000, 'preparation_minutes' => 1, 'image_key' => 'soju-viet-quoc'],

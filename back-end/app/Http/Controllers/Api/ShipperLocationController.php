@@ -101,20 +101,16 @@ class ShipperLocationController extends Controller
 
         $orders = Order::query()
             ->where('order_type', 'ONLINE')
-            ->where('status', 'CONFIRMED')
+            ->whereIn('status', ['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'])
             ->whereNull('shipper_accepted_at')
-            ->where(function ($q) use ($shipper) {
-                $q->whereNull('shipper_id')->orWhere('shipper_id', $shipper->id);
-            })
-            ->whereNotNull('delivery_latitude')
-            ->whereNotNull('delivery_longitude')
+            ->where('shipper_id', $shipper->id)
             ->orderByDesc('placed_at')
             ->limit(30)
             ->get();
 
         $rows = $orders->map(function (Order $order) use ($location, $shipper) {
             $distance = null;
-            if ($location) {
+            if ($location && $order->delivery_latitude !== null && $order->delivery_longitude !== null) {
                 $distance = round($this->haversineKm(
                     (float) $location->latitude,
                     (float) $location->longitude,
@@ -128,8 +124,8 @@ class ShipperLocationController extends Controller
                 'code'               => $order->code,
                 'recipient_name'     => $order->recipient_name,
                 'delivery_address'   => $order->delivery_address,
-                'delivery_latitude'  => (float) $order->delivery_latitude,
-                'delivery_longitude' => (float) $order->delivery_longitude,
+                'delivery_latitude'  => $order->delivery_latitude !== null ? (float) $order->delivery_latitude : null,
+                'delivery_longitude' => $order->delivery_longitude !== null ? (float) $order->delivery_longitude : null,
                 'total_amount'       => (float) $order->total_amount,
                 'payment_method'     => $order->payment_method,
                 'distance_km'        => $distance,

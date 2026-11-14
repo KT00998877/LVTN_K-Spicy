@@ -6,7 +6,7 @@
         </div>
 
         <div class="header-right">
-            <StaffNotificationBell v-if="staffStore.userRoles.some(role => ['MANAGER', 'KITCHEN', 'SHIPPER'].includes(role))" />
+            <StaffNotificationBell v-if="staffStore.userRoles.some(role => ['MANAGER', 'KITCHEN', 'SHIPPER', 'CASHIER'].includes(role))" />
             <div class="header-clock" aria-live="polite">
                 <span class="clock-time">{{ currentTime }}</span>
                 <span class="clock-date">{{ currentDate }}</span>

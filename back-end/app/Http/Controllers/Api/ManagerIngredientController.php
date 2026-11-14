@@ -100,6 +100,12 @@ class ManagerIngredientController extends Controller
         return response()->json(['success' => true, 'data' => $payload]);
     }
 
+    public function destroy(int $id): JsonResponse
+    {
+        $this->service->remove($id);
+        return response()->json(['success' => true]);
+    }
+
     /**
      * GET /api/staff/manager/ingredients/{id}/blocking-references
      *

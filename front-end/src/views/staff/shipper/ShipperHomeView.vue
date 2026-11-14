@@ -60,9 +60,9 @@ const active = computed(() => list.value.filter(o => o.status === 'DELIVERING'))
 const awaiting = computed(() => list.value.filter(o => o.status === 'DELIVERED'))
 const recent = computed(() => list.value.filter(o => o.status === 'COMPLETED'))
 
-const assigned = computed(() => list.value.filter(order => ['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'].includes(order.status)))
+const assigned = computed(() => list.value.filter(order => (order.order_type === 'TAKEAWAY' || order.shipper_accepted_at) && ['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'].includes(order.status)))
 const route = useNotificationOrderTarget(() => list.value, order => {
-    if (['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'].includes(order.status)) tab.value = 'assigned'
+    if (['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER'].includes(order.status)) tab.value = order.order_type === 'TAKEAWAY' || order.shipper_accepted_at ? 'assigned' : 'nearby'
     else if (order.status === 'DELIVERING') tab.value = 'active'
     else if (order.status === 'DELIVERED') tab.value = 'awaiting'
     else tab.value = 'recent'
@@ -266,6 +266,7 @@ async function handleAccept(job: NearbyJob) {
         toast.success(`Đã nhận đơn ${job.code}.`)
         await loadNearbyJobs()
         await refresh()
+        tab.value = 'assigned'
     } catch (e) {
         const err = e as { response?: { status?: number; data?: { message?: string } } }
         toast.error(err.response?.data?.message ?? 'Đơn này đã có shipper khác nhận.')
@@ -275,7 +276,16 @@ async function handleAccept(job: NearbyJob) {
     }
 }
 
-useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && busyId.value === null)
+async function handleArrivedRestaurant(id: number) {
+    const updated = await deliveriesStore.arrivedRestaurant(id)
+    if (updated) toast.success('Đã xác nhận đến nhà hàng. Vui lòng chờ bàn giao món.')
+    else if (error.value) toast.error(error.value)
+}
+
+useStaffLiveRefresh(async () => {
+    await deliveriesStore.fetch(true)
+    if (tab.value === 'nearby') await loadNearbyJobs()
+}, () => !loading.value && busyId.value === null && acceptingId.value === null)
 </script>
 
 <template>
@@ -327,10 +337,10 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 
         <nav class="tabs" aria-label="Lọc trạng thái đơn">
             <button :class="{ active: tab === 'nearby' }" @click="tab = 'nearby'; void loadNearbyJobs()">
-                Đơn gần nhất ({{ nearbyJobs.length }})
+                Được phân công ({{ nearbyJobs.length }})
             </button>
             <button :class="{ active: tab === 'assigned' }" @click="tab = 'assigned'">
-                Được phân công ({{ assigned.length }})
+                Đơn đã nhận ({{ assigned.length }})
             </button>
             <button :class="{ active: tab === 'active' }" @click="tab = 'active'">
                 Đang giao ({{ active.length }})
@@ -348,9 +358,9 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 
         <!-- Phase 2 — Danh sách đơn đang chờ shipper nhận, xếp theo khoảng cách -->
         <div v-if="tab === 'nearby'">
-            <p v-if="nearbyLoading" class="empty">Đang tải đơn gần bạn…</p>
+            <p v-if="nearbyLoading" class="empty">Đang tải đơn được phân công…</p>
             <div v-else-if="!nearbyJobs.length" class="empty">
-                <p>Hiện chưa có đơn nào đang chờ nhận. Đơn mới sẽ hiện ở đây theo khoảng cách gần bạn nhất.</p>
+                <p>Chưa có đơn nào được phân công đang chờ bạn nhận.</p>
             </div>
             <ul v-else class="nearby-list">
                 <li v-for="job in nearbyJobs" :key="job.id" class="nearby-item">
@@ -376,7 +386,7 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
             </ul>
         </div>
 
-        <div v-else-if="tab === 'assigned' && !assigned.length" class="empty"><p>Chưa có đơn đang chờ chế biến hoặc lấy hàng.</p></div>
+        <div v-else-if="tab === 'assigned' && !assigned.length" class="empty"><p>Bạn chưa nhận đơn nào đang chờ chế biến hoặc lấy hàng.</p></div>
         <div v-else-if="tab === 'active' && !active.length" class="empty">
             <p>Hiện chưa có đơn nào được bàn giao cho bạn. Hãy chờ quản lý / thu ngân phân công.</p>
         </div>
@@ -439,11 +449,11 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 
                 <!-- Banner trạng thái chờ khách xác nhận -->
                 <section v-else-if="o.status === 'DELIVERED'" class="awaiting-banner" role="status">
-                    <strong>Đã giao xong · chờ khách xác nhận</strong>
-                    <span>
+                    <strong>Đã giao xong </strong>
+                    <!-- <span>
                         Đơn sẽ hoàn tất khi khách bấm <em>"Tôi đã nhận hàng"</em>.
                         Nếu khách không xác nhận, đơn vẫn ở trạng thái này và không được tích điểm.
-                    </span>
+                    </span> -->
                 </section>
 
                 <section class="recipient">
@@ -509,6 +519,13 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                     <span v-if="o.delivered_at">Giao lúc: {{ formatDateTime(o.delivered_at) }}</span>
                 </footer>
 
+                <footer v-if="o.order_type === 'ONLINE' && o.status === 'READY_NOTIFY_SHIPPER'" class="actions">
+                    <span v-if="o.shipper_arrived_restaurant_at" class="done-label">Đã đến nhà hàng lúc {{ formatTime(o.shipper_arrived_restaurant_at) }} · Chờ bàn giao món</span>
+                    <button v-else class="btn-primary" type="button" :disabled="busyId === o.id" @click="handleArrivedRestaurant(o.id)">
+                        {{ busyId === o.id ? 'Đang xác nhận…' : 'Tôi đã đến nhà hàng' }}
+                    </button>
+                </footer>
+
                 <!-- Actions: 3 bước -->
                 <footer v-if="o.status === 'DELIVERING'" class="actions">
                     <!-- Chưa lấy món -->
@@ -517,7 +534,7 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
                             Báo cáo sự cố
                         </button>
                         <button class="btn-primary" :disabled="busyId === o.id" @click="handlePickup(o.id)">
-                            Xác nhận đã lấy món và bàn giao tiền
+                            Xác nhận đã lấy món
                         </button>
                     </template>
 
@@ -543,14 +560,14 @@ useStaffLiveRefresh(() => deliveriesStore.fetch(true), () => !loading.value && b
 
                     <!-- Tất cả bước xong -->
                     <template v-else>
-                        <span class="done-label">Đã giao xong · chờ khách xác nhận</span>
+                        <span class="done-label">Đã giao xong </span>
                     </template>
                 </footer>
 
                 <!-- Actions: đơn đang chờ khách xác nhận (DELIVERED) -->
                 <footer v-else-if="o.status === 'DELIVERED'" class="actions">
                     <span class="done-label">
-                        Chờ khách bấm "Tôi đã nhận hàng" để hoàn tất
+                       Đơn đã giao xong
                     </span>
                 </footer>
             </article>

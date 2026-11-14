@@ -14,13 +14,11 @@ class ShipPurchaseOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'supplier_document_code' => ['required', 'string', 'max:100'],
             'supplier_note' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.purchase_order_item_id' => ['required', 'integer', 'distinct'],
             'items.*.shipped_purchase_quantity' => ['required', 'integer', 'min:1', 'max:9999999999'],
-            'items.*.supplier_lot_code' => ['nullable', 'string', 'max:60'],
-            'items.*.expiry_date' => ['nullable', 'date_format:Y-m-d'],
+            'items.*.expiry_months' => ['required', 'integer', 'in:1,2,3,4,5,6,12,24'],
             'items.*.supplier_note' => ['nullable', 'string', 'max:500'],
         ];
     }

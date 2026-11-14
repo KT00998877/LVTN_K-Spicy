@@ -10,6 +10,7 @@ import {
     type ReservationStatus,
 } from '@/api/reservations'
 import { useAppDialog } from '@/composables/useAppDialog'
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import {
     normalizeReservation,
     validateReservation,
@@ -165,6 +166,7 @@ function formatSchedule(item: CustomerReservation): string {
 }
 
 onMounted(load)
+useRealtimeRefresh(async () => { items.value = (await fetchMyReservations()).data }, () => !loading.value && editingId.value === null && savingId.value === null && cancellingId.value === null, 3000)
 </script>
 
 <template>

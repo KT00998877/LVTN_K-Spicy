@@ -95,6 +95,39 @@
             </article>
         </section>
 
+        <section class="stats-section" aria-labelledby="profit-ledger-title">
+            <div class="stats-section__head">
+                <h2 id="profit-ledger-title" class="stats-section__title">Doanh thu · Vốn · Lợi nhuận</h2>
+                <span class="stats-section__meta">Theo ngày hoàn tất đơn</span>
+            </div>
+            <p class="stats-profit__description">Doanh thu sau công shipper − giá vốn nguyên liệu = lợi nhuận gộp. Chưa trừ chi phí vận hành.</p>
+            <div class="stats-section__body stats-section__body--profit">
+                <WidgetState :loading="statsStore.loading.profitLedger" :error="statsStore.errors.profitLedger ?? null" :empty="!statsStore.profitLedger?.rows.length" empty-message="Chưa có đơn hoàn tất trong kỳ." @retry="statsStore.retry('profitLedger')">
+                    <div v-if="statsStore.profitLedger?.rows.length" class="stats-profit">
+                        <div class="stats-profit__summary" aria-label="Tổng kỳ">
+                            <div><span>Doanh thu</span><strong>{{ formatVND(statsStore.profitLedger.total.revenue) }}</strong></div>
+                            <div><span>Vốn nguyên liệu</span><strong>{{ formatVND(statsStore.profitLedger.total.cost) }}</strong></div>
+                            <div><span>Lợi nhuận gộp</span><strong>{{ statsStore.profitLedger.total.profit === null ? 'Chưa đủ dữ liệu' : formatVND(statsStore.profitLedger.total.profit) }}</strong></div>
+                        </div>
+
+                        <div class="stats-profit__scroll">
+                        <table class="stats-rank-table stats-profit__table" aria-label="Bảng doanh thu, vốn và lợi nhuận theo ngày">
+                            <thead><tr><th>Ngày</th><th class="ar">Đơn hoàn tất</th><th class="ar">Doanh thu</th><th class="ar">Vốn nguyên liệu</th><th class="ar">Lợi nhuận gộp</th></tr></thead>
+                            <tbody>
+                                <tr v-for="row in statsStore.profitLedger.rows" :key="row.date">
+                                    <td><strong>{{ row.date }}</strong></td><td class="ar">{{ formatInt(row.orders) }}</td>
+                                    <td class="ar">{{ formatVND(row.revenue) }}</td><td class="ar">{{ formatVND(row.cost) }}</td>
+                                    <td class="ar"><strong>{{ row.profit === null ? `Thiếu giá vốn ${row.missing_cost_items} món` : formatVND(row.profit) }}</strong><small v-if="row.estimated_cost_items && row.profit !== null" class="stats-profit__tag">Có giá vốn ước tính</small></td>
+                                </tr>
+                            </tbody>
+                            <tfoot><tr><th>Tổng kỳ</th><th class="ar">{{ formatInt(statsStore.profitLedger.total.orders) }}</th><th class="ar">{{ formatVND(statsStore.profitLedger.total.revenue) }}</th><th class="ar">{{ formatVND(statsStore.profitLedger.total.cost) }}</th><th class="ar">{{ statsStore.profitLedger.total.profit === null ? 'Chưa đủ dữ liệu' : formatVND(statsStore.profitLedger.total.profit) }}</th></tr></tfoot>
+                        </table>
+                        </div>
+                    </div>
+                </WidgetState>
+            </div>
+        </section>
+
         <section class="stats-section" aria-labelledby="loyalty-title">
             <div class="stats-section__head">
                 <h2 id="loyalty-title" class="stats-section__title">Hạng thành viên tích lũy</h2>
@@ -863,6 +896,25 @@ useRealtimeRefresh(
     padding: 10px 12px;
     border-bottom: 1px solid var(--mgr-gray-100, #f3f4f6);
 }
+.stats-table-scroll { overflow-x: auto; }
+.stats-table-scroll .stats-rank-table { min-width: 650px; }
+.stats-table-scroll tfoot th { color: var(--mgr-charcoal-black, #111111); }
+.stats-section__body--profit { min-height: 0; }
+.stats-section__body--profit :deep(.widget-state--ok) { min-height: 0; display: block; }
+.stats-profit { width: 100%; }
+.stats-profit__description { margin: 0; color: var(--mgr-gray-500, #6b7280); font-size: 13px; line-height: 1.5; }
+.stats-profit__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--mgr-gray-200, #e5e7eb); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.stats-profit__summary > div { display: grid; gap: 6px; padding: 16px 18px; border-right: 1px solid var(--mgr-gray-200, #e5e7eb); }
+.stats-profit__summary > div:last-child { border-right: 0; background: var(--mgr-cream-dark, #fff5e6); }
+.stats-profit__summary span { color: var(--mgr-gray-500, #6b7280); font-size: 12px; }
+.stats-profit__summary strong { color: var(--mgr-charcoal-black, #111111); font-size: clamp(18px, 2vw, 24px); font-variant-numeric: tabular-nums; }
+.stats-profit__estimate { margin: 0 0 12px; color: #713f12; background: #fff4e5; border-radius: 8px; padding: 9px 12px; font-size: 12px; }
+.stats-profit__scroll { overflow-x: auto; }
+.stats-profit__table { min-width: 700px; font-variant-numeric: tabular-nums; }
+.stats-profit__table tbody tr:hover { background: var(--mgr-gray-50, #f9fafb); }
+.stats-profit__table tfoot th { color: var(--mgr-charcoal-black, #111111); border-top: 2px solid var(--mgr-gray-200, #e5e7eb); }
+.stats-profit__tag { display: block; color: #713f12; font-size: 11px; font-weight: 500; margin-top: 3px; }
+@media (max-width: 640px) { .stats-profit__summary { grid-template-columns: 1fr; } .stats-profit__summary > div { border-right: 0; border-bottom: 1px solid var(--mgr-gray-200, #e5e7eb); } .stats-profit__summary > div:last-child { border-bottom: 0; } }
 .stats-rank-table__num {
     font-weight: 800;
     color: var(--mgr-chili-red, #d71920);

@@ -157,19 +157,16 @@ export interface SupplierAcceptPayload {
   items: Array<{
     purchase_order_item_id: number
     supplier_accepted_quantity: number
-    purchase_unit_price: number
     supplier_note?: string | null
   }>
 }
 
 export interface SupplierShipPayload {
-  supplier_document_code: string
   supplier_note?: string | null
   items: Array<{
     purchase_order_item_id: number
     shipped_purchase_quantity: number
-    supplier_lot_code?: string | null
-    expiry_date?: string | null
+    expiry_months: 1 | 2 | 3 | 4 | 5 | 6 | 12 | 24
     supplier_note?: string | null
   }>
 }

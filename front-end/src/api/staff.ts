@@ -464,6 +464,7 @@ export interface KitchenItem {
         id: number
         menu_item_id: number
         menu_item_name: string
+        category_slug: string | null
         menu_item_image: string | null
         unit_price: number
         quantity: number
@@ -828,6 +829,8 @@ export interface DeliveryOrder {
     customer_received_at: string | null  // Khách xác nhận đã nhận
     points_awarded: number           // Điểm thưởng đã cộng cho đơn này
     shipper_id: number | null
+    shipper_accepted_at: string | null
+    shipper_arrived_restaurant_at: string | null
     shipper_name: string | null
     delivery_issue: string | null
     payment: {
@@ -851,8 +854,8 @@ export interface NearbyJob {
     code: string
     recipient_name: string | null
     delivery_address: string | null
-    delivery_latitude: number
-    delivery_longitude: number
+    delivery_latitude: number | null
+    delivery_longitude: number | null
     total_amount: number
     payment_method: PaymentMethod
     distance_km: number | null
@@ -957,6 +960,13 @@ export const deliveries = {
     async pickup(id: number): Promise<DeliveryOrder> {
         const res = await apiClient.post<{ success: boolean; data: DeliveryOrder }>(
             `/staff/deliveries/${id}/pickup`,
+        )
+        return res.data.data
+    },
+
+    async arrivedRestaurant(id: number): Promise<DeliveryOrder> {
+        const res = await apiClient.post<{ success: boolean; data: DeliveryOrder }>(
+            `/staff/deliveries/${id}/arrived-restaurant`,
         )
         return res.data.data
     },

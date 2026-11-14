@@ -2,10 +2,12 @@
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import axios from 'axios'
-import { createReservation, getReservationOptions } from '@/api/reservations'
+import { createReservation, getReservationOptions, getReservationStatus, type ReservationStatus } from '@/api/reservations'
+import { useAuthStore } from '@/stores/auth'
 import { normalizeReservation, restaurantNow, validateReservation, type ReservationForm, type ReservationOptions } from '@/utils/reservation'
 
 const props = defineProps<{ tables?: Array<{ id: number; code: string; capacity: number }> }>()
+const authStore = useAuthStore()
 const emit = defineEmits<{ created: [] }>()
 const id = useId()
 const formElement = ref<HTMLFormElement>()
@@ -16,6 +18,7 @@ const touched = reactive<Record<string, boolean>>({})
 const attempted = ref(false)
 const submitting = ref(false)
 const success = ref('')
+const bookingStatus = ref<ReservationStatus | null>(null)
 const message = ref('')
 const now = ref(Date.now())
 let clockOffset = 0
@@ -86,7 +89,8 @@ async function submit() {
         }
         const receipt = await createReservation(payload, requestKey)
         const date = receipt.reserved_date.split('-').reverse().join('/')
-        success.value = `Cảm ơn ${receipt.customer_name}. Yêu cầu đặt bàn cho ${receipt.guest_count} khách vào lúc ${receipt.reserved_time} ngày ${date} đã được ghi nhận. Nhà hàng sẽ liên hệ xác nhận.`
+        success.value = `Cảm ơn ${receipt.customer_name}. Yêu cầu đặt bàn cho ${receipt.guest_count} khách vào lúc ${receipt.reserved_time} ngày ${date} đã được ghi nhận.`
+        bookingStatus.value = receipt.status as ReservationStatus
         emit('created')
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 422) {
@@ -103,11 +107,18 @@ async function submit() {
     }
 }
 useRealtimeRefresh(async () => { const latest = await getReservationOptions(); options.value = latest; clockOffset = Date.parse(latest.server_now) - Date.now() }, () => !submitting.value && !success.value, 10000)
+useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatus(requestKey) }, () => !!success.value && bookingStatus.value === 'PENDING', 3000)
 </script>
 
 <template>
     <form ref="formElement" class="booking-form" novalidate @submit.prevent="submit">
-        <p v-if="success" class="success" role="status">{{ success }}</p>
+        <div v-if="success" class="success" role="status">
+            <p>{{ success }}</p>
+            <strong v-if="bookingStatus === 'PENDING'">Đang chờ thu ngân xác nhận. Trạng thái sẽ tự cập nhật tại đây.</strong>
+            <p v-if="bookingStatus === 'PENDING' && !authStore.isAuthenticated">Bạn chưa đăng nhập; hãy giữ trang này mở để nhận kết quả.</p>
+            <strong v-else-if="bookingStatus === 'CONFIRMED'">Thu ngân đã xác nhận đặt bàn của bạn.</strong>
+            <strong v-else-if="bookingStatus === 'CANCELLED'">Thu ngân không thể tiếp nhận đặt bàn này. Vui lòng chọn lịch khác hoặc liên hệ nhà hàng.</strong>
+        </div>
         <template v-else>
             <p v-if="options" class="helper">Nhận đặt bàn {{ options.opens_at }}–{{ options.closes_at }} (giờ Việt Nam). Vui lòng đặt trước ít nhất {{ options.min_advance_minutes }} phút. Dấu * là thông tin bắt buộc.</p>
             <fieldset :disabled="submitting" class="fields">

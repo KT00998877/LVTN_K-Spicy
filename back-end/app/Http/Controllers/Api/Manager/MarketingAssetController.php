@@ -73,9 +73,11 @@ class MarketingAssetController extends Controller
             'campaign_id'   => 'nullable|integer|exists:campaigns,id',
             'menu_item_id'  => 'nullable|integer|exists:menu_items,id',
             'promotion_id'  => 'nullable|integer|exists:promotions,id',
+            'news_section'  => 'required|string|in:NEWS,OPENING,PROMOTION',
         ]);
 
         $context = $this->marketing->buildContextFromInput($data);
+        $context['news_section'] = $data['news_section'];
         // Đảm bảo có subject
         $data['subject'] = $context['subject'];
         $data['context_payload'] = $context;

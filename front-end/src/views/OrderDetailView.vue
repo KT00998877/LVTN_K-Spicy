@@ -53,6 +53,7 @@ async function reorder(): Promise<void> {
     try {
         reorderResult.value = await reorderMyOrder(current.value.id)
         await cartStore.fetchCart(true)
+        if (reorderResult.value.added.length) await router.push('/thanh-toan')
     } catch (err) {
         reorderError.value = (err as { response?: { data?: { message?: string } } }).response?.data?.message
             ?? 'Không thể đặt lại đơn. Vui lòng thử lại.'
@@ -175,7 +176,8 @@ function backToList() {
     router.push({ name: 'account', query: { tab: 'orders' } })
 }
 
-const canCancelOrder = computed(() => isDeliveryOrder.value && current.value?.status === 'PENDING')
+const canCancelOrder = computed(() => isDeliveryOrder.value && (['PENDING', 'CONFIRMED'].includes(current.value?.status ?? '') || !!current.value?.can_request_cancellation))
+const needsManagerApproval = computed(() => current.value?.status === 'CONFIRMED' || !!current.value?.can_request_cancellation || isPaidVnpayOrder.value)
 const hasCancellationRequest = computed(() => !!current.value?.cancellation_request)
 const isPaidVnpayOrder = computed(() => current.value?.payment_method === 'PREPAID'
     && current.value?.payment?.status === 'PAID'
@@ -186,13 +188,13 @@ async function cancelOrder(): Promise<void> {
     if (!current.value || loadingCancel.value) return
     cancelError.value = ''
     const value = await appDialog.prompt({
-        title: isPaidVnpayOrder.value ? 'Gửi yêu cầu hủy đơn?' : 'Hủy đơn hàng?',
-        message: isPaidVnpayOrder.value
-            ? 'Đơn đã thanh toán VNPay. Quản lý sẽ duyệt yêu cầu, xác nhận hoàn tiền sandbox và thông báo lại cho bạn.'
+        title: needsManagerApproval.value ? 'Gửi yêu cầu hủy đơn?' : 'Hủy đơn hàng?',
+        message: needsManagerApproval.value
+            ? 'Đơn đã được xác nhận hoặc thanh toán. Quản lý sẽ xem xét yêu cầu hủy và thông báo lại cho bạn.'
             : 'Đơn đang chờ nhà hàng xác nhận. Hãy cho nhà hàng biết lý do bạn muốn hủy.',
         label: 'Lý do hủy',
         placeholder: 'Ví dụ: Tôi đặt nhầm món',
-        confirmLabel: isPaidVnpayOrder.value ? 'Gửi yêu cầu' : 'Hủy đơn',
+        confirmLabel: needsManagerApproval.value ? 'Gửi yêu cầu' : 'Hủy đơn',
         tone: 'danger',
     })
     if (value === null) return
@@ -518,7 +520,8 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                     </button>
                     <p v-if="reorderError" role="alert">{{ reorderError }}</p>
                     <div v-if="reorderResult" role="status">
-                        <p>Đã thêm {{ reorderResult.added.length }} món vào giỏ hàng theo giá hiện tại.</p>
+                        <p v-if="reorderResult.added.length">Đã thêm {{ reorderResult.added.length }} món vào giỏ hàng theo giá hiện tại.</p>
+                        <p v-else>{{ reorderResult.skipped.length ? 'Không thêm được món nào vào giỏ hàng.' : 'Đơn cũ không có món để đặt lại.' }}</p>
                         <p v-for="(item, index) in reorderResult.skipped" :key="index">{{ item.name }}: {{ item.reason }}.</p>
                         <p v-for="(item, index) in reorderResult.price_changes" :key="index">
                             {{ item.name }}: giá {{ formatCurrency(item.old_price) }} → {{ formatCurrency(item.new_price) }}.
@@ -549,23 +552,23 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                     aria-live="polite"
                 >
                     <div class="refund-progress-copy">
-                        <span class="refund-kicker">YÊU CẦU HỦY ĐƠN VNPAY</span>
+                        <span class="refund-kicker">YÊU CẦU HỦY ĐƠN</span>
                         <h2 id="refund-progress-title">
                             <template v-if="current.cancellation_request.status === 'PENDING'">Đang chờ quản lý duyệt</template>
-                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">Đã duyệt hủy, đang chờ hoàn tiền</template>
-                            <template v-else>Hoàn tiền thành công</template>
+                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">{{ isPaidVnpayOrder ? 'Đã duyệt hủy, đang chờ hoàn tiền' : 'Đã duyệt hủy đơn' }}</template>
+                            <template v-else>Đã hủy đơn</template>
                         </h2>
                         <p>
                             <template v-if="current.cancellation_request.status === 'PENDING'">Nhà hàng đã nhận yêu cầu và sẽ phản hồi ngay trên tài khoản của bạn.</template>
-                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">Quản lý đã hủy đơn và đang xác nhận hoàn tiền trên VNPay Sandbox.</template>
-                            <template v-else>Khoản thanh toán đã được đánh dấu hoàn tiền. Thông báo xác nhận đã gửi đến bạn.</template>
+                            <template v-else-if="current.cancellation_request.status === 'APPROVED'">{{ isPaidVnpayOrder ? 'Quản lý đã hủy đơn và đang xác nhận hoàn tiền trên VNPay Sandbox.' : 'Quản lý đã hủy đơn theo yêu cầu của bạn.' }}</template>
+                            <template v-else>Yêu cầu hủy đã được quản lý xử lý.</template>
                         </p>
                         <p class="refund-reason"><strong>Lý do:</strong> {{ current.cancellation_request.reason }}</p>
                     </div>
-                    <ol class="refund-steps" aria-label="Tiến trình hủy và hoàn tiền">
+                    <ol class="refund-steps" aria-label="Tiến trình hủy đơn">
                         <li class="done"><span>1</span>Đã gửi yêu cầu</li>
                         <li :class="{ done: current.cancellation_request.status !== 'PENDING' }"><span>2</span>Quản lý duyệt hủy</li>
-                        <li :class="{ done: current.cancellation_request.status === 'REFUNDED' }"><span>3</span>Hoàn tiền</li>
+                        <li v-if="isPaidVnpayOrder" :class="{ done: current.cancellation_request.status === 'REFUNDED' }"><span>3</span>Hoàn tiền</li>
                     </ol>
                 </section>
 
@@ -596,11 +599,11 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                 <section v-if="canCancelOrder && !hasCancellationRequest" class="cancel-order-card" aria-labelledby="cancel-order-title">
                     <div>
                         <strong id="cancel-order-title">Bạn cần thay đổi đơn?</strong>
-                        <p>{{ isPaidVnpayOrder ? 'Đơn đã thanh toán sẽ được quản lý duyệt và xác nhận hoàn tiền.' : 'Đơn chỉ có thể hủy trước khi nhà hàng xác nhận.' }}</p>
+                        <p>{{ needsManagerApproval ? 'Đơn đã xác nhận cần quản lý duyệt yêu cầu hủy.' : 'Đơn có thể tự hủy trước khi nhà hàng xác nhận.' }}</p>
                         <p v-if="cancelError" class="cancel-order-error" role="alert">{{ cancelError }}</p>
                     </div>
                     <button type="button" class="au-btn au-btn-danger" :disabled="loadingCancel" @click="cancelOrder">
-                        {{ loadingCancel ? 'Đang gửi…' : isPaidVnpayOrder ? 'Yêu cầu hủy đơn' : 'Hủy đơn' }}
+                        {{ loadingCancel ? 'Đang gửi…' : needsManagerApproval ? 'Gửi yêu cầu hủy đơn' : 'Hủy đơn' }}
                     </button>
                 </section>
 

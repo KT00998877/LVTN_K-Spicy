@@ -17,6 +17,7 @@ type MenuSelection = {
     price_formatted: string
     default_spicy: number
     image_url: string
+    category_slug?: string
     /** Gợi ý combo nước uống (Phase 3). */
     suggestions?: MenuSuggestion[]
 }
@@ -114,6 +115,7 @@ export const useCartStore = defineStore('cart', {
                 id: item.menu_item_id, name: item.menu_item.name, price: item.menu_item.price,
                 price_formatted: item.menu_item.price_formatted, default_spicy: item.spicy_level,
                 image_url: item.menu_item.image_url,
+                category_slug: item.menu_item.category_slug,
             }
             this.modalVisible = true
         },
@@ -160,7 +162,22 @@ export const useCartStore = defineStore('cart', {
             return this.mutate(() => cartApi.updateCartItem(id, payload))
         },
         async removeItem(id: number): Promise<void> {
-            await this.mutate(() => cartApi.removeFromCart(id))
+            this.restoreCheckout()
+            if (!this.isLoggedIn || !this.canMutate) return
+            const current = sessionGuard()
+            if (!current()) return
+            this.loadingItem = true
+            this.error = null
+            ++this.fetchRevision
+            this.loadingCart = false
+            try {
+                const cart = await cartApi.removeFromCart(id)
+                if (current()) this.cart = cart
+            } catch (err) {
+                if (current()) this.error = (err as CartError).response?.data?.message ?? 'Không thể xóa món khỏi giỏ hàng.'
+            } finally {
+                if (current()) this.loadingItem = false
+            }
         },
         async clearCart(): Promise<void> {
             await this.mutate(() => cartApi.clearCart())

@@ -120,7 +120,9 @@ async function handleConfirm(o: DeliveryOrder) {
 async function approveCancellation(o: DeliveryOrder) {
     const confirmed = await appDialog.confirm({
         title: `Duyệt hủy đơn ${o.code}?`,
-        message: 'Đơn sẽ chuyển sang Đã hủy. Sau đó bạn cần xác nhận hoàn tiền VNPay Sandbox ở bước tiếp theo.',
+        message: o.payment_method === 'PREPAID' && !o.payment?.is_simulated
+            ? 'Đơn sẽ chuyển sang Đã hủy. Sau đó bạn cần xác nhận hoàn tiền VNPay Sandbox.'
+            : 'Đơn sẽ chuyển sang Đã hủy và khách hàng sẽ được thông báo.',
         confirmLabel: 'Duyệt hủy đơn',
         cancelLabel: 'Giữ đơn',
         tone: 'danger',
@@ -128,7 +130,9 @@ async function approveCancellation(o: DeliveryOrder) {
     if (!confirmed) return
 
     const updated = await store.approveCancellation(o.id)
-    if (updated) toast.success(`Đã duyệt hủy đơn ${updated.code}. Vui lòng xác nhận hoàn tiền.`)
+    if (updated) toast.success(updated.cancellation_request?.status === 'APPROVED'
+        ? `Đã duyệt hủy đơn ${updated.code}. Vui lòng xác nhận hoàn tiền.`
+        : `Đã hủy đơn ${updated.code}.`)
     else if (error.value) toast.error(error.value)
 }
 
@@ -346,8 +350,8 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                     <div>
                         <strong>
                             <template v-if="o.cancellation_request.status === 'PENDING'">Khách yêu cầu hủy đơn</template>
-                            <template v-else-if="o.cancellation_request.status === 'APPROVED'">Đã duyệt hủy · Chờ hoàn tiền</template>
-                            <template v-else>Hoàn tiền VNPay thành công</template>
+                            <template v-else-if="o.cancellation_request.status === 'APPROVED'">{{ o.payment_method === 'PREPAID' && !o.payment?.is_simulated ? 'Đã duyệt hủy · Chờ hoàn tiền' : 'Đã duyệt hủy đơn' }}</template>
+                            <template v-else>Đã hủy và hoàn tiền</template>
                         </strong>
                         <p>{{ o.cancellation_request.reason }}</p>
                     </div>
@@ -377,13 +381,14 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                         <span v-else class="note-info">Yêu cầu đang chờ quản lý duyệt.</span>
                     </template>
                     <template v-else-if="o.cancellation_request?.status === 'APPROVED'">
-                        <button v-if="isManager" class="btn-primary" :disabled="busyId === o.id" @click="confirmRefund(o)">
+                        <button v-if="isManager && o.payment_method === 'PREPAID' && !o.payment?.is_simulated" class="btn-primary" :disabled="busyId === o.id" @click="confirmRefund(o)">
                             {{ busyId === o.id ? 'Đang xác nhận…' : 'Xác nhận hoàn tiền' }}
                         </button>
-                        <span v-else class="note-info">Quản lý đang xử lý hoàn tiền.</span>
+                        <span v-else-if="o.payment_method === 'PREPAID' && !o.payment?.is_simulated" class="note-info">Quản lý đang xử lý hoàn tiền.</span>
+                        <span v-else class="note-info note-info--success">Đã duyệt hủy đơn.</span>
                     </template>
                     <template v-else-if="o.cancellation_request?.status === 'REFUNDED'">
-                        <span class="note-info note-info--success">Đã hoàn tiền và thông báo cho khách hàng.</span>
+                        <span class="note-info note-info--success">Đã hủy đơn và thông báo cho khách hàng.</span>
                     </template>
                     <template v-else-if="o.status === 'PENDING'">
                         <button class="btn-ghost danger" :disabled="busyId === o.id" @click="openReject(o)">
@@ -398,7 +403,8 @@ useStaffLiveRefresh(() => Promise.all([store.fetchOrders(undefined, true), store
                         </button>
                     </template>
                     <template v-else-if="o.status === 'READY_NOTIFY_SHIPPER'">
-                        <button class="btn-primary" :disabled="busyId === o.id" @click="openHandover(o)">
+                        <span v-if="o.order_type === 'ONLINE' && !o.shipper_arrived_restaurant_at" class="note-info">Chờ shipper xác nhận đã đến nhà hàng.</span>
+                        <button class="btn-primary" :disabled="busyId === o.id || (o.order_type === 'ONLINE' && !o.shipper_arrived_restaurant_at)" @click="openHandover(o)">
                             Bàn giao shipper
                         </button>
                     </template>

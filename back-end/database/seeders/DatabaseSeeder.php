@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             CategoriesAndMenuItemsSeeder::class,
             InventorySeeder::class,
             PurchaseOrderPackagingSeeder::class,
+            SupplierPricesSeeder::class,
             TablesSeeder::class,
             CancellationsSeeder::class,
             VoucherSeeder::class,

@@ -74,4 +74,15 @@ class OrderItem extends Model
         }
         return (int) ($this->menuItem?->spicy_level ?? 0);
     }
+
+    /** Bột ớt trong công thức mì cay được khai báo theo lượng cho một cấp cay. */
+    public function recipeSpicyMultiplier(int $menuItemId, ?string $ingredientCode): int
+    {
+        if ($menuItemId !== (int) $this->menu_item_id || $ingredientCode !== 'NL009'
+            || !str_starts_with((string) $this->menuItem?->slug, 'mi-cay-')) {
+            return 1;
+        }
+
+        return max(0, min(7, $this->effective_spicy_level));
+    }
 }

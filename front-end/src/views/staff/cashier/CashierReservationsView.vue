@@ -16,7 +16,7 @@
         </div>
 
         <div class="reservation-grid">
-            <div v-for="r in filteredReservations" :key="r.id" class="reservation-card">
+            <div v-for="r in filteredReservations" :key="r.id" class="reservation-card" :class="{ 'reservation-card--selected': Number(route.query.reservation_id) === r.id }">
                 <div class="card-top">
                     <div class="customer-block">
                         <div class="customer-avatar">{{ initials(r.customer_name) }}</div>
@@ -62,7 +62,7 @@
                         class="btn btn-cancel"
                         @click="updateStatus(r.id, 'CANCELLED')"
                     >
-                        Hủy
+                        {{ r.status === 'PENDING' ? 'Từ chối' : 'Hủy' }}
                     </button>
                 </div>
             </div>
@@ -77,7 +77,8 @@
 
 <script setup lang="ts">
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useReservationsStore } from '@/stores/staffReservations'
 import { useToast, formatDate } from '@/composables/useStaffUtils'
@@ -86,6 +87,7 @@ import type { Reservation } from '@/types/staff'
 const reservationsStore = useReservationsStore()
 const { reservations } = storeToRefs(reservationsStore)
 const toast = useToast()
+const route = useRoute()
 
 const searchQuery = ref('')
 const filterStatus = ref<'all' | Reservation['status']>('all')
@@ -100,6 +102,9 @@ const filters: Array<{ value: 'all' | Reservation['status']; label: string }> = 
 ]
 
 onMounted(() => reservationsStore.fetchAll())
+watch(() => route.query.reservation_id, value => {
+    if (value) { filterStatus.value = 'all'; searchQuery.value = '' }
+}, { immediate: true })
 
 const filteredReservations = computed(() => {
     return reservations.value
@@ -112,6 +117,9 @@ const filteredReservations = computed(() => {
                 || (r.table_code ?? '').toLowerCase().includes(q)
         })
         .sort((a, b) => {
+            const selectedId = Number(route.query.reservation_id)
+            if (a.id === selectedId) return -1
+            if (b.id === selectedId) return 1
             if (a.reserved_date !== b.reserved_date) return a.reserved_date.localeCompare(b.reserved_date)
             return a.reserved_time.localeCompare(b.reserved_time)
         })
@@ -198,6 +206,7 @@ useRealtimeRefresh(() => reservationsStore.fetchAll(undefined, true), () => !res
     flex-direction: column;
     gap: 10px;
 }
+.reservation-card--selected { border-color: #dc2626; box-shadow: 0 0 0 2px #fee2e2; }
 
 .card-top {
     display: flex;

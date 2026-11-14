@@ -119,9 +119,9 @@ class StaffOrderService
     /**
      * Thêm 1 món vào order.
      */
-    public function addItem(int $orderId, array $data): array
+    public function addItem(int $orderId, array $data, User $actor): array
     {
-        return DB::transaction(function () use ($orderId, $data) {
+        return DB::transaction(function () use ($orderId, $data, $actor) {
             /** @var Order|null $order */
             $order = Order::with('items')->lockForUpdate()->find($orderId);
             if (!$order) {
@@ -189,8 +189,7 @@ class StaffOrderService
                 'subtotal'             => $itemSubtotal,
                 'note'                 => $note,
                 'spicy_level_override' => $spicyLevel,
-                'status'               => $menu->category?->slug === 'do-uong' ? 'READY' : 'PENDING',
-                'ready_at'             => $menu->category?->slug === 'do-uong' ? now() : null,
+                'status'               => 'PENDING',
             ]);
 
             // Món gọi thêm cần vào hàng chờ dù đợt trước đã phục vụ xong.
@@ -206,6 +205,8 @@ class StaffOrderService
                 unset($td);
                 OrderItemTopping::insert($toppingData);
             }
+
+            app(NonKitchenItemService::class)->complete($orderItem->load('menuItem.category'), $actor);
 
             $this->recalcOrderTotals($order);
             $order->refresh();

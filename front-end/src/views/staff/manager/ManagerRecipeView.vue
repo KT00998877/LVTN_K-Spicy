@@ -130,6 +130,9 @@
                             <strong :class="foodCostClass">{{ preview.food_cost_pct.toFixed(1) }}%</strong>
                         </div>
                     </div>
+                    <p v-if="recipe?.menu_item.slug?.startsWith('mi-cay-') && rows.some(row => row.meta.ingredient_code === 'NL009')" class="mgr-spice-note">
+                        Bột ớt: lượng trong công thức tính cho 1 cấp cay. Cấp 0 không dùng; cấp 1–7 nhân theo cấp. Chi phí nguyên liệu đang hiển thị theo cấp 1.
+                    </p>
 
                     <!-- Loading recipe -->
                     <div v-if="loadingRecipe" class="mgr-state mgr-state--loading">
@@ -321,6 +324,7 @@ const workingLines = ref<WorkingLine[]>([])
 const savedLines = ref<WorkingLine[]>([])
 
 const pickerDialog = ref<HTMLDialogElement | null>(null)
+const pickerIngredients = ref<Ingredient[]>([])
 const pickerResults = ref<Ingredient[]>([])
 const loadingIngredients = ref(false)
 const picker = reactive<{ q: string; selectedId: number | null }>({ q: '', selectedId: null })
@@ -457,9 +461,7 @@ async function loadAvailability() {
     }
 }
 
-/** Giá nhập của từng nguyên liệu để tính thành tiền ngay khi đang sửa.
- *  Lấy từ server qua `line_cost / quantity_required`, nên khớp đúng công thức
- *  của RecipeService::summarize (chỉ nhân quantity_required, không nhân waste_factor). */
+/** Giá nhà cung cấp quy đổi về một đơn vị tồn kho để tính cost khi sửa. */
 const unitPrices = ref<Map<number, number>>(new Map())
 /** Nguồn sự thật duy nhất cho bảng: mỗi dòng ghép metadata từ server với giá trị đang sửa.
  *  `shortage` tính lại từ lượng đang sửa × hao hụt nên phản ánh ngay khi manager tăng định lượng. */
@@ -477,14 +479,10 @@ const rows = computed(() => workingLines.value.map((work) => {
 
 const unitPriceOf = (ingredientId: number): number => unitPrices.value.get(ingredientId) ?? 0
 
-/** Suy ra đơn giá từ line_cost / quantity_required để preview khớp công thức backend.
- *  line_cost = quantity_required × import_price → import_price = line_cost / quantity_required. */
 function syncUnitPrices(lines: RecipeLine[]): void {
     const next = new Map<number, number>()
     for (const l of lines) {
-        const qty = Number(l.quantity_required)
-        const cost = Number(l.line_cost)
-        if (qty > 0 && cost >= 0) next.set(l.ingredient_id, cost / qty)
+        if (l.unit_price !== undefined) next.set(l.ingredient_id, Number(l.unit_price))
     }
     unitPrices.value = next
 }
@@ -516,13 +514,15 @@ async function openAddLine() {
     if (!activeMenuId.value) return
     picker.q = ''
     picker.selectedId = null
+    pickerIngredients.value = []
     pickerResults.value = []
     pickerDialog.value?.showModal()
     loadingIngredients.value = true
     try {
         const res = await ingredientsApi.list({ is_active: true, per_page: 100 })
         const taken = new Set(workingLines.value.map((l) => l.ingredient_id))
-        pickerResults.value = res.data.filter((x) => !taken.has(x.id))
+        pickerIngredients.value = res.data.filter((x) => !taken.has(x.id))
+        pickerResults.value = pickerIngredients.value
     } finally {
         loadingIngredients.value = false
     }
@@ -537,9 +537,14 @@ function onPickerBackdrop(e: MouseEvent) {
 }
 
 function confirmAddLine() {
-    const ing = pickerResults.value.find((x) => x.id === picker.selectedId)
+    const ing = pickerIngredients.value.find((x) => x.id === picker.selectedId)
     if (!ing) return
     const defaultQty = ['gói', 'chai', 'lon', 'hộp', 'quả', 'cái', 'cục', 'cây', 'phần'].includes(ing.unit) ? 1 : 0.1
+    const pricedPackaging = ing.packagings.find((pack) => pack.is_active && pack.is_default && pack.supplier_id === ing.supplier_id && pack.supplier_price !== null)
+        ?? ing.packagings.find((pack) => pack.is_active && pack.supplier_id === ing.supplier_id && pack.supplier_price !== null)
+    const unitPrice = pricedPackaging
+        ? Number(pricedPackaging.supplier_price) / Number(pricedPackaging.conversion_quantity)
+        : Number(ing.supplier_price ?? ing.import_price)
     workingLines.value.push({
         ingredient_id: ing.id,
         quantity_required: defaultQty,
@@ -564,10 +569,11 @@ function confirmAddLine() {
             availability_required: false,
             effective_quantity: defaultQty,
             display_unit: ing.unit,
-            line_cost: defaultQty * Number(ing.import_price),
+            unit_price: unitPrice,
+            line_cost: defaultQty * unitPrice,
         })
     }
-    unitPrices.value = new Map(unitPrices.value).set(ing.id, Number(ing.import_price))
+    unitPrices.value = new Map(unitPrices.value).set(ing.id, unitPrice)
     closePicker()
 }
 
@@ -627,10 +633,9 @@ async function toggleAuto() {
 /** Lọc cục bộ trên kết quả vừa tải từ server. KHÔNG dùng store.list —
  *  store.list chỉ được fill khi manager đã mở trang Nguyên liệu trước đó. */
 watch(() => picker.q, () => {
-    const kw = picker.q.trim().toLowerCase()
-    if (!kw) return
-    pickerResults.value = pickerResults.value.filter((x) =>
-        x.name.toLowerCase().includes(kw) || x.code.toLowerCase().includes(kw))
+    const kw = picker.q.trim().toLocaleLowerCase('vi')
+    pickerResults.value = pickerIngredients.value.filter((x) =>
+        !kw || x.name.toLocaleLowerCase('vi').includes(kw) || x.code.toLowerCase().includes(kw))
 })
 
 onMounted(() => loadMenus())
@@ -727,6 +732,7 @@ function formatNumber(value: number): string {
                        font-weight: 800; color: var(--mgr-gray-600); }
 .mgr-costcard__cell strong { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums;
                               color: var(--mgr-charcoal-black); }
+.mgr-spice-note { margin: -8px 0 0; color: var(--mgr-gray-600); font-size: 12px; }
 
 .mgr-num--ok { color: #15803d; }
 .mgr-num--warn { color: #b45309; }

@@ -42,10 +42,9 @@
               <th>Nguyên liệu</th>
               <th>Loại</th>
               <th>Số lượng</th>
-              <th>Tồn trước → sau</th>
-              <th>Tham chiếu</th>
+              <th>Tồn trước</th>
+              <th>Tồn sau</th>
               <th>Người thực hiện</th>
-              <th>Lý do</th>
             </tr>
           </thead>
           <tbody>
@@ -63,15 +62,9 @@
                   {{ t.quantity > 0 ? '+' : '' }}{{ fmtNumber(t.quantity) }}
                 </strong>
               </td>
-              <td class="number">
-                {{ fmtNumber(t.stock_before) }} → {{ fmtNumber(t.stock_after) }}
-              </td>
-              <td>
-                <span v-if="t.reference_type" class="ref">{{ t.reference_type }}#{{ t.reference_id }}</span>
-                <span v-else>—</span>
-              </td>
+              <td class="number">{{ fmtNumber(t.stock_before) }}</td>
+              <td class="number">{{ fmtNumber(t.stock_after) }}</td>
               <td>{{ t.performed_name || '—' }}</td>
-              <td><small class="note">{{ t.note || '—' }}</small></td>
             </tr>
           </tbody>
         </table>
@@ -94,8 +87,7 @@ import { ingredientsApi } from '@/api/ingredients'
 interface Transaction {
   id: number; code: string; name: string; unit: string; type: string
   quantity: number; stock_before: number | null; stock_after: number | null
-  reference_type: string | null; reference_id: number | null
-  performed_name: string | null; note: string; transacted_at: string
+  performed_name: string | null; transacted_at: string
 }
 interface IngredientRow { id: number; code: string; name: string }
 
@@ -179,8 +171,6 @@ small { display: block; color: #64748b; margin-top: 4px; font-size: 11px; }
 .tag.accent { color: #245440; background: #d5e7e0; }
 .pos { color: #0f7d34; }
 .neg { color: #b42318; }
-.ref { background: #f1f5f9; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-family: monospace; }
-.note { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 280px; }
 .pagination { display: flex; align-items: center; gap: 10px; justify-content: flex-end; font-size: 13px; }
 input, select { border: 1px solid #cbd5d0; border-radius: 7px; padding: 10px; font: inherit; min-width: 0; box-sizing: border-box; }
 button { cursor: pointer; }

@@ -38,7 +38,7 @@
       <div><span class="purchase-order-spinner" aria-hidden="true"></span><p>Đang tải yêu cầu nhập hàng…</p></div>
     </div>
     <div v-else-if="listError" class="purchase-order-state purchase-order-state--error" role="alert">
-      <div><p>{{ listError }}</p><button class="purchase-order-button" type="button" @click="fetchOrders">Thử lại</button></div>
+      <div><p>{{ listError }}</p><button class="purchase-order-button" type="button" @click="fetchOrders()">Thử lại</button></div>
     </div>
     <div v-else-if="orders.length === 0" class="purchase-order-state">
       <div>
@@ -113,6 +113,7 @@ import {
   type PurchaseOrderStatus,
 } from '@/api/purchaseOrders'
 import { useAppDialog } from '@/composables/useAppDialog'
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import PurchaseOrderDetailDialog from '@/components/manager/purchase-orders/PurchaseOrderDetailDialog.vue'
 import PurchaseOrderFormDialog from '@/components/manager/purchase-orders/PurchaseOrderFormDialog.vue'
 import '@/assets/purchase-orders.css'
@@ -146,9 +147,8 @@ const statusOptions: Array<{ value: PurchaseOrderStatus; label: string }> = [
 
 const hasFilters = computed(() => Boolean(filters.q || filters.status))
 
-async function fetchOrders() {
-  loading.value = true
-  listError.value = ''
+async function fetchOrders(quiet = false) {
+  if (!quiet) { loading.value = true; listError.value = '' }
   try {
     const response = await purchaseOrdersApi.list({
       q: filters.q || undefined,
@@ -158,10 +158,12 @@ async function fetchOrders() {
     })
     orders.value = response.data.data
     Object.assign(meta, response.data.meta)
+    listError.value = ''
   } catch (error) {
+    if (quiet) throw error
     listError.value = purchaseOrderError(error)
   } finally {
-    loading.value = false
+    if (!quiet) loading.value = false
   }
 }
 
@@ -283,4 +285,5 @@ function formatDateTime(value: string | null) {
 onMounted(() => {
   void Promise.all([fetchOrders(), loadIngredients()])
 })
+useRealtimeRefresh(() => fetchOrders(true), () => !loading.value && busyId.value === null)
 </script>

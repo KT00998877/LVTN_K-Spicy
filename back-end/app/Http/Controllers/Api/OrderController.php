@@ -34,7 +34,6 @@ class OrderController extends Controller
             $priceChanges = [];
             $availability = app(MenuAvailabilityService::class);
             foreach ($order->items as $item) {
-                if ($item->status === 'CANCELLED') continue;
                 $menu = MenuItem::with('category')->find($item->menu_item_id);
                 $quantity = (int) $item->quantity;
                 if (!$menu || !$menu->is_active || !$menu->is_available || !$menu->category?->is_active

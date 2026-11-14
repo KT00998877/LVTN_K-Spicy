@@ -13,7 +13,9 @@ class ServiceNotificationController extends Controller
     public function index()
     {
         $items = OrderItem::with('order.tableSession.table')->where('status', 'READY')
-            ->whereHas('order', fn ($q) => $q->whereNotIn('status', ['COMPLETED', 'CANCELLED']))
+            ->whereHas('order', fn ($q) => $q->where('order_type', 'DINE_IN')
+                ->whereNotIn('status', ['COMPLETED', 'CANCELLED'])
+                ->whereHas('tableSession.table'))
             ->orderBy('ready_at')->orderBy('id')->get();
         return response()->json(['data' => $items->map(fn ($item) => [
             'id' => $item->id, 'order_id' => $item->order_id,

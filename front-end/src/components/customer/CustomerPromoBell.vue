@@ -96,6 +96,7 @@ async function openNotification(item: PromoNotification) {
                     <strong v-if="item.data.event === 'PROMO_CAMPAIGN'" class="notification-kind">Ưu đãi từ quán</strong>
                     <strong v-else-if="item.data.event === 'FLASH_SALE'" class="notification-kind">Flash Sale</strong>
                     <strong v-else-if="item.data.event === 'COMBO_PROMOTION'" class="notification-kind">Combo món và nước</strong>
+                    <strong v-else-if="item.data.event === 'RESERVATION_CONFIRMED' || item.data.event === 'RESERVATION_REJECTED' || item.data.event === 'RESERVATION_CANCELLED'" class="notification-kind">Cập nhật đặt bàn</strong>
                     <p class="promo-message">{{ item.data.message }}</p>
                     <div v-if="item.data.voucher_code" class="promo-code-row">
                         <code class="promo-code">{{ item.data.voucher_code }}</code>
