@@ -47,6 +47,19 @@ class ReservationRepository {
       throw e.error as ApiException;
     }
   }
+
+  Future<List<ReservationReceipt>> fetchMine() async {
+    final res = await _dio.get<Map<String, dynamic>>('/reservations/me');
+    final rows = res.data?['data'] as List? ?? [];
+    return rows.map((row) => ReservationReceipt.fromJson((row as Map).cast<String, dynamic>())).toList();
+  }
+
+  Future<List<String>> fetchAvailableTimes(String date, int guests, String location) async {
+    final res = await _dio.get<Map<String, dynamic>>('/reservations/availability',
+        queryParameters: {'date': date, 'guest_count': guests, 'location': location});
+    final data = res.data?['data'] as Map?;
+    return (data?['times'] as List? ?? []).map((time) => time.toString()).toList();
+  }
 }
 
 final reservationRepositoryProvider = Provider<ReservationRepository>((ref) {

@@ -81,9 +81,11 @@ class ReservationValidator {
       return 'Vui lòng đặt bàn trước ít nhất ${options.minAdvanceMinutes} phút.';
     }
 
-    if (hhmm.compareTo(options.opensAt) < 0 ||
-        hhmm.compareTo(options.closesAt) > 0) {
-      return 'Nhà hàng nhận đặt bàn từ ${options.opensAt} đến ${options.closesAt}.';
+    final closingParts = options.closesAt.split(':').map(int.parse).toList();
+    final lastMinute = closingParts[0] * 60 + closingParts[1] - options.holdMinutes;
+    final chosenMinute = h * 60 + m;
+    if (hhmm.compareTo(options.opensAt) < 0 || chosenMinute > lastMinute) {
+      return 'Giờ đặt phải đủ ${options.holdMinutes} phút trước khi nhà hàng đóng cửa.';
     }
 
     return null;

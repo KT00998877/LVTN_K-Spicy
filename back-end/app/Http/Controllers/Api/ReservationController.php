@@ -21,6 +21,19 @@ class ReservationController extends Controller
         ])]);
     }
 
+    public function availability(Request $request, ReservationService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'guest_count' => ['required', 'integer', 'min:1', 'max:'.config('reservations.max_guests')],
+            'location' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['Tầng 1', 'Tầng 2'])],
+        ]);
+        return response()->json(['data' => [
+            'date' => $data['date'],
+            'times' => $service->availableTimes($data['date'], (int) $data['guest_count'], $data['location'] ?? null),
+        ]]);
+    }
+
     public function store(StoreReservationRequest $request, ReservationService $service, ReservationNotificationService $notifications): JsonResponse
     {
         $data = $request->validated();

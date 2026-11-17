@@ -8,9 +8,7 @@ import '../domain/reservation_models.dart';
 /// ============================================================
 /// 💾 RESERVATION LOCAL CACHE — lưu booking receipts gần nhất
 /// ============================================================
-/// Backend không có endpoint "my reservations" cho customer.
-/// Nên ta cache receipt mới nhất vào SharedPreferences để user
-/// có thể xem lại "đơn vừa đặt" ngay trong session.
+/// Phiếu của khách chưa đăng nhập được giữ trên thiết bị để xem lại.
 /// ============================================================
 
 const _kLatestKey = 'reservation_latest_v1';
@@ -75,6 +73,7 @@ extension on ReservationReceipt {
             '${reservedDate.year.toString().padLeft(4, '0')}-${reservedDate.month.toString().padLeft(2, '0')}-${reservedDate.day.toString().padLeft(2, '0')}',
         'reserved_time': reservedTime,
         'status': status.name.toUpperCase(),
+        'location': location,
       };
 }
 

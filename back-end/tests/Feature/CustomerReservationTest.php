@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Reservation;
+use App\Services\ReservationService;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
@@ -129,6 +130,31 @@ class CustomerReservationTest extends TestCase
         $this->withToken($other->createToken('web')->plainTextToken)
             ->postJson("/api/reservations/me/{$reservation->id}/cancel")
             ->assertNotFound();
+    }
+
+    public function test_thirty_minute_hold_blocks_overlapping_times_and_releases_at_boundary(): void
+    {
+        $date = CarbonImmutable::now(config('reservations.timezone'))->addDays(2)->toDateString();
+        $service = app(ReservationService::class);
+        $first = $this->payload();
+        $service->create($first);
+
+        $this->assertNotContains('18:00', $service->availableTimes($date, 2, 'Tầng 1'));
+        $this->assertContains(1, ReservationService::busyTableIds($date, '18:15'));
+        $this->assertContains('18:30', $service->availableTimes($date, 2, 'Tầng 1'));
+
+        $overlap = array_replace($this->payload(), ['reserved_time' => '18:15']);
+        try {
+            $service->create($overlap);
+            $this->fail('Overlapping reservation should be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('guest_count', $exception->errors());
+        }
+
+        $boundary = array_replace($this->payload(), ['reserved_time' => '18:30']);
+        $this->assertSame('18:30:00', $service->create($boundary)->reserved_time);
+        $this->assertContains('21:30', $service->availableTimes($date, 2, 'Tầng 1'));
+        $this->assertNotContains('22:00', $service->availableTimes($date, 2, 'Tầng 1'));
     }
 
     private function customer(string $email): User

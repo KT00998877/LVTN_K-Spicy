@@ -6,6 +6,7 @@ return [
     'opens_at' => '10:00',
     'closes_at' => '22:00',
     'min_advance_minutes' => 60,
+    'hold_minutes' => 30,
     'max_guests' => 20,
     'max_note_length' => 1000,
 ];

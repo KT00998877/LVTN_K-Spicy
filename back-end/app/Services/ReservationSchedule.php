@@ -21,8 +21,10 @@ class ReservationSchedule
         if ($at->lessThan($now->addMinutes(config('reservations.min_advance_minutes')))) {
             return ['reserved_time' => ['Vui lòng đặt bàn trước ít nhất '.config('reservations.min_advance_minutes').' phút.']];
         }
-        if ($time < config('reservations.opens_at') || $time > config('reservations.closes_at')) {
-            return ['reserved_time' => ['Nhà hàng nhận đặt bàn từ '.config('reservations.opens_at').' đến '.config('reservations.closes_at').'.']];
+        $closing = CarbonImmutable::createFromFormat('!H:i', config('reservations.closes_at'), $timezone)
+            ->subMinutes(config('reservations.hold_minutes'))->format('H:i');
+        if ($time < config('reservations.opens_at') || $time > $closing) {
+            return ['reserved_time' => ['Nhà hàng nhận đặt bàn từ '.config('reservations.opens_at').' đến '.$closing.' để giữ bàn đủ '.config('reservations.hold_minutes').' phút.']];
         }
         return [];
     }

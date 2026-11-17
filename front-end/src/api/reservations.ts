@@ -42,6 +42,12 @@ export async function getReservationOptions(): Promise<ReservationOptions> {
     return (await apiClient.get<{ data: ReservationOptions }>('/reservations/options')).data.data
 }
 
+export async function getReservationAvailability(date: string, guestCount: number, location?: string): Promise<string[]> {
+    return (await apiClient.get<{ data: { times: string[] } }>('/reservations/availability', {
+        params: { date, guest_count: guestCount, location: location || undefined },
+    })).data.data.times
+}
+
 export async function createReservation(form: ReservationForm, requestKey: string): Promise<ReservationReceipt> {
     const response = await apiClient.post<{ data: ReservationReceipt }>('/reservations', { ...form, request_key: requestKey })
     if (!response.data.data?.id) throw new Error('Thiếu thông tin xác nhận từ nhà hàng.')

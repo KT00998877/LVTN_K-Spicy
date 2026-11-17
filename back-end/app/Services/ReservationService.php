@@ -13,6 +13,37 @@ class ReservationService
 {
     public const HOLDING_STATUSES = ['PENDING', 'CONFIRMED', 'ARRIVED'];
 
+    public static function busyTableIds(string $date, string $time, ?int $exceptId = null): array
+    {
+        $start = CarbonImmutable::createFromFormat('!Y-m-d H:i', $date.' '.$time, config('reservations.timezone'));
+        $end = $start->addMinutes(config('reservations.hold_minutes'));
+        $query = Reservation::whereDate('reserved_date', $date)
+            ->where('reserved_time', '<', $end->format('H:i:s'))
+            ->where('reserved_time', '>', $start->subMinutes(config('reservations.hold_minutes'))->format('H:i:s'))
+            ->whereIn('status', self::HOLDING_STATUSES);
+        if ($exceptId !== null) $query->whereKeyNot($exceptId);
+        return $query->pluck('table_id')->all();
+    }
+
+    public function availableTimes(string $date, int $guests, ?string $location = null): array
+    {
+        $tables = Table::where('is_active', true)->where('capacity', '>=', $guests)
+            ->when($location, fn ($query) => $query->where('location', $location))->get();
+        $today = CarbonImmutable::now(config('reservations.timezone'))->toDateString();
+        $times = [];
+        $open = CarbonImmutable::createFromFormat('!Y-m-d H:i', $date.' '.config('reservations.opens_at'), config('reservations.timezone'));
+        $close = CarbonImmutable::createFromFormat('!Y-m-d H:i', $date.' '.config('reservations.closes_at'), config('reservations.timezone'));
+        for ($at = $open; $at->addMinutes(config('reservations.hold_minutes'))->lessThanOrEqualTo($close); $at = $at->addMinutes(30)) {
+            $time = $at->format('H:i');
+            if (ReservationSchedule::errors($date, $time)) continue;
+            $busy = self::busyTableIds($date, $time);
+            $available = $tables->contains(fn (Table $table) => !in_array($table->id, $busy, true)
+                && ($date !== $today || ($table->status === 'AVAILABLE' && !$table->currentSession()->exists())));
+            if ($available) $times[] = $time;
+        }
+        return $times;
+    }
+
     public function create(array $data): Reservation
     {
         return DB::transaction(function () use ($data) {
@@ -33,9 +64,7 @@ class ReservationService
             // Time may have advanced while waiting for allocation locks.
             $errors = ReservationSchedule::errors($data['reserved_date'], $data['reserved_time']);
             if ($errors) throw ValidationException::withMessages($errors);
-            $busy = Reservation::whereDate('reserved_date', $data['reserved_date'])
-                ->where('reserved_time', $data['reserved_time'].':00')
-                ->whereIn('status', self::HOLDING_STATUSES)->pluck('table_id')->all();
+            $busy = self::busyTableIds($data['reserved_date'], $data['reserved_time']);
             $today = CarbonImmutable::now(config('reservations.timezone'))->toDateString();
             $candidates = $tables->filter(function (Table $table) use ($data, $busy, $today) {
                 if (!empty($data['table_id']) && $table->id !== (int) $data['table_id']) return false;
@@ -85,13 +114,7 @@ class ReservationService
                 throw ValidationException::withMessages($errors);
             }
 
-            $busy = Reservation::query()
-                ->whereKeyNot($reservation->id)
-                ->whereDate('reserved_date', $data['reserved_date'])
-                ->where('reserved_time', $data['reserved_time'].':00')
-                ->whereIn('status', self::HOLDING_STATUSES)
-                ->pluck('table_id')
-                ->all();
+            $busy = self::busyTableIds($data['reserved_date'], $data['reserved_time'], $reservation->id);
             $today = CarbonImmutable::now(config('reservations.timezone'))->toDateString();
             $table = $tables->filter(function (Table $table) use ($data, $busy, $today): bool {
                 if (!empty($data['table_id']) && $table->id !== (int) $data['table_id']) return false;

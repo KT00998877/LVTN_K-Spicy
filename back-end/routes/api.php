@@ -1,6 +1,7 @@
 <?php
 
 Route::get('/reservations/options', [\App\Http\Controllers\Api\ReservationController::class, 'options']);
+Route::get('/reservations/availability', [\App\Http\Controllers\Api\ReservationController::class, 'availability'])->middleware('throttle:60,1');
 Route::post('/reservations', [\App\Http\Controllers\Api\ReservationController::class, 'store'])->middleware('throttle:30,1');
 Route::get('/reservations/status', [\App\Http\Controllers\Api\ReservationController::class, 'status'])->middleware('throttle:60,1');
 Route::middleware('auth:sanctum')->prefix('reservations/me')->group(function () {

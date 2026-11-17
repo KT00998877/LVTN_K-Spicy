@@ -3,6 +3,7 @@ export interface ReservationOptions {
     opens_at: string
     closes_at: string
     min_advance_minutes: number
+    hold_minutes: number
     max_guests: number
     max_note_length: number
     server_now: string
@@ -55,7 +56,12 @@ export function validateReservation(input: ReservationForm, options: Reservation
         const at = `${form.reserved_date}T${form.reserved_time}:00`
         if (at <= localNow) errors.reserved_time = 'Thời gian đặt bàn phải lớn hơn thời gian hiện tại.'
         else if (at < restaurantNow(options.timezone, now + options.min_advance_minutes * 60000)) errors.reserved_time = `Vui lòng đặt bàn trước ít nhất ${options.min_advance_minutes} phút.`
-        else if (form.reserved_time < options.opens_at || form.reserved_time > options.closes_at) errors.reserved_time = `Nhà hàng nhận đặt bàn từ ${options.opens_at} đến ${options.closes_at}.`
+        else {
+            const closingParts = options.closes_at.split(':').map(Number)
+            const lastMinute = closingParts[0]! * 60 + closingParts[1]! - options.hold_minutes
+            const latest = `${String(Math.floor(lastMinute / 60)).padStart(2, '0')}:${String(lastMinute % 60).padStart(2, '0')}`
+            if (form.reserved_time < options.opens_at || form.reserved_time > latest) errors.reserved_time = `Nhà hàng nhận đặt bàn từ ${options.opens_at} đến ${latest}.`
+        }
     }
     if (!['', 'Tầng 1', 'Tầng 2'].includes(form.location)) errors.location = 'Khu vực đặt bàn không hợp lệ.'
     if ([...form.note].length > options.max_note_length) errors.note = `Ghi chú không được vượt quá ${options.max_note_length} ký tự.`

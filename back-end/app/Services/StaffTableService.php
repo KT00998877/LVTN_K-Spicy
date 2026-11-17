@@ -388,9 +388,9 @@ class StaffTableService
                     throw ValidationException::withMessages(['status' => ['Không thể xác nhận đặt bàn đã quá giờ.']]);
                 }
                 $table = $r->table;
-                $conflict = Reservation::where('id', '!=', $r->id)->where('table_id', $r->table_id)
-                    ->whereDate('reserved_date', $r->reserved_date->format('Y-m-d'))->where('reserved_time', $r->reserved_time)
-                    ->whereIn('status', ReservationService::HOLDING_STATUSES)->exists();
+                $conflict = in_array($r->table_id, ReservationService::busyTableIds(
+                    $r->reserved_date->format('Y-m-d'), substr($r->reserved_time, 0, 5), $r->id
+                ), true);
                 $busyToday = $table && $r->reserved_date->format('Y-m-d') === \Carbon\CarbonImmutable::now(config('reservations.timezone'))->toDateString()
                     && ($table->status !== 'AVAILABLE' || $table->currentSession()->exists());
                 if (!$table || !$table->is_active || $table->capacity < $r->guest_count || $conflict || $busyToday) {

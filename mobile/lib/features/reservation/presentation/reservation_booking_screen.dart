@@ -46,6 +46,18 @@ class _ReservationBookingScreenState
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
   String _location = 'Tầng 1';
+  String? _availabilityKey;
+  Future<List<String>>? _availabilityFuture;
+
+  Future<List<String>> _availableTimes(String date) {
+    final key = '$date|$_guestCount|$_location';
+    if (_availabilityKey != key) {
+      _availabilityKey = key;
+      _availabilityFuture = ref.read(reservationRepositoryProvider)
+          .fetchAvailableTimes(date, _guestCount, _location);
+    }
+    return _availabilityFuture!;
+  }
 
   @override
   void initState() {
@@ -246,6 +258,7 @@ class _ReservationBookingScreenState
     final dateText = DateFormat('EEEE, dd/MM/yyyy', 'vi').format(_selectedDate);
     final timeText =
         '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+    final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     return Form(
       key: _formKey,
@@ -345,6 +358,32 @@ class _ReservationBookingScreenState
               fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 8),
+          Text('Bàn được giữ tối đa ${options.holdMinutes} phút kể từ giờ đặt.'),
+          FutureBuilder<List<String>>(
+            future: _availableTimes(dateKey),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Text('Đang kiểm tra giờ còn bàn...');
+              }
+              if (snapshot.hasError) {
+                return const Text('Chưa kiểm tra được giờ còn bàn. Bạn vẫn có thể chọn giờ thủ công.');
+              }
+              final times = snapshot.data ?? [];
+              if (times.isEmpty) return const Text('Không có giờ phù hợp trong ngày này. Hãy chọn ngày hoặc khu vực khác.');
+              return Wrap(
+                spacing: 8,
+                children: times.map((time) => ChoiceChip(
+                  label: Text(time),
+                  selected: time == timeText,
+                  onSelected: (_) {
+                    final parts = time.split(':').map(int.parse).toList();
+                    setState(() => _selectedTime = TimeOfDay(hour: parts[0], minute: parts[1]));
+                  },
+                )).toList(),
+              );
+            },
+          ),
 
           const SizedBox(height: AppSpacing.md),
 
@@ -428,7 +467,7 @@ class _ReservationBookingScreenState
                     ),
                   )
                 : const Icon(Icons.check_rounded),
-            label: const Text('Xác nhận đặt bàn'),
+            label: const Text('Gửi yêu cầu đặt bàn'),
           ),
           const SizedBox(height: AppSpacing.md),
         ],
@@ -651,7 +690,7 @@ class _ReservationSuccessSheet extends StatelessWidget {
             const Text('🎉', style: TextStyle(fontSize: 72)),
             const SizedBox(height: AppSpacing.sm),
             const Text(
-              'Đặt bàn thành công!',
+              'Đã gửi yêu cầu đặt bàn',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -684,7 +723,7 @@ class _ReservationSuccessSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             const Text(
-              'Chúng tôi sẽ gọi xác nhận trước giờ đặt. Bạn có thể xem lại trong Tài khoản → Lịch sử đặt bàn.',
+              'Yêu cầu đang chờ nhà hàng xác nhận. Bàn được giữ tối đa 30 phút kể từ giờ đã chọn. Nếu đã đăng nhập trước khi đặt, bạn có thể theo dõi trạng thái trong Tài khoản → Đặt bàn của tôi.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, height: 1.5),
             ),

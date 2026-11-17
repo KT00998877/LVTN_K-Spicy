@@ -4,20 +4,13 @@ import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
 import '../../../shared/widgets/common_widgets.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/reservation_local_cache.dart';
+import '../data/reservation_repository.dart';
 import '../domain/reservation_models.dart';
 import 'reservation_visuals.dart';
 
-/// ============================================================
-/// 📅 MY RESERVATIONS — đơn đặt bàn của tôi (local cache)
-/// ============================================================
-/// Backend không có endpoint /api/reservations/me cho customer,
-/// nên ta hiển thị các đơn đã cache trong SharedPreferences
-/// (tối đa 5 đơn gần nhất).
-///
-/// Đây là giải pháp tạm thời; khi backend bổ sung endpoint
-/// customer-scoped, có thể thay bằng FutureProvider gọi API.
-/// ============================================================
+/// Lịch của tài khoản lấy từ API; khách chưa đăng nhập xem phiếu lưu trên máy.
 
 class MyReservationsScreen extends ConsumerStatefulWidget {
   const MyReservationsScreen({super.key});
@@ -37,18 +30,29 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
   }
 
   Future<List<ReservationReceipt>> _load() async {
-    final cache = await ref.read(reservationLocalCacheProvider.future);
-    return cache.loadHistory();
+    if (!ref.read(authControllerProvider).isAuthenticated) {
+      final cache = await ref.read(reservationLocalCacheProvider.future);
+      return cache.loadHistory();
+    }
+    return ref.read(reservationRepositoryProvider).fetchMine();
   }
 
   Future<void> _refresh() async {
     final next = _load();
     setState(() => _future = next);
-    await next;
+    try {
+      await next;
+    } catch (_) {
+      // FutureBuilder hiển thị lỗi để người dùng có thể thử lại.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (previous?.status != next.status) _refresh();
+    });
+    final isAuthenticated = ref.watch(authControllerProvider).isAuthenticated;
     return Scaffold(
       backgroundColor: AppColors.cream,
       appBar: AppBar(
@@ -70,6 +74,9 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
             if (snap.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+            if (snap.hasError) {
+              return Center(child: Text('Không thể tải lịch đặt bàn. Vui lòng thử lại.'));
+            }
             final items = snap.data ?? const <ReservationReceipt>[];
             if (items.isEmpty) {
               return const EmptyState(
@@ -82,10 +89,11 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
             return ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: items.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (_, i) => _ReservationCard(receipt: items[i]),
+              itemCount: items.length + (isAuthenticated ? 0 : 1),
+              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              itemBuilder: (_, i) => !isAuthenticated && i == 0
+                  ? const Text('Phiếu lưu trên thiết bị không tự cập nhật trạng thái. Đăng nhập trước khi đặt để theo dõi xác nhận.')
+                  : _ReservationCard(receipt: items[i - (isAuthenticated ? 0 : 1)]),
             );
           },
         ),

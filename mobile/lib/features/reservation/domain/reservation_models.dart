@@ -10,6 +10,7 @@ class ReservationOptions {
     required this.opensAt,
     required this.closesAt,
     required this.minAdvanceMinutes,
+    required this.holdMinutes,
     required this.maxGuests,
     required this.maxNoteLength,
     required this.serverNow,
@@ -19,6 +20,7 @@ class ReservationOptions {
   final String opensAt;           // "10:00"
   final String closesAt;          // "22:00"
   final int minAdvanceMinutes;    // 60
+  final int holdMinutes;
   final int maxGuests;            // 20
   final int maxNoteLength;        // 1000
   final DateTime? serverNow;      // ISO8601
@@ -38,6 +40,7 @@ class ReservationOptions {
       opensAt: (json['opens_at'] ?? '10:00').toString(),
       closesAt: (json['closes_at'] ?? '22:00').toString(),
       minAdvanceMinutes: (json['min_advance_minutes'] as num?)?.toInt() ?? 60,
+      holdMinutes: (json['hold_minutes'] as num?)?.toInt() ?? 30,
       maxGuests: (json['max_guests'] as num?)?.toInt() ?? 20,
       maxNoteLength: (json['max_note_length'] as num?)?.toInt() ?? 1000,
       serverNow: parseNow(json['server_now']?.toString()),
@@ -161,7 +164,7 @@ class ReservationReceipt {
       reservedDate: parseDate(json['reserved_date']?.toString()),
       reservedTime: (json['reserved_time'] ?? '').toString(),
       status: parseReservationStatus(json['status']?.toString()),
-      location: (json['location'] ?? 'Tầng 1').toString(),
+      location: ((json['table'] as Map?)?['location'] ?? json['location'] ?? 'Nhà hàng sắp xếp').toString(),
     );
   }
 }
