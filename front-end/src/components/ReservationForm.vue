@@ -40,7 +40,6 @@ const fields = [
     { key: 'customer_name', label: 'Họ và tên', type: 'text', autocomplete: 'name' },
     { key: 'customer_phone', label: 'Số điện thoại', type: 'tel', autocomplete: 'tel' },
     { key: 'reserved_date', label: 'Ngày đặt bàn', type: 'date', autocomplete: 'off' },
-    { key: 'reserved_time', label: 'Giờ đặt bàn', type: 'time', autocomplete: 'off' },
 ] as const
 
 async function loadOptions() {
@@ -79,6 +78,7 @@ watch(today, () => { if (attempted.value || touched.reserved_date) validate() })
 let availabilityVersion = 0
 watch(() => [form.reserved_date, form.guest_count, form.location, !!options.value], async () => {
     const version = ++availabilityVersion
+    form.reserved_time = ''
     availableTimes.value = []
     availabilityError.value = ''
     if (!options.value || !/^\d{4}-\d{2}-\d{2}$/.test(form.reserved_date) || !Number.isInteger(form.guest_count) || form.guest_count < 1 || form.guest_count > options.value.max_guests) return
@@ -87,7 +87,7 @@ watch(() => [form.reserved_date, form.guest_count, form.location, !!options.valu
         const times = await getReservationAvailability(form.reserved_date, form.guest_count, form.location)
         if (version === availabilityVersion) availableTimes.value = times
     } catch {
-        if (version === availabilityVersion) availabilityError.value = 'Chưa kiểm tra được giờ còn bàn. Bạn vẫn có thể nhập giờ và gửi yêu cầu.'
+        if (version === availabilityVersion) availabilityError.value = 'Chưa kiểm tra được giờ còn bàn. Bạn có thể nhập giờ thủ công.'
     } finally {
         if (version === availabilityVersion) availabilityLoading.value = false
     }
@@ -156,8 +156,7 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
                     <label :for="`${id}-${field.key}`">{{ field.label }} *</label>
                     <input :id="`${id}-${field.key}`" v-model="form[field.key]" :type="field.type" :autocomplete="field.autocomplete"
                         :inputmode="field.type === 'tel' ? 'tel' : undefined" required
-                        :min="field.type === 'date' ? today : field.type === 'time' ? options?.opens_at : undefined"
-                        :max="field.type === 'time' ? latestTime : undefined"
+                        :min="field.type === 'date' ? today : undefined"
                         :maxlength="field.key === 'customer_name' ? 100 : field.key === 'customer_phone' ? 30 : undefined"
                         :aria-invalid="!!errors[field.key]" :aria-describedby="errors[field.key] ? `${id}-${field.key}-error` : undefined" @blur="validate(field.key)" />
                     <p v-if="errors[field.key]" :id="`${id}-${field.key}-error`" class="field-error">{{ errors[field.key] }}</p>
@@ -175,15 +174,23 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
                     </select>
                     <p v-if="errors.location" :id="`${id}-location-error`" class="field-error">{{ errors.location }}</p>
                 </div>
-                <div v-if="form.reserved_date" class="form-group wide" aria-live="polite">
-                    <strong>Giờ còn bàn cho {{ form.guest_count }} khách</strong>
-                    <p v-if="availabilityLoading" class="helper">Đang kiểm tra giờ còn bàn...</p>
-                    <p v-else-if="availabilityError" class="helper">{{ availabilityError }}</p>
+                <div class="form-group wide" role="group" :aria-labelledby="`${id}-time-label`" :aria-describedby="errors.reserved_time ? `${id}-time-error` : undefined" :aria-invalid="!!errors.reserved_time" tabindex="-1">
+                    <strong :id="`${id}-time-label`">Giờ đặt bàn * <span v-if="form.reserved_date">— còn bàn cho {{ form.guest_count }} khách</span></strong>
+                    <p v-if="!form.reserved_date" class="helper">Chọn ngày để xem giờ còn bàn.</p>
+                    <p v-else-if="availabilityLoading" class="helper" role="status">Đang kiểm tra giờ còn bàn...</p>
+                    <template v-else-if="availabilityError">
+                        <p class="helper">{{ availabilityError }}</p>
+                        <label :for="`${id}-fallback-time`" class="sr-only">Nhập giờ đặt bàn</label>
+                        <input :id="`${id}-fallback-time`" v-model="form.reserved_time" type="time" :min="options?.opens_at" :max="latestTime" :aria-invalid="!!errors.reserved_time" />
+                    </template>
                     <p v-else-if="!availableTimes.length" class="helper">Không có giờ phù hợp trong ngày này. Hãy chọn ngày hoặc khu vực khác.</p>
-                    <div v-else class="available-times">
-                        <button v-for="time in availableTimes" :key="time" type="button" :aria-pressed="form.reserved_time === time" @click="form.reserved_time = time">{{ time }}</button>
-                    </div>
-                    <p class="helper">Giờ còn bàn có thể thay đổi trước khi gửi yêu cầu.</p>
+                    <template v-else>
+                        <div class="available-times">
+                            <button v-for="time in availableTimes" :key="time" type="button" :aria-pressed="form.reserved_time === time" @click="form.reserved_time = time">{{ time }}</button>
+                        </div>
+                        <p class="helper">Giờ còn bàn có thể thay đổi trước khi gửi yêu cầu.</p>
+                    </template>
+                    <p v-if="errors.reserved_time" :id="`${id}-time-error`" class="field-error">{{ errors.reserved_time }}</p>
                 </div>
                 <div v-if="tables" class="form-group wide">
                         <label :for="`${id}-table_id`">Bàn (không bắt buộc)</label>
@@ -212,6 +219,7 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
 .booking-form { display: flex; flex-direction: column; gap: 20px; }
 .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; padding: 0; margin: 0; border: 0; min-width: 0; }
 .form-group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .wide { grid-column: 1 / -1; }
 label { font-size: 14px; font-weight: 600; color: var(--color-charcoal-black); }
 input, select, textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 14px; background: var(--color-white); border: 1px solid var(--color-gray-300, #ccc); border-radius: var(--radius-md); font: inherit; color: var(--color-charcoal-black); }
@@ -222,8 +230,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .success { background: var(--color-success-bg, #f0fdf4); color: #166534; padding: 20px; border-radius: var(--radius-md); line-height: 1.6; }
 .submit-btn { padding: 16px; width: 100%; }
 .available-times { display: flex; flex-wrap: wrap; gap: 8px; }
-.available-times button { padding: 8px 12px; border: 1px solid var(--color-gray-300, #ccc); border-radius: var(--radius-md); background: white; cursor: pointer; }
-.available-times button[aria-pressed="true"] { border-color: var(--color-chili-red); color: var(--color-chili-red); font-weight: 700; }
+.available-times button { padding: 8px 12px; border: 1px solid var(--color-gray-300, #ccc); border-radius: var(--radius-md); background: var(--color-white); color: var(--color-charcoal-black); font: inherit; cursor: pointer; }
+.available-times button[aria-pressed="true"] { border-color: var(--color-chili-red); background: var(--color-chili-red); color: var(--color-white); font-weight: 700; }
 button:disabled { opacity: .65; cursor: not-allowed; }
 @media (max-width: 575px) { .fields { grid-template-columns: 1fr; } }
 </style>
