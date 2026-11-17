@@ -57,6 +57,13 @@ class ReservationStatusVisual {
           fg: AppColors.success,
           icon: Icons.celebration_rounded,
         );
+      case ReservationStatus.noShow:
+        return const ReservationStatusVisual(
+          label: 'Không đến',
+          bg: Color(0xFFFDEEEE),
+          fg: AppColors.danger,
+          icon: Icons.person_off_rounded,
+        );
       case ReservationStatus.unknown:
         return const ReservationStatusVisual(
           label: '—',

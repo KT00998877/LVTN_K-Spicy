@@ -360,7 +360,7 @@ class StaffTableService
      */
     public function updateReservationStatus(int $id, string $status): array
     {
-        $allowed = ['PENDING', 'CONFIRMED', 'ARRIVED', 'CANCELLED', 'COMPLETED'];
+        $allowed = ['PENDING', 'CONFIRMED', 'ARRIVED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'];
         if (!in_array($status, $allowed, true)) {
             throw ValidationException::withMessages([
                 'status' => ['Trạng thái reservation không hợp lệ.'],
@@ -375,12 +375,18 @@ class StaffTableService
             }
             $transitions = [
                 'PENDING' => ['CONFIRMED', 'CANCELLED'],
-                'CONFIRMED' => ['ARRIVED', 'CANCELLED'],
+                'CONFIRMED' => ['ARRIVED', 'CANCELLED', 'NO_SHOW'],
                 'ARRIVED' => ['COMPLETED'],
-                'CANCELLED' => [], 'COMPLETED' => [],
+                'CANCELLED' => [], 'COMPLETED' => [], 'NO_SHOW' => [],
             ];
             if ($r->status !== $status && !in_array($status, $transitions[$r->status] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => ['Không thể chuyển trạng thái đặt bàn này.']]);
+            }
+            if ($r->status !== $status && $status === 'NO_SHOW') {
+                $at = \Carbon\CarbonImmutable::parse($r->reserved_date->format('Y-m-d').' '.$r->reserved_time, config('reservations.timezone'));
+                if (\Carbon\CarbonImmutable::now(config('reservations.timezone'))->lessThan($at->addMinutes(config('reservations.hold_minutes')))) {
+                    throw ValidationException::withMessages(['status' => ['Chỉ đánh dấu khách không đến sau khi hết thời gian giữ bàn.']]);
+                }
             }
             if ($r->status !== $status && $status === 'CONFIRMED') {
                 $at = \Carbon\CarbonImmutable::parse($r->reserved_date->format('Y-m-d').' '.$r->reserved_time, config('reservations.timezone'));

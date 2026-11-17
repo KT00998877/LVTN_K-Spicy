@@ -62,7 +62,7 @@ export interface TableSession {
 
 // ===== Reservations =====
 
-export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED'
+export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'
 
 export interface Reservation {
     id: number

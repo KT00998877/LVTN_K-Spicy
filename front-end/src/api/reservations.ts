@@ -10,7 +10,7 @@ export interface ReservationReceipt {
     status: string
 }
 
-export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED'
+export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'
 
 export interface CustomerReservation extends ReservationReceipt {
     customer_phone: string

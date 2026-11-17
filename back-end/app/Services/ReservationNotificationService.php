@@ -48,6 +48,20 @@ class ReservationNotificationService
         $this->send((int) $reservation->customer_id, 'customer.reservation', $data, $data['event'].':'.$reservation->id.':'.$reservation->customer_id, false);
     }
 
+    public function remind(Reservation $reservation): void
+    {
+        if (!$reservation->customer_id || $reservation->status !== 'CONFIRMED') return;
+        $schedule = $reservation->reserved_date->format('d/m/Y').' lúc '.substr($reservation->reserved_time, 0, 5);
+        $this->send((int) $reservation->customer_id, 'customer.reservation', [
+            'event' => 'RESERVATION_REMINDER',
+            'reservation_id' => $reservation->id,
+            'name' => 'Sắp đến giờ đặt bàn',
+            'message' => 'Bạn có lịch đặt bàn '.$schedule.'. Bàn được giữ tối đa '.config('reservations.hold_minutes').' phút kể từ giờ đặt.',
+            'cta_text' => 'Xem đặt bàn',
+            'url' => '/tai-khoan?tab=reservations',
+        ], 'RESERVATION_REMINDER:'.$reservation->id.':'.$reservation->reserved_date->format('Ymd').':'.substr($reservation->reserved_time, 0, 5), false);
+    }
+
     private function send(int $recipientId, string $type, array $data, string $key, bool $staff): void
     {
         $id = (string) Str::uuid();

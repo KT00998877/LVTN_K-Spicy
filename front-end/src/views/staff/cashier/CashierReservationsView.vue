@@ -50,6 +50,7 @@
                     >
                         Đã đến
                     </button>
+                    <button v-if="r.status === 'CONFIRMED'" class="btn btn-cancel" @click="updateStatus(r.id, 'NO_SHOW')">Khách không đến</button>
                     <button
                         v-if="r.status === 'ARRIVED'"
                         class="btn btn-done"
@@ -99,6 +100,7 @@ const filters: Array<{ value: 'all' | Reservation['status']; label: string }> = 
     { value: 'ARRIVED', label: 'Khách đã đến' },
     { value: 'COMPLETED', label: 'Hoàn tất' },
     { value: 'CANCELLED', label: 'Đã hủy' },
+    { value: 'NO_SHOW', label: 'Không đến' },
 ]
 
 onMounted(() => reservationsStore.fetchAll())
@@ -132,7 +134,7 @@ function initials(name: string): string {
 function statusLabel(status: Reservation['status']): string {
     const map: Record<Reservation['status'], string> = {
         PENDING: 'Chờ xác nhận', CONFIRMED: 'Đã xác nhận',
-        ARRIVED: 'Đã đến', CANCELLED: 'Đã hủy', COMPLETED: 'Hoàn tất',
+        ARRIVED: 'Đã đến', CANCELLED: 'Đã hủy', COMPLETED: 'Hoàn tất', NO_SHOW: 'Không đến',
     }
     return map[status]
 }
@@ -247,6 +249,7 @@ useRealtimeRefresh(() => reservationsStore.fetchAll(undefined, true), () => !res
 .badge-CONFIRMED { background: #d1fae5; color: #065f46; }
 .badge-ARRIVED   { background: #dbeafe; color: #1e3a8a; }
 .badge-CANCELLED { background: #fee2e2; color: #991b1b; }
+.badge-NO_SHOW { background: #fee2e2; color: #991b1b; }
 .badge-COMPLETED { background: #f3f4f6; color: #374151; }
 
 .card-time {

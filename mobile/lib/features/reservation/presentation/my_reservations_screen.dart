@@ -8,6 +8,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/reservation_local_cache.dart';
 import '../data/reservation_repository.dart';
 import '../domain/reservation_models.dart';
+import '../domain/reservation_validator.dart';
 import 'reservation_visuals.dart';
 
 /// Lịch của tài khoản lấy từ API; khách chưa đăng nhập xem phiếu lưu trên máy.
@@ -44,6 +45,91 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
       await next;
     } catch (_) {
       // FutureBuilder hiển thị lỗi để người dùng có thể thử lại.
+    }
+  }
+
+  Future<void> _edit(ReservationReceipt item) async {
+    ReservationOptions options;
+    try {
+      options = await ref.read(reservationOptionsProvider.future);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không tải được quy định đặt bàn. Vui lòng thử lại.')));
+      return;
+    }
+    final guests = TextEditingController(text: item.guestCount.toString());
+    final note = TextEditingController(text: item.note ?? '');
+    var date = item.reservedDate;
+    var time = TimeOfDay(hour: int.parse(item.reservedTime.substring(0, 2)), minute: int.parse(item.reservedTime.substring(3, 5)));
+    var location = item.location == 'Tầng 2' ? 'Tầng 2' : 'Tầng 1';
+    String? error;
+    bool saving = false;
+    if (!mounted) return;
+    try {
+      final saved = await showDialog<bool>(context: context, builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Sửa lịch đặt bàn'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextButton(onPressed: saving ? null : () async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(context: context, initialDate: date, firstDate: DateTime(now.year, now.month, now.day), lastDate: now.add(const Duration(days: 365)));
+              if (picked != null) setDialogState(() => date = picked);
+            }, child: Text('Ngày: ${DateFormat('dd/MM/yyyy').format(date)}')),
+            TextButton(onPressed: saving ? null : () async {
+              final picked = await showTimePicker(context: context, initialTime: time);
+              if (picked != null) setDialogState(() => time = picked);
+            }, child: Text('Giờ: ${time.format(context)}')),
+            TextField(controller: guests, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Số khách')),
+            DropdownButtonFormField<String>(initialValue: location, decoration: const InputDecoration(labelText: 'Khu vực'), items: const [
+              DropdownMenuItem(value: 'Tầng 1', child: Text('Tầng 1')),
+              DropdownMenuItem(value: 'Tầng 2', child: Text('Tầng 2')),
+            ], onChanged: (value) { if (value != null) setDialogState(() => location = value); }),
+            TextField(controller: note, maxLines: 2, decoration: const InputDecoration(labelText: 'Ghi chú')),
+            if (error != null) Text(error!, style: const TextStyle(color: AppColors.danger)),
+          ])),
+          actions: [
+            TextButton(onPressed: saving ? null : () => Navigator.pop(dialogContext, false), child: const Text('Đóng')),
+            FilledButton(onPressed: saving ? null : () async {
+              final count = int.tryParse(guests.text);
+              final hhmm = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+              final validation = count == null ? 'Số khách không hợp lệ.' : ReservationValidator.validateGuestCount(count, options.maxGuests)
+                  ?? ReservationValidator.validateDate(date, DateTime.now())
+                  ?? ReservationValidator.validateTime(date: date, hhmm: hhmm, options: options, now: DateTime.now())
+                  ?? ReservationValidator.validateNote(note.text, options.maxNoteLength);
+              if (validation != null) { setDialogState(() => error = validation); return; }
+              setDialogState(() { saving = true; error = null; });
+              try {
+                await ref.read(reservationRepositoryProvider).updateMine(item.id, {
+                  'guest_count': count, 'reserved_date': DateFormat('yyyy-MM-dd').format(date),
+                  'reserved_time': hhmm, 'location': location, 'note': note.text.trim(),
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+              } catch (_) {
+                if (dialogContext.mounted) setDialogState(() { saving = false; error = 'Không thể sửa lịch. Vui lòng chọn giờ khác hoặc thử lại.'; });
+              }
+            }, child: const Text('Lưu lịch')),
+          ],
+        ),
+      ));
+      if (saved == true) await _refresh();
+    } finally {
+      guests.dispose();
+      note.dispose();
+    }
+  }
+
+  Future<void> _cancel(ReservationReceipt item) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Hủy đặt bàn?'),
+      content: Text('Hủy lịch lúc ${item.reservedTime} ngày ${DateFormat('dd/MM/yyyy').format(item.reservedDate)}?'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Giữ lịch')),
+        TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Hủy lịch'))],
+    ));
+    if (confirmed != true) return;
+    try {
+      await ref.read(reservationRepositoryProvider).cancelMine(item.id);
+      await _refresh();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể hủy lịch. Vui lòng thử lại.')));
     }
   }
 
@@ -93,7 +179,7 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
               separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (_, i) => !isAuthenticated && i == 0
                   ? const Text('Phiếu lưu trên thiết bị không tự cập nhật trạng thái. Đăng nhập trước khi đặt để theo dõi xác nhận.')
-                  : _ReservationCard(receipt: items[i - (isAuthenticated ? 0 : 1)]),
+                  : _ReservationCard(receipt: items[i - (isAuthenticated ? 0 : 1)], onEdit: _edit, onCancel: _cancel),
             );
           },
         ),
@@ -103,8 +189,10 @@ class _MyReservationsScreenState extends ConsumerState<MyReservationsScreen> {
 }
 
 class _ReservationCard extends StatelessWidget {
-  const _ReservationCard({required this.receipt});
+  const _ReservationCard({required this.receipt, required this.onEdit, required this.onCancel});
   final ReservationReceipt receipt;
+  final Future<void> Function(ReservationReceipt) onEdit;
+  final Future<void> Function(ReservationReceipt) onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +293,7 @@ class _ReservationCard extends StatelessWidget {
           ),
 
           // ── Note nếu có ───────────────────────────────
-          if (_note != null) ...[
+          if (receipt.note != null && receipt.note!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
@@ -221,7 +309,7 @@ class _ReservationCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      _note!,
+                      receipt.note!,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -232,13 +320,13 @@ class _ReservationCard extends StatelessWidget {
               ),
             ),
           ],
+          if (receipt.canEdit || receipt.canCancel) Row(children: [
+            if (receipt.canEdit) TextButton(onPressed: () => onEdit(receipt), child: const Text('Sửa lịch')),
+            if (receipt.canCancel) TextButton(onPressed: () => onCancel(receipt), child: const Text('Hủy lịch')),
+          ]),
         ],
       ),
     );
   }
 
-  String? get _note {
-    // ReservationReceipt không có note field — để null cho tới khi backend expose
-    return null;
-  }
 }

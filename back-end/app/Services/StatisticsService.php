@@ -832,7 +832,7 @@ class StatisticsService
             'arrived'               => $byStatus['ARRIVED']   ?? 0,
             'completed'             => $byStatus['COMPLETED'] ?? 0,
             'cancelled'             => $byStatus['CANCELLED'] ?? 0,
-            'no_show'               => 0, // schema không có
+            'no_show'               => $byStatus['NO_SHOW'] ?? 0,
             'total_growth_pct'      => self::growthPct($total, $prevTotal),
         ];
     }

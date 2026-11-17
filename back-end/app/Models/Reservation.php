@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string      $reserved_date  // YYYY-MM-DD
  * @property string      $reserved_time  // HH:mm
  * @property string|null $note
- * @property string      $status         // PENDING, CONFIRMED, ARRIVED, CANCELLED, COMPLETED
+ * @property string      $status         // PENDING, CONFIRMED, ARRIVED, CANCELLED, COMPLETED, NO_SHOW
  */
 class Reservation extends Model
 {

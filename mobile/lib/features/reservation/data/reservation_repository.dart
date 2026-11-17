@@ -54,6 +54,15 @@ class ReservationRepository {
     return rows.map((row) => ReservationReceipt.fromJson((row as Map).cast<String, dynamic>())).toList();
   }
 
+  Future<ReservationReceipt> updateMine(int id, Map<String, dynamic> data) async {
+    final res = await _dio.patch<Map<String, dynamic>>('/reservations/me/$id', data: data);
+    return ReservationReceipt.fromJson((res.data!['data'] as Map).cast<String, dynamic>());
+  }
+
+  Future<void> cancelMine(int id) async {
+    await _dio.post('/reservations/me/$id/cancel');
+  }
+
   Future<List<String>> fetchAvailableTimes(String date, int guests, String location) async {
     final res = await _dio.get<Map<String, dynamic>>('/reservations/availability',
         queryParameters: {'date': date, 'guest_count': guests, 'location': location});

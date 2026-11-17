@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/api/api_exception.dart';
@@ -46,6 +47,8 @@ class _ReservationBookingScreenState
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
   String _location = 'Tầng 1';
+  bool _prefillApplied = false;
+  String? _aiSuggestedTime;
   String? _availabilityKey;
   Future<List<String>>? _availabilityFuture;
 
@@ -57,6 +60,28 @@ class _ReservationBookingScreenState
           .fetchAvailableTimes(date, _guestCount, _location);
     }
     return _availabilityFuture!;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefillApplied) return;
+    _prefillApplied = true;
+    final query = GoRouterState.of(context).uri.queryParameters;
+    final date = DateTime.tryParse(query['date'] ?? '');
+    if (date != null && !date.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))) _selectedDate = date;
+    final guests = int.tryParse(query['guest_count'] ?? '');
+    if (guests != null && guests >= 1 && guests <= 20) _guestCount = guests;
+    if (query['location'] == 'Tầng 1' || query['location'] == 'Tầng 2') _location = query['location']!;
+    final parts = (query['time'] ?? '').split(':');
+    if (parts.length == 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null && minute != null && hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+        _selectedTime = TimeOfDay(hour: hour, minute: minute);
+        _aiSuggestedTime = query['time'];
+      }
+    }
   }
 
   @override
@@ -371,6 +396,17 @@ class _ReservationBookingScreenState
               }
               final times = snapshot.data ?? [];
               if (times.isEmpty) return const Text('Không có giờ phù hợp trong ngày này. Hãy chọn ngày hoặc khu vực khác.');
+              if (_aiSuggestedTime != null) {
+                final preferred = _aiSuggestedTime!;
+                _aiSuggestedTime = null;
+                int minutes(String value) => int.parse(value.substring(0, 2)) * 60 + int.parse(value.substring(3, 5));
+                final nearest = [...times]..sort((a, b) => (minutes(a) - minutes(preferred)).abs().compareTo((minutes(b) - minutes(preferred)).abs()));
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  final parts = nearest.first.split(':').map(int.parse).toList();
+                  setState(() => _selectedTime = TimeOfDay(hour: parts[0], minute: parts[1]));
+                });
+              }
               return Wrap(
                 spacing: 8,
                 children: times.map((time) => ChoiceChip(

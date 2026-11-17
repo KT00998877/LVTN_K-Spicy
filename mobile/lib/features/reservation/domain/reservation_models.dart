@@ -71,7 +71,7 @@ class ReservationOptions {
 }
 
 /// Trạng thái reservation (đồng bộ backend)
-enum ReservationStatus { pending, confirmed, arrived, cancelled, completed, unknown }
+enum ReservationStatus { pending, confirmed, arrived, cancelled, completed, noShow, unknown }
 
 ReservationStatus parseReservationStatus(String? raw) {
   switch ((raw ?? '').toUpperCase()) {
@@ -85,6 +85,8 @@ ReservationStatus parseReservationStatus(String? raw) {
       return ReservationStatus.cancelled;
     case 'COMPLETED':
       return ReservationStatus.completed;
+    case 'NO_SHOW':
+      return ReservationStatus.noShow;
     default:
       return ReservationStatus.unknown;
   }
@@ -137,6 +139,9 @@ class ReservationReceipt {
     required this.reservedTime,
     required this.status,
     this.location = 'Tầng 1',
+    this.note,
+    this.canEdit = false,
+    this.canCancel = false,
   });
 
   final int id;
@@ -146,6 +151,9 @@ class ReservationReceipt {
   final String reservedTime;
   final ReservationStatus status;
   final String location;
+  final String? note;
+  final bool canEdit;
+  final bool canCancel;
 
   factory ReservationReceipt.fromJson(Map<String, dynamic> json) {
     DateTime parseDate(String? s) {
@@ -165,6 +173,9 @@ class ReservationReceipt {
       reservedTime: (json['reserved_time'] ?? '').toString(),
       status: parseReservationStatus(json['status']?.toString()),
       location: ((json['table'] as Map?)?['location'] ?? json['location'] ?? 'Nhà hàng sắp xếp').toString(),
+      note: json['note']?.toString(),
+      canEdit: json['can_edit'] == true,
+      canCancel: json['can_cancel'] == true,
     );
   }
 }

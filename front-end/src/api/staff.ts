@@ -408,7 +408,7 @@ export interface Reservation {
     reserved_date: string
     reserved_time: string
     note: string | null
-    status: 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED'
+    status: 'PENDING' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW'
     handled_by: number | null
     handled_by_name: string | null
     created_at: string | null

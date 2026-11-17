@@ -34,6 +34,7 @@ export const useReservationsStore = defineStore('staffReservations', {
                     (r) =>
                         r.reserved_date >= today &&
                         r.status !== 'CANCELLED' &&
+                        r.status !== 'NO_SHOW' &&
                         r.status !== 'COMPLETED'
                 )
                 .sort((a, b) => {

@@ -239,7 +239,12 @@ onMounted(async () => {
                             <RouterLink
                                 v-if="msg.role === 'assistant' && messageReady(msg.id) && msg.metadata?.quick_action?.type === 'reservation_form'"
                                 class="chatbot-msg__booking"
-                                to="/dat-ban"
+                                :to="{ path: '/dat-ban', query: msg.metadata.quick_action.prefill ? {
+                                    date: msg.metadata.quick_action.prefill.date,
+                                    time: msg.metadata.quick_action.prefill.time,
+                                    guests: msg.metadata.quick_action.prefill.guest_count,
+                                    location: msg.metadata.quick_action.prefill.location,
+                                } : {} }"
                                 @click="store.close()"
                             >Đặt bàn</RouterLink>
                         </div>

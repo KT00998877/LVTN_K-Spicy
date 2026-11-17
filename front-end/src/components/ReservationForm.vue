@@ -2,11 +2,13 @@
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import axios from 'axios'
+import { useRoute } from 'vue-router'
 import { createReservation, getReservationAvailability, getReservationOptions, getReservationStatus, type ReservationStatus } from '@/api/reservations'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeReservation, restaurantNow, validateReservation, type ReservationForm, type ReservationOptions } from '@/utils/reservation'
 
 const props = defineProps<{ tables?: Array<{ id: number; code: string; capacity: number }> }>()
+const route = useRoute()
 const authStore = useAuthStore()
 const emit = defineEmits<{ created: [] }>()
 const id = useId()
@@ -29,6 +31,7 @@ let clockOffset = 0
 let timer: ReturnType<typeof setInterval> | undefined
 let requestKey = ''
 let requestPayload = ''
+const preferredTime = typeof route.query.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(route.query.time) ? route.query.time : ''
 const today = computed(() => options.value ? restaurantNow(options.value.timezone, now.value).slice(0, 10) : '')
 const latestTime = computed(() => {
     if (!options.value) return ''
@@ -53,6 +56,12 @@ async function loadOptions() {
     }
 }
 onMounted(() => {
+    if (typeof route.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date)) form.reserved_date = route.query.date
+    if (typeof route.query.guests === 'string') {
+        const guests = Number(route.query.guests)
+        if (Number.isInteger(guests) && guests >= 1 && guests <= 20) form.guest_count = guests
+    }
+    if (route.query.location === 'Tầng 1' || route.query.location === 'Tầng 2') form.location = route.query.location
     void loadOptions()
     timer = setInterval(() => { now.value = Date.now() + clockOffset }, 1000)
 })
@@ -85,7 +94,13 @@ watch(() => [form.reserved_date, form.guest_count, form.location, !!options.valu
     availabilityLoading.value = true
     try {
         const times = await getReservationAvailability(form.reserved_date, form.guest_count, form.location)
-        if (version === availabilityVersion) availableTimes.value = times
+        if (version === availabilityVersion) {
+            availableTimes.value = times
+            if (preferredTime && times.length) {
+                const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5))
+                form.reserved_time = [...times].sort((a, b) => Math.abs(minutes(a) - minutes(preferredTime)) - Math.abs(minutes(b) - minutes(preferredTime)))[0]!
+            }
+        }
     } catch {
         if (version === availabilityVersion) availabilityError.value = 'Chưa kiểm tra được giờ còn bàn. Bạn có thể nhập giờ thủ công.'
     } finally {
@@ -176,6 +191,7 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
                 </div>
                 <div class="form-group wide" role="group" :aria-labelledby="`${id}-time-label`" :aria-describedby="errors.reserved_time ? `${id}-time-error` : undefined" :aria-invalid="!!errors.reserved_time" tabindex="-1">
                     <strong :id="`${id}-time-label`">Giờ đặt bàn * <span v-if="form.reserved_date">— còn bàn cho {{ form.guest_count }} khách</span></strong>
+                    <p v-if="preferredTime && form.reserved_time" class="helper">AI gợi ý giờ {{ form.reserved_time }} gần với giờ bạn hỏi. Hãy kiểm tra trước khi gửi.</p>
                     <p v-if="!form.reserved_date" class="helper">Chọn ngày để xem giờ còn bàn.</p>
                     <p v-else-if="availabilityLoading" class="helper" role="status">Đang kiểm tra giờ còn bàn...</p>
                     <template v-else-if="availabilityError">

@@ -37,6 +37,16 @@ class CustomerReservationTest extends TestCase
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
         });
+        Schema::create('roles', function (Blueprint $table): void {
+            $table->id();
+            $table->string('code');
+            $table->string('name');
+        });
+        Schema::create('user_role', function (Blueprint $table): void {
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('role_id');
+            $table->timestamp('assigned_at')->nullable();
+        });
         Schema::create('tables', function (Blueprint $table): void {
             $table->id();
             $table->string('code');

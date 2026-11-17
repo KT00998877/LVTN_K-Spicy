@@ -46,6 +46,7 @@ const STATUS: Record<ReservationStatus, { label: string; cls: string }> = {
     ARRIVED: { label: 'Đã đến', cls: 'reservation-status arrived' },
     CANCELLED: { label: 'Đã hủy', cls: 'reservation-status cancelled' },
     COMPLETED: { label: 'Hoàn thành', cls: 'reservation-status completed' },
+    NO_SHOW: { label: 'Không đến', cls: 'reservation-status cancelled' },
 }
 
 async function load(): Promise<void> {

@@ -126,6 +126,7 @@ class QuickAction(BaseModel):
         default="",
         description="Optional heading for the opened surface",
     )
+    prefill: Optional[dict] = Field(default=None, description="Optional reservation form hints")
 
 
 class ChatResponse(BaseModel):

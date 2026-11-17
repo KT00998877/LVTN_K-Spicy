@@ -51,6 +51,7 @@ export interface QuickAction {
     type: 'reservation_form'
     label: string
     title?: string
+    prefill?: { date?: string; time?: string; guest_count?: number; location?: string }
 }
 
 export interface MenuSuggestion {

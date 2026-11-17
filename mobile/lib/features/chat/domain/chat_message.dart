@@ -95,11 +95,12 @@ class MenuSuggestion {
 
 /// Hành động nhanh trợ lý đề nghị.
 class QuickAction {
-  const QuickAction({required this.type, required this.label, this.title});
+  const QuickAction({required this.type, required this.label, this.title, this.prefill = const {}});
 
   final String type;
   final String label;
   final String? title;
+  final Map<String, dynamic> prefill;
 
   /// Đặt bàn — mở form đặt bàn của ứng dụng.
   static const String reservationForm = 'reservation_form';
@@ -115,6 +116,7 @@ class QuickAction {
       type: type,
       label: (json['label'] ?? '').toString(),
       title: json['title'] as String?,
+      prefill: json['prefill'] is Map ? Map<String, dynamic>.from(json['prefill'] as Map) : const {},
     );
   }
 }

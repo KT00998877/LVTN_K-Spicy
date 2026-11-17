@@ -484,10 +484,21 @@ class ChatbotController extends Controller
             return null;
         }
 
+        $prefill = is_array($quickAction['prefill'] ?? null) ? $quickAction['prefill'] : [];
+        $safe = [];
+        if (isset($prefill['date']) && is_string($prefill['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $prefill['date'])) {
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $prefill['date']);
+            if ($date && $date->format('Y-m-d') === $prefill['date']) $safe['date'] = $prefill['date'];
+        }
+        if (isset($prefill['time']) && is_string($prefill['time']) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $prefill['time'])) $safe['time'] = $prefill['time'];
+        if (isset($prefill['guest_count']) && filter_var($prefill['guest_count'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => config('reservations.max_guests')]]) !== false) $safe['guest_count'] = (int) $prefill['guest_count'];
+        if (in_array($prefill['location'] ?? null, ['Tầng 1', 'Tầng 2'], true)) $safe['location'] = $prefill['location'];
+
         return [
             'type' => $type,
             'label' => $quickAction['label'] ?? self::QUICK_ACTION_TYPES[$type],
             'title' => is_string($quickAction['title'] ?? null) ? $quickAction['title'] : '',
+            'prefill' => $safe,
         ];
     }
 

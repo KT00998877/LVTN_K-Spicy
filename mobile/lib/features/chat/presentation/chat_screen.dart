@@ -437,7 +437,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: FilledButton.icon(
-                onPressed: () => context.push('/reservation'),
+                onPressed: () {
+                  final hints = message.quickAction!.prefill;
+                  final query = <String, String>{};
+                  for (final key in ['date', 'time', 'location', 'guest_count']) {
+                    if (hints[key] != null) query[key] = hints[key].toString();
+                  }
+                  context.push(Uri(path: '/reservation', queryParameters: query).toString());
+                },
                 icon: const Icon(Icons.event_seat_rounded, size: 18),
                 label: Text(message.quickAction!.label.isEmpty
                     ? 'Đặt bàn'

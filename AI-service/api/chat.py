@@ -25,6 +25,7 @@ from schemas import (
     StructuredChatResponse,
 )
 from services.chat_service import chat_service, business_tool_service, detect_intents, is_negated_cart_request
+from services.reservation_prefill import extract_reservation_hints
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -87,6 +88,13 @@ async def chat(
             # between the models it tries.
             with gemini_request_deadline(config.settings.chat_timeout_seconds):
                 result = await _process_chat(request)
+        if result.get("intent") == "make_reservation" and (result.get("quick_action") or {}).get("type") == "reservation_form":
+            try:
+                hints = await asyncio.wait_for(extract_reservation_hints(request.message), timeout=3)
+                if hints:
+                    result["quick_action"] = {**result["quick_action"], "prefill": hints}
+            except Exception:
+                pass
         if result.get("intent") == "error" or not result.get("reply", "").strip():
             chat_metrics.record(result, (time.perf_counter() - started) * 1000)
             raise HTTPException(503, detail={"code": "AI_UNAVAILABLE", "message": "Dịch vụ trả lời đang bận. Vui lòng thử lại."})
