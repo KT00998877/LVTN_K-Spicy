@@ -45,7 +45,7 @@
         <form v-if="order.status === 'SENT'" class="purchase-order-section" @submit.prevent="acceptOrder" novalidate>
           <div class="purchase-order-section__heading"><div><h3>Phản hồi yêu cầu</h3><p class="purchase-order-help">Xác nhận số lượng có thể cung cấp. Đơn giá lấy từ bảng Giá nhập khi nhà hàng gửi yêu cầu.</p></div></div>
           <div class="purchase-order-form-grid">
-            <div class="purchase-order-field"><label for="supplier-delivery-date">Ngày dự kiến giao</label><input id="supplier-delivery-date" v-model="deliveryDate" class="purchase-order-input" type="date" required :disabled="busy"></div>
+            <div class="purchase-order-field"><label for="supplier-delivery-date">Ngày dự kiến giao</label><input id="supplier-delivery-date" v-model="deliveryDate" class="purchase-order-input" type="date" :min="today" required :disabled="busy"></div>
             <div class="purchase-order-field"><label for="supplier-accept-note">Ghi chú</label><input id="supplier-accept-note" v-model.trim="supplierNote" class="purchase-order-input" maxlength="2000" :disabled="busy"></div>
           </div>
           <div class="purchase-orders__table-wrap">
@@ -105,20 +105,22 @@ const busy = ref(false)
 const loadError = ref('')
 const formError = ref('')
 const deliveryDate = ref('')
+const today = ref(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }))
 const supplierNote = ref('')
 const rejectionReason = ref('')
 const acceptLines = ref<AcceptLine[]>([])
 const shipLines = ref<ShipLine[]>([])
 
-async function open(selected: PurchaseOrder) { orderId.value = selected.id; order.value = selected; formError.value = ''; rejectionReason.value = ''; syncForm(); dialog.value?.showModal(); await reload() }
+async function open(selected: PurchaseOrder) { today.value = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }); orderId.value = selected.id; order.value = selected; formError.value = ''; rejectionReason.value = ''; syncForm(); dialog.value?.showModal(); await reload() }
 async function reload() { if (!orderId.value) return; loading.value = true; loadError.value = ''; try { order.value = (await supplierPurchaseOrdersApi.get(orderId.value)).data.data; syncForm() } catch (error) { loadError.value = purchaseOrderError(error) } finally { loading.value = false } }
-function syncForm() { if (!order.value) return; deliveryDate.value = order.value.supplier_delivery_date || order.value.requested_delivery_date || ''; supplierNote.value = order.value.supplier_note || ''; acceptLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, requested: item.requested_purchase_quantity, quantity: item.supplier_accepted_quantity ?? item.requested_purchase_quantity, price: item.purchase_unit_price ?? 0 })); shipLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, accepted: item.supplier_accepted_quantity ?? 0, quantity: item.shipped_purchase_quantity ?? item.supplier_accepted_quantity ?? 0, expiryMonths: 1 })) }
+function syncForm() { if (!order.value) return; deliveryDate.value = [order.value.supplier_delivery_date, order.value.requested_delivery_date, today.value].filter(Boolean).sort().at(-1) || today.value; supplierNote.value = order.value.supplier_note || ''; acceptLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, requested: item.requested_purchase_quantity, quantity: item.supplier_accepted_quantity ?? item.requested_purchase_quantity, price: item.purchase_unit_price ?? 0 })); shipLines.value = order.value.items.map((item) => ({ id: item.id, name: item.ingredient_name || item.ingredient_code || 'Nguyên liệu', unit: item.purchase_unit, accepted: item.supplier_accepted_quantity ?? 0, quantity: item.shipped_purchase_quantity ?? item.supplier_accepted_quantity ?? 0, expiryMonths: 1 })) }
 function close() { if (!busy.value) dialog.value?.close() }
 function onCancel(event: Event) { if (busy.value) event.preventDefault() }
 async function showError(error: unknown) { formError.value = error instanceof Error ? error.message : purchaseOrderError(error); await nextTick(); errorSummary.value?.focus() }
 
 async function acceptOrder() {
   if (!order.value || busy.value) return
+  if (deliveryDate.value && deliveryDate.value < new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })) return showError(new Error('Ngày dự kiến giao không được ở quá khứ.'))
   const invalid = !deliveryDate.value || acceptLines.value.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > line.requested)
   if (invalid) return showError(new Error('Ngày giao và số chấp nhận nguyên dương không vượt yêu cầu là bắt buộc.'))
   if (!await appDialog.confirm({ title: `Chấp nhận ${order.value.code}?`, message: 'Số lượng, đơn giá và ngày giao sẽ được gửi cho nhà hàng. Sau khi xác nhận, bạn không thể sửa phản hồi này.', confirmLabel: 'Chấp nhận yêu cầu' })) return

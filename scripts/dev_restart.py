@@ -1,4 +1,4 @@
-"""Start the local Laravel, chatbot, Reverb, queue, Vite, and Flutter Chrome stack.
+"""Start the local Laravel, chatbot, Reverb, queue, and Vite stack.
 
 Run from any directory: python scripts/dev_restart.py
 Ctrl+C stops only the processes started by this launcher. Logs are written to
@@ -62,7 +62,6 @@ def wait_for_port(process: subprocess.Popen, port: int, name: str) -> None:
 def main() -> None:
     php = require_command("php")
     npm = require_command("npm.cmd" if os.name == "nt" else "npm")
-    flutter = require_command("flutter.bat" if os.name == "nt" else "flutter")
     if not (ROOT / "front-end" / "node_modules").is_dir():
         raise SystemExit("Run npm install in front-end first.")
     for port in (8000, 8002, 8080, 5173):
@@ -108,10 +107,14 @@ def main() -> None:
         if queue.poll() is not None:
             raise RuntimeError("Queue worker did not start. Check its dev-restart log.")
 
+        scheduler = start("scheduler", [php, "artisan", "schedule:work"], "back-end")
+        time.sleep(1)
+        if scheduler.poll() is not None:
+            raise RuntimeError("Scheduler did not start. Check its dev-restart log.")
+
         vite = start("vite", [npm, "run", "dev", "--", "--host", "0.0.0.0"], "front-end")
         wait_for_http(vite, "http://127.0.0.1:5173", "Vite")
 
-        start("flutter", [flutter, "run", "-d", "chrome"], "mobile")
         print("All services started. Press Ctrl+C to stop them.", flush=True)
         while True:
             for name, process, _ in processes:

@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
  * và dispatch job gửi cho từng chiến dịch.
  *
  * Đăng ký trong routes/console.php:
- *   Schedule::command('marketing:send-campaigns')->everyTenMinutes()->withoutOverlapping();
+ *   Schedule::command('marketing:send-campaigns')->everyMinute()->withoutOverlapping();
  */
 class SendMarketingCampaignsCommand extends Command
 {

@@ -46,7 +46,7 @@ const reorderResult = ref<ReorderResult | null>(null)
 const reorderError = ref('')
 
 async function reorder(): Promise<void> {
-    if (!current.value || reordering.value || !cartStore.canMutate) return
+    if (!current.value || !canReorder.value || reordering.value || !cartStore.canMutate) return
     reordering.value = true
     reorderResult.value = null
     reorderError.value = ''
@@ -62,6 +62,7 @@ async function reorder(): Promise<void> {
     }
 }
 const { current, loadingDetail, loadingPayment, loadingCancel, error } = storeToRefs(orderStore)
+const canReorder = computed(() => current.value?.status === 'COMPLETED' || current.value?.status === 'CANCELLED')
 
 /* ---------------- Status maps ---------------- */
 
@@ -514,7 +515,7 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
             </div>
 
             <template v-else>
-                <section class="detail-card" aria-label="Đặt lại đơn cũ">
+                <section v-if="canReorder" class="detail-card" aria-label="Đặt lại đơn cũ">
                     <button type="button" class="au-btn au-btn-primary" :disabled="reordering || !cartStore.canMutate" @click="reorder">
                         {{ reordering ? 'Đang kiểm tra món...' : 'Đặt lại' }}
                     </button>

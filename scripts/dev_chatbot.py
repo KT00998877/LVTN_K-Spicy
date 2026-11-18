@@ -49,6 +49,7 @@ def main():
         # (thanh toán, thông báo…). Live chat đã chuyển sang broadcast trực
         # tiếp nên không phụ thuộc worker này.
         ("queue", [php, "artisan", "queue:work", "--tries=3", "--sleep=1"], "back-end", None),
+        ("scheduler", [php, "artisan", "schedule:work"], "back-end", None),
     ]
     try:
         for name, command, folder, url in services:

@@ -13,19 +13,17 @@ const router = useRouter()
 const panel = ref<HTMLDialogElement>()
 const open = ref(false)
 const copyState = ref<Record<string, 'idle' | 'copied' | 'failed'>>({})
-const toast = ref<PromoNotification | null>(null)
+const toast = computed(() => store.announcements[0] ?? null)
 
 const connectionLabel = computed(() =>
     store.connected ? 'Cập nhật trực tiếp' : '',
 )
 
 let timer: ReturnType<typeof setTimeout> | undefined
-watch(() => store.latest, value => {
-    if (!value) return
-    toast.value = value
+watch(toast, value => {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => { toast.value = null }, 8000)
-})
+    if (value) timer = setTimeout(() => { store.dismissAnnouncement() }, 8000)
+}, { immediate: true })
 onUnmounted(() => { if (timer) clearTimeout(timer) })
 
 function togglePanel() {
@@ -47,7 +45,7 @@ async function copyCode(code: string, id: string) {
 /** Mở đích đến phù hợp của ưu đãi hoặc cập nhật đơn hàng. */
 async function openNotification(item: PromoNotification) {
     await store.markRead(item)
-    toast.value = null
+    if (toast.value?.id === item.id) store.dismissAnnouncement()
     open.value = false
     if (item.data.url) {
         await router.push(item.data.url)
@@ -134,7 +132,7 @@ async function openNotification(item: PromoNotification) {
                 <span>{{ toast.data.message }}</span>
                 <code v-if="toast.data.voucher_code">{{ toast.data.voucher_code }}</code>
             </button>
-            <button class="close-button" type="button" aria-label="Ẩn thông báo" @click="toast = null">✕</button>
+            <button class="close-button" type="button" aria-label="Ẩn thông báo" @click="store.dismissAnnouncement()">✕</button>
         </aside>
     </div>
 </template>

@@ -20,12 +20,17 @@ class StorePurchaseOrderRequest extends FormRequest
                 'integer',
                 Rule::exists('suppliers', 'id')->where('is_active', true),
             ],
-            'requested_delivery_date' => ['nullable', 'date_format:Y-m-d'],
+            'requested_delivery_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:'.now('Asia/Ho_Chi_Minh')->toDateString()],
             'manager_note' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.ingredient_id' => ['required', 'integer', 'distinct', 'exists:ingredients,id'],
             'items.*.ingredient_packaging_id' => ['nullable', 'integer', 'exists:ingredient_packagings,id'],
             'items.*.requested_purchase_quantity' => ['required', 'integer', 'min:1', 'max:9999999999'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['requested_delivery_date.after_or_equal' => 'Ngày cần giao không được ở quá khứ.'];
     }
 }

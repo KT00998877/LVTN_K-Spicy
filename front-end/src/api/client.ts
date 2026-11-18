@@ -30,6 +30,7 @@ function getChatGuestToken(): string | null {
  * `auth_token`), nên không thể suy ra token từ URL như các endpoint khác.
  */
 const LIVE_CHAT_AUTH_URL = '/live-chat/broadcast-auth'
+const BROADCAST_AUTH_URL = '/broadcasting/auth'
 
 /** Endpoint phía nhân viên nhưng không nằm dưới /staff/ (live chat manager). */
 const STAFF_LIVE_CHAT_URL = '/live-chat/manager/'
@@ -74,6 +75,10 @@ function staleSession(config: InternalAxiosRequestConfig | undefined): boolean {
     // khách), nên không thể so sánh với token "hiện tại" của interceptor.
     if (config.url?.includes(LIVE_CHAT_AUTH_URL)) return false
     const sent = config.headers.Authorization ?? null
+    if (config.url?.includes(BROADCAST_AUTH_URL)) {
+        return sent !== `Bearer ${localStorage.getItem('staff_token')}`
+            && sent !== `Bearer ${localStorage.getItem('auth_token')}`
+    }
     const current = pickToken(config.url)
     return sent !== (current ? `Bearer ${current}` : null)
 }
@@ -97,7 +102,7 @@ apiClient.interceptors.response.use(
 
         // 401 = token hết hạn / không hợp lệ
         if (status === 401) {
-            if (url.includes(LIVE_CHAT_AUTH_URL)) {
+            if (url.includes(LIVE_CHAT_AUTH_URL) || url.includes(BROADCAST_AUTH_URL)) {
                 // Ký kênh realtime: token do caller tự truyền, không nên xoá
                 // phiên đăng nhập nào ở đây.
                 return Promise.reject(error)

@@ -74,7 +74,7 @@ async function submitReturn() {
   const invalid = items.length === 0 || items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > (returnableLines.value.find((line) => line.id === item.stock_import_item_id)?.returnable_quantity ?? 0))
   if (invalid) return showError('Chọn ít nhất một dòng và nhập số lượng nguyên không vượt lượng còn có thể trả.')
   const total = items.reduce((sum, item) => sum + item.quantity, 0)
-  if (!await appDialog.confirm({ title: `Gửi yêu cầu trả từ ${props.order.stock_import?.code}?`, message: `Gửi ${formatQuantity(total)} đơn vị tồn kho cho NCC xem xét. Tồn kho chưa thay đổi.`, confirmLabel: 'Gửi yêu cầu' })) return
+  if (!await appDialog.confirm({ title: `Gửi yêu cầu trả từ ${props.order.stock_import?.code}?`, message: `Gửi ${formatQuantity(total)} đơn vị tồn kho cho Nhà cung cấp xem xét. Tồn kho chưa thay đổi.`, confirmLabel: 'Gửi yêu cầu' })) return
 
   busy.value = true; error.value = ''
   try {

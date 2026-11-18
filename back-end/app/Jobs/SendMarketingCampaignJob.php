@@ -11,8 +11,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * SendMarketingCampaignJob — gửi 1 chiến dịch ưu đãi tới nhóm khách mục tiêu.
  *
- * Job được dispatch bởi command `marketing:send-campaigns` (chạy theo cron
- * mỗi 10 phút). Mỗi campaign là 1 job riêng để nếu 1 chiến dịch lỗi thì
+ * Job được dispatch bởi command `marketing:send-campaigns` (chạy mỗi phút).
+ * Mỗi campaign là 1 job riêng để nếu 1 chiến dịch lỗi thì
  * không chặn các chiến dịch còn lại.
  */
 class SendMarketingCampaignJob implements ShouldQueue

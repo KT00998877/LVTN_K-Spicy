@@ -9,6 +9,39 @@ use Illuminate\Support\Str;
 
 class CustomerOrderNotificationService
 {
+    public function itemCancelled(Order $order, \App\Models\OrderItem $item): void
+    {
+        if (!$order->customer_id) return;
+
+        $id = (string) Str::uuid();
+        $createdAt = now();
+        $data = [
+            'event' => 'ORDER_ITEM_CANCELLED',
+            'order_id' => (int) $order->id,
+            'order_code' => $order->code,
+            'name' => 'Món trong đơn đã bị hủy',
+            'message' => "Nhà hàng xin lỗi: món {$item->item_name} trong đơn {$order->code} không thể phục vụ vì {$item->cancellation_reason}. Tổng tiền đã được cập nhật.",
+            'cta_text' => 'Xem đơn hàng',
+            'url' => '/tai-khoan/don-hang/'.$order->id,
+        ];
+        $inserted = DB::table('notifications')->insertOrIgnore([
+            'id' => $id,
+            'type' => 'customer.order',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $order->customer_id,
+            'data' => json_encode($data, JSON_THROW_ON_ERROR),
+            'deduplication_key' => 'ORDER_ITEM_CANCELLED:'.$item->id.':'.$order->customer_id,
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ]);
+        if ($inserted) {
+            CustomerOrderNotificationCreated::dispatch((int) $order->customer_id, [
+                'id' => $id, 'data' => $data, 'read_at' => null,
+                'created_at' => $createdAt->toIso8601String(),
+            ]);
+        }
+    }
+
     public function refundCompleted(Order $order): void
     {
         if (!$order->customer_id) return;

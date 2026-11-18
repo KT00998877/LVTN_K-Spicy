@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Events\StaffNotificationCreated;
-use App\Models\{Order, User};
+use App\Models\{Order, OrderItem, User};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -43,13 +43,23 @@ class StaffNotificationService
         $this->send($order, (int) $order->shipper_id, 'KITCHEN_READY', 'Đơn hàng đã được chế biến xong, vui lòng đến lấy hàng', '/staff/shipper');
     }
 
+    public function kitchenItemCancelledForShipper(Order $order, OrderItem $item): void
+    {
+        if ($order->order_type !== 'ONLINE' || !$order->shipper_id || !$order->shipper_accepted_at) return;
+
+        $message = $order->status === 'CANCELLED'
+            ? "Đơn {$order->code} đã bị hủy do hết món. Vui lòng kiểm tra đơn hàng."
+            : "Món {$item->item_name} trong đơn {$order->code} đã bị hủy do hết món. Vui lòng kiểm tra đơn hàng đã cập nhật.";
+        $this->send($order, (int) $order->shipper_id, 'KITCHEN_ITEM_CANCELLED', $message, '/staff/shipper', (string) $item->id);
+    }
+
     private function sendRole(Order $order, string $role, string $type, string $message, string $path): void
     {
         $ids = User::where('is_active', true)->whereHas('roles', fn ($q) => $q->where('code', $role))->pluck('id');
         foreach ($ids as $id) $this->send($order, (int) $id, $type, $message, $path);
     }
 
-    private function send(Order $order, int $recipientId, string $type, string $message, string $path): void
+    private function send(Order $order, int $recipientId, string $type, string $message, string $path, ?string $itemKey = null): void
     {
         $id = (string) Str::uuid();
         $data = ['event' => $type, 'order_id' => $order->id, 'order_code' => $order->code,
@@ -58,7 +68,7 @@ class StaffNotificationService
         $inserted = DB::table('notifications')->insertOrIgnore([
             'id' => $id, 'type' => 'staff.order', 'notifiable_type' => User::class,
             'notifiable_id' => $recipientId, 'data' => json_encode($data, JSON_THROW_ON_ERROR),
-            'deduplication_key' => $type.':'.$order->id.':'.$recipientId,
+            'deduplication_key' => $type.':'.$order->id.($itemKey !== null ? ':'.$itemKey : '').':'.$recipientId,
             'created_at' => $createdAt, 'updated_at' => $createdAt,
         ]);
         if ($inserted) {

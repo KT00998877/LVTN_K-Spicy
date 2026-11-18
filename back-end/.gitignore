@@ -30,6 +30,7 @@ Thumbs.db
 /tests/*
 !/tests/Feature/
 /tests/Feature/*
+!/tests/Feature/FlashSaleListingTest.php
 !/tests/Feature/MarketingRealMenuCoverTest.php
 !/tests/Feature/TablePaymentTest.php
 !/tests/Feature/GoogleLoginTest.php

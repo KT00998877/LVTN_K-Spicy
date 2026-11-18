@@ -90,6 +90,7 @@ class CategoriesAndMenuItemsSeeder extends Seeder
 
         // ===== BƯỚC 4: Topping thêm =====
         $toppings = [
+            ['name' => 'Thêm mì', 'description' => '1 gói', 'price' => 20000, 'preparation_minutes' => 3],
             ['name' => 'Thêm trứng',           'price' => 10000, 'preparation_minutes' => 2, 'image_key' => 'bo-them'],
             ['name' => 'Thêm gà',         'price' => 30000, 'preparation_minutes' => 3, 'image_key' => 'ga-them'],
             ['name' => 'Thêm tôm ',        'price' => 25000, 'preparation_minutes' => 3, 'image_key' => 'tom-them'],
@@ -179,7 +180,7 @@ class CategoriesAndMenuItemsSeeder extends Seeder
                 'category_id' => $categoryId,
                 'name' => $item['name'],
                 'slug' => $slug,
-                'description' => null,
+                'description' => $item['description'] ?? null,
                 'spicy_level' => 0,
                 'size' => null,
                 'image_url' => $this->menuImage($item['image_key'] ?? null),

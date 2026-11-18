@@ -331,14 +331,15 @@ class StaffOrderService
             if ($order->order_type === 'ONLINE' || $order->order_type === 'TAKEAWAY') {
                 abort_unless($order->confirmed_at && in_array($order->status, ['CONFIRMED', 'PREPARING', 'READY', 'READY_NOTIFY_SHIPPER']),
                     409, 'Đơn giao hàng cần được xác nhận trước khi bếp chế biến.');
-                abort_unless(in_array($status, ['PREPARING', 'READY']), 409,
+                abort_unless(in_array($status, ['PREPARING', 'READY', 'CANCELLED']), 409,
                     'Đơn giao hàng chỉ chuyển tiến trong bếp; hoàn tất qua shipper.');
                 // COD: hóa đơn có thể chưa thanh toán → bếp vẫn nấu được
                 // PREPAID: cần thanh toán trước (đã kiểm tra ở OnlineOrderService::confirm)
             }
             if ($status === 'CANCELLED') {
-                abort_if(DB::table('invoices')->where('order_id', $order->id)->exists(), 409,
-                    'Đơn đã lập hóa đơn; không được hủy món riêng lẻ.');
+                $invoice = DB::table('invoices')->where('order_id', $order->id)->lockForUpdate()->first();
+                abort_if($invoice && $invoice->status !== 'UNPAID', 409,
+                    'Đơn đã thanh toán không thể huỷ món.');
             }
 
             /** @var OrderItem|null $item */
@@ -444,7 +445,20 @@ class StaffOrderService
             }
             $order->save();
 
-            if ($status === 'CANCELLED') $this->recalcOrderTotals($order);
+            if ($status === 'CANCELLED') {
+                $this->recalcOrderTotals($order);
+                if (isset($invoice) && $invoice) {
+                    DB::table('invoices')->where('id', $invoice->id)->update([
+                        'subtotal' => $order->subtotal,
+                        'total_amount' => $order->total_amount,
+                        'updated_at' => now(),
+                    ]);
+                }
+                app(CustomerOrderNotificationService::class)->itemCancelled($order, $item);
+                if ($reason && (str_contains($reason, 'Hết nguyên liệu') || str_contains($reason, 'Hết món'))) {
+                    app(StaffNotificationService::class)->kitchenItemCancelledForShipper($order, $item);
+                }
+            }
 
             return [
                 'order'       => $this->formatOrderDetail($order->fresh()->load(['items.toppings.topping'])),
@@ -463,7 +477,7 @@ class StaffOrderService
             ->where('status', '!=', 'CANCELLED')
             ->sum('subtotal');
         $order->subtotal = $subtotal;
-        $order->total_amount = max(0, $subtotal - (float) $order->discount_amount);
+        $order->total_amount = max(0, $subtotal - (float) $order->discount_amount + (float) $order->shipping_fee);
         $order->save();
     }
 

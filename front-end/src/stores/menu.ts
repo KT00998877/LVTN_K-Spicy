@@ -78,9 +78,6 @@ export const useMenuStore = defineStore('menu', {
             if (!quiet) {
                 this.loadingMore = false
                 this.loadMoreError = null
-                this.items = []
-                this.currentPage = 0
-                this.lastPage = 1
             }
             const fresh = beginRead(this, 'items', quiet)
             try {

@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { claimPromotion, fetchFeaturedPromotions, type FeaturedPromotion } from '@/api/promotions'
 import { useAuthStore } from '@/stores/auth'
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -23,15 +24,19 @@ const claimError = ref('')
 
 const active = computed<FeaturedPromotion | null>(() => promos.value[activeIndex.value] ?? null)
 
-onMounted(async () => {
+async function refreshPromos() {
     try {
         promos.value = await fetchFeaturedPromotions()
+        if (activeIndex.value >= promos.value.length) activeIndex.value = 0
     } catch {
-        promos.value = []
+        // Giữ banner đang hiển thị khi lần làm mới tạm thời thất bại.
     } finally {
         loading.value = false
     }
-})
+}
+
+onMounted(refreshPromos)
+useRealtimeRefresh(refreshPromos, () => !loading.value, 10000)
 
 async function copyCode(code: string, index: number) {
     try {

@@ -45,6 +45,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
     const loading = ref(false)
     const error = ref('')
     const latest = ref<PromoNotification | null>(null)
+    const announcements = ref<PromoNotification[]>([])
 
     let echo: Echo<'reverb'> | null = null
     let retry: ReturnType<typeof setInterval> | undefined
@@ -71,7 +72,11 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
             items.value = [...new Map(merged.map(item => [item.id, item])).values()]
             unreadCount.value = response.data.unread_count
             error.value = ''
-            if (newItems.length) { latest.value = newItems[0] ?? null; playSound() }
+            if (newItems.length) {
+                announcements.value.push(...newItems.reverse())
+                latest.value = newItems[newItems.length - 1] ?? null
+                playSound()
+            }
         } catch {
             if (generation === currentGeneration) error.value = 'Chưa tải được thông báo. Hệ thống sẽ tự thử lại.'
         } finally {
@@ -126,6 +131,10 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         }
     }
 
+    function dismissAnnouncement() {
+        announcements.value.shift()
+    }
+
     function stop() {
         generation++
         revision++
@@ -139,6 +148,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
         seen.clear()
         initialized = false
         latest.value = null
+        announcements.value = []
         unreadCount.value = 0
         error.value = ''
         void audio?.close()
@@ -204,6 +214,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
                 items.value.unshift(item)
                 unreadCount.value++
                 latest.value = item
+                announcements.value.push(item)
                 playSound()
             })
             .listen('.customer.order.created', (item: PromoNotification) => {
@@ -213,6 +224,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
                 items.value.unshift(item)
                 unreadCount.value++
                 latest.value = item
+                announcements.value.push(item)
                 playSound()
             })
             .listen('.customer.notification.read', ({ id }: { id: string }) => {
@@ -228,7 +240,7 @@ export const useCustomerNotificationsStore = defineStore('customerNotifications'
     }
 
     return {
-        items, unreadCount, connected, loading, error, latest,
-        start, stop, fetchPage, markRead, markAllRead, playSound,
+        items, unreadCount, connected, loading, error, latest, announcements,
+        start, stop, fetchPage, markRead, markAllRead, playSound, dismissAnnouncement,
     }
 })

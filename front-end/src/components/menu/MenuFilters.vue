@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMenuStore } from '@/stores/menu'
 import type { MenuSize } from '@/types/menu'
@@ -20,19 +20,51 @@ function selectSize(size: MenuSize | null) {
     void store.setFilter('size', size)
 }
 
-function setMinPrice(e: Event) {
-    const v = (e.target as HTMLInputElement).value
-    const n = v === '' ? null : Number(v)
-    void store.setFilter('min_price', isNaN(n as number) ? null : n)
+const minPrice = ref(String(filters.value.min_price ?? ''))
+const maxPrice = ref(String(filters.value.max_price ?? ''))
+let priceTimer: ReturnType<typeof setTimeout> | undefined
+const money = (value: string) => `${new Intl.NumberFormat('vi-VN').format(Number(value))}₫`
+const priceSummary = computed(() => {
+    if (minPrice.value && maxPrice.value) return `${money(minPrice.value)} – ${money(maxPrice.value)}`
+    if (minPrice.value) return `Từ ${money(minPrice.value)}`
+    if (maxPrice.value) return `Đến ${money(maxPrice.value)}`
+    return 'Không giới hạn'
+})
+
+watch(() => [filters.value.min_price, filters.value.max_price], ([min, max]) => {
+    minPrice.value = String(min ?? '')
+    maxPrice.value = String(max ?? '')
+})
+
+function applyPrices() {
+    if (priceTimer) clearTimeout(priceTimer)
+    priceTimer = undefined
+    const min = minPrice.value === '' ? null : Number(minPrice.value)
+    const max = maxPrice.value === '' ? null : Number(maxPrice.value)
+    if (min === filters.value.min_price && max === filters.value.max_price) return
+    void store.setFilters({ min_price: min, max_price: max })
 }
 
-function setMaxPrice(e: Event) {
-    const v = (e.target as HTMLInputElement).value
-    const n = v === '' ? null : Number(v)
-    void store.setFilter('max_price', isNaN(n as number) ? null : n)
+function onPriceInput(key: 'min' | 'max', event: Event) {
+    const value = (event.target as HTMLInputElement).value
+    if (key === 'min') minPrice.value = value
+    else maxPrice.value = value
+    if (priceTimer) clearTimeout(priceTimer)
+    priceTimer = setTimeout(applyPrices, 350)
 }
+
+function clearPrices() {
+    if (priceTimer) clearTimeout(priceTimer)
+    priceTimer = undefined
+    minPrice.value = ''
+    maxPrice.value = ''
+    void store.setFilters({ min_price: null, max_price: null })
+}
+
+onUnmounted(() => { if (priceTimer) clearTimeout(priceTimer) })
 
 function reset() {
+    if (priceTimer) clearTimeout(priceTimer)
     void store.resetFilters()
     showExtraFilters.value = false
 }
@@ -99,29 +131,18 @@ function getCategoryIcon(slug: string): string {
 
                 <div class="filter-section">
                     <h4 class="filter-section-title">Khoảng giá</h4>
+                    <p class="price-summary" aria-live="polite">{{ priceSummary }}</p>
                     <div class="price-inputs">
-                        <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            placeholder="Từ (đ)"
-                            :value="filters.min_price ?? ''"
-                            @change="setMinPrice"
-                            class="price-input"
-                            aria-label="Giá tối thiểu"
-                        />
-                        <span class="price-dash">—</span>
-                        <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            placeholder="Đến (đ)"
-                            :value="filters.max_price ?? ''"
-                            @change="setMaxPrice"
-                            class="price-input"
-                            aria-label="Giá tối đa"
-                        />
+                        <label class="price-field">
+                            <span>Giá từ</span>
+                            <span class="price-control"><input type="number" min="0" step="1000" inputmode="numeric" placeholder="10000" :value="minPrice" @input="onPriceInput('min', $event)" @blur="applyPrices" class="price-input" /><span>₫</span></span>
+                        </label>
+                        <label class="price-field">
+                            <span>Giá đến</span>
+                            <span class="price-control"><input type="number" min="0" step="1000" inputmode="numeric" placeholder="180000" :value="maxPrice" @input="onPriceInput('max', $event)" @blur="applyPrices" class="price-input" /><span>₫</span></span>
+                        </label>
                     </div>
+                    <button v-if="minPrice || maxPrice" type="button" class="clear-price" @click="clearPrices">Xóa khoảng giá</button>
                 </div>
 
                 <button v-if="store.activeFilterCount > 0" type="button" class="reset-filters-btn" @click="reset">
@@ -175,29 +196,18 @@ function getCategoryIcon(slug: string): string {
 
             <div class="filter-group">
                 <h4 class="filter-group-title">Khoảng giá</h4>
+                <p class="price-summary" aria-live="polite">{{ priceSummary }}</p>
                 <div class="price-inputs">
-                    <input
-                        type="number"
-                        min="0"
-                        step="1000"
-                        placeholder="Từ"
-                        :value="filters.min_price ?? ''"
-                        @change="setMinPrice"
-                        class="price-input"
-                        aria-label="Giá tối thiểu"
-                    />
-                    <span class="price-dash">—</span>
-                    <input
-                        type="number"
-                        min="0"
-                        step="1000"
-                        placeholder="Đến"
-                        :value="filters.max_price ?? ''"
-                        @change="setMaxPrice"
-                        class="price-input"
-                        aria-label="Giá tối đa"
-                    />
+                    <label class="price-field">
+                        <span>Giá từ</span>
+                        <span class="price-control"><input type="number" min="0" step="1000" inputmode="numeric" placeholder="10000" :value="minPrice" @input="onPriceInput('min', $event)" @blur="applyPrices" class="price-input" /><span>₫</span></span>
+                    </label>
+                    <label class="price-field">
+                        <span>Giá đến</span>
+                        <span class="price-control"><input type="number" min="0" step="1000" inputmode="numeric" placeholder="180000" :value="maxPrice" @input="onPriceInput('max', $event)" @blur="applyPrices" class="price-input" /><span>₫</span></span>
+                    </label>
                 </div>
+                <button v-if="minPrice || maxPrice" type="button" class="clear-price" @click="clearPrices">Xóa khoảng giá</button>
             </div>
         </div>
     </aside>
@@ -381,41 +391,81 @@ function getCategoryIcon(slug: string): string {
 }
 
 .price-inputs {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
 }
 
-.price-input-wrap {
-    flex: 1;
+.price-summary {
+    margin: -4px 0 12px;
+    color: var(--color-chili-red);
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
+
+.price-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 6px;
+    color: var(--color-gray-600);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.price-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    padding: 0 9px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+    color: var(--color-gray-500);
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.price-control:hover { border-color: var(--color-gray-400); }
+.price-control:focus-within { border-color: var(--color-chili-red); box-shadow: 0 0 0 3px rgba(215, 25, 32, 0.12); }
 
 .price-input {
     width: 100%;
-    height: 40px;
-    padding: 0 12px;
-    border: 1.5px solid var(--color-gray-200);
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-family: inherit;
-    background: var(--color-white);
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
     color: var(--color-charcoal-black);
-    transition: border-color var(--dur-fast) var(--ease-out);
+    font: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
 }
 
-.price-input:focus {
-    outline: none;
-    border-color: var(--color-chili-red);
-}
+.price-control > span { padding-left: 4px; font-size: 13px; font-weight: 700; }
+.price-input::-webkit-inner-spin-button, .price-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.price-input { appearance: textfield; }
 
 .price-input::placeholder {
     color: var(--color-gray-400);
 }
 
-.price-dash {
-    color: var(--color-gray-400);
-    font-weight: 600;
+.clear-price {
+    margin-top: 10px;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-chili-red);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
 }
+
+.clear-price:hover { text-decoration: underline; }
+.clear-price:focus-visible { outline: 2px solid var(--color-chili-red); outline-offset: 3px; }
 
 .reset-filters-btn {
     width: 100%;

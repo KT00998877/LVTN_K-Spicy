@@ -21,7 +21,7 @@
           </div>
           <div class="purchase-order-field">
             <label for="po-delivery-date">Ngày cần giao <span class="purchase-order-muted">(không bắt buộc)</span></label>
-            <input id="po-delivery-date" v-model="form.requested_delivery_date" class="purchase-order-input" type="date" />
+            <input id="po-delivery-date" v-model="form.requested_delivery_date" class="purchase-order-input" type="date" :min="today" />
           </div>
           <div class="purchase-order-field purchase-order-form-grid__wide">
             <label for="po-manager-note">Ghi chú cho nhà cung cấp <span class="purchase-order-muted">(không bắt buộc)</span></label>
@@ -183,6 +183,7 @@ function linePrice(line: FormLine): number | null {
 }
 
 const formatMoney = (value: number) => `${Number(value).toLocaleString('vi-VN')} đ`
+const today = ref(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }))
 
 function selectIngredient(line: FormLine) {
   const defaultPackaging = packagingOptions(line).find((packaging) => packaging.is_default) ?? packagingOptions(line)[0]
@@ -190,6 +191,7 @@ function selectIngredient(line: FormLine) {
 }
 
 function open(order: PurchaseOrder | null = null) {
+  today.value = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
   editing.value = order
   suggested.value = false
   error.value = ''
@@ -244,6 +246,11 @@ function onCancel(event: Event) {
 async function submit() {
   if (saving.value) return
   error.value = ''
+  if (form.requested_delivery_date && form.requested_delivery_date < new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })) {
+    error.value = 'Ngày cần giao không được ở quá khứ.'
+    await focusError()
+    return
+  }
   const currentSupplierId = supplierId.value
   if (!currentSupplierId) {
     error.value = 'Không tìm thấy Nhà cung cấp K trong danh sách nguyên liệu.'

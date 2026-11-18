@@ -25,7 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withBroadcasting(__DIR__.'/../routes/channels.php', [
-        'prefix' => 'api', 'middleware' => ['api', 'auth:sanctum', 'staff:MANAGER,KITCHEN,SHIPPER'],
+        'prefix' => 'api', 'middleware' => ['api', 'auth:sanctum'],
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);

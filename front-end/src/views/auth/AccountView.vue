@@ -203,6 +203,9 @@ async function onLogout() {
 
 // ===== Orders =====
 const orderFilter = ref<OrderStatus | ''>('')
+const primaryOrderStatuses: OrderStatus[] = ['PENDING', 'PREPARING', 'DELIVERING', 'COMPLETED']
+const otherOrderStatuses: OrderStatus[] = ['CONFIRMED', 'READY', 'SERVED', 'DELIVERED', 'CANCELLED']
+const otherOrderStatusSelected = computed(() => otherOrderStatuses.includes(orderFilter.value as OrderStatus))
 
 async function loadOrders() {
     await orderStore.fetchList({
@@ -212,8 +215,13 @@ async function loadOrders() {
     })
 }
 
-function onFilterChange() {
-    loadOrders()
+function selectOrderFilter(status: OrderStatus | '') {
+    orderFilter.value = status
+    void loadOrders()
+}
+
+function onOtherOrderStatusChange(event: Event) {
+    selectOrderFilter((event.target as HTMLSelectElement).value as OrderStatus)
 }
 
 function viewOrderDetail(id: number) {
@@ -434,7 +442,7 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
             </div>
 
             <!-- Tabs -->
-            <div class="account-tabs">
+            <nav class="account-tabs" aria-label="Mục tài khoản">
                 <button
                     type="button"
                     class="tab-btn"
@@ -508,7 +516,7 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon><line x1="12" y1="17" x2="12" y2="17.01"></line></svg>
                     Đánh giá của tôi
                 </button>
-            </div>
+            </nav>
 
             <!-- ============== TAB: PROFILE ============== -->
             <section v-show="activeTab === 'profile'" class="account-card">
@@ -623,33 +631,44 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
 
             <!-- ============== TAB: ORDERS ============== -->
             <section v-show="activeTab === 'orders'" class="account-card">
-                <div class="card-head">
+                <div class="card-head orders-head">
                     <h2>Đơn hàng của tôi</h2>
-                    <button class="btn-edit" @click="loadOrders" :disabled="loadingList">
+                    <button class="btn-edit orders-refresh" @click="loadOrders" :disabled="loadingList">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                         Tải lại
                     </button>
                 </div>
 
-                <div class="order-filter">
+                <div class="order-filter" role="group" aria-label="Lọc đơn hàng theo trạng thái">
                     <button
                         type="button"
                         class="filter-chip"
                         :class="{ active: orderFilter === '' }"
-                        @click="orderFilter = ''; onFilterChange()"
+                        :aria-pressed="orderFilter === ''"
+                        @click="selectOrderFilter('')"
                     >
                         Tất cả
+                        <span v-if="orderFilter === '' && !loadingList" class="filter-count">{{ orderMeta.total }}</span>
                     </button>
                     <button
-                        v-for="key in (['PENDING','CONFIRMED','PREPARING','READY','SERVED','DELIVERING','DELIVERED','COMPLETED','CANCELLED'] as OrderStatus[])"
+                        v-for="key in primaryOrderStatuses"
                         :key="key"
                         type="button"
                         class="filter-chip"
                         :class="{ active: orderFilter === key }"
-                        @click="orderFilter = key; onFilterChange()"
+                        :aria-pressed="orderFilter === key"
+                        @click="selectOrderFilter(key)"
                     >
                         {{ STATUS_LABELS[key].label }}
+                        <span v-if="orderFilter === key && !loadingList" class="filter-count">{{ orderMeta.total }}</span>
                     </button>
+                    <label class="filter-more" :class="{ active: otherOrderStatusSelected }">
+                        <select aria-label="Trạng thái khác" :value="otherOrderStatusSelected ? orderFilter : ''" @change="onOtherOrderStatusChange">
+                            <option value="" disabled>Trạng thái khác</option>
+                            <option v-for="key in otherOrderStatuses" :key="key" :value="key">{{ STATUS_LABELS[key].label }}</option>
+                        </select>
+                        <span v-if="otherOrderStatusSelected && !loadingList" class="filter-more-count" aria-label="Số đơn ở trạng thái đang chọn">{{ orderMeta.total }}</span>
+                    </label>
                 </div>
 
                 <div v-if="loadingList && orders.length === 0" class="order-state">
@@ -1143,21 +1162,21 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
 
 /* Tabs */
 .account-tabs {
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
     margin-bottom: 32px;
     background: var(--color-white);
     padding: 8px;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
-    overflow-x: auto;
     border: 1px solid var(--color-gray-100);
 }
 
 .tab-btn {
-    flex: 1;
-    min-width: max-content;
-    padding: 12px 24px;
+    min-width: 0;
+    min-height: 54px;
+    padding: 10px 12px;
     border: 0;
     background: transparent;
     border-radius: var(--radius-lg);
@@ -1168,8 +1187,23 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    text-align: left;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.tab-btn svg { flex: 0 0 18px; }
+
+.tab-btn:focus-visible {
+    outline: 3px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+    .account-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .tab-btn:hover {
@@ -1431,15 +1465,34 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
 }
 
 /* Order filter */
+.orders-head {
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.orders-head h2 { letter-spacing: -0.02em; }
+
+.orders-refresh {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
 .order-filter {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 24px;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
 .filter-chip {
-    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 42px;
+    padding: 8px 13px;
     border: 1px solid var(--color-gray-200);
     background: var(--color-white);
     border-radius: var(--radius-full);
@@ -1458,7 +1511,68 @@ useRealtimeRefresh(() => orderStore.fetchList(orderStore.lastQuery, false, true)
 .filter-chip.active {
     background: var(--color-brand-primary);
     color: var(--color-white);
-    border-color: var(--color-charcoal-black);
+    border-color: var(--color-brand-primary);
+}
+
+.filter-count, .filter-more-count {
+    min-width: 20px;
+    padding: 2px 5px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.2);
+    color: inherit;
+    font-size: 11px;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.filter-more {
+    position: relative;
+    min-width: 160px;
+    max-width: 100%;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-full);
+    background: var(--color-white);
+    color: var(--color-gray-500);
+}
+
+.filter-more::after {
+    content: '⌄';
+    position: absolute;
+    right: 13px;
+    top: 50%;
+    transform: translateY(-55%);
+    pointer-events: none;
+}
+
+.filter-more.active {
+    border-color: var(--color-brand-primary);
+    background: var(--color-brand-primary);
+    color: var(--color-white);
+}
+
+.filter-more select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 36px 8px 13px;
+    border: 0;
+    border-radius: inherit;
+    appearance: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.filter-more:has(.filter-more-count) select { padding-right: 60px; }
+.filter-more option { color: var(--color-charcoal-black); background: var(--color-white); }
+.filter-more-count { position: absolute; right: 28px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.filter-chip:focus-visible, .filter-more:focus-within { outline: 3px solid var(--color-brand-primary); outline-offset: 2px; }
+
+@media (max-width: 480px) {
+    .orders-head h2 { font-size: 21px; }
+    .filter-chip { font-size: 13px; }
 }
 
 /* Spinner */

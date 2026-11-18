@@ -50,13 +50,14 @@ class MenuController extends Controller
             ->where('m.flash_sale_starts_at', '<=', $now)
             ->where('m.flash_sale_ends_at', '>', $now)
             ->orderBy('m.flash_sale_ends_at')->orderBy('m.id')
-            ->get(['m.id', 'm.name', 'm.slug', 'm.price', 'm.flash_sale_discount',
+            ->get(['m.id', 'm.name', 'm.slug', 'm.image_url', 'm.price', 'm.flash_sale_discount',
                 'm.flash_sale_starts_at', 'm.flash_sale_ends_at', 'm.is_available',
                 'm.auto_availability_enabled'])
             ->filter(fn ($item) => $availability->status($item)['is_available'])
             ->map(fn ($item) => [
                 'name' => $item->name,
                 'slug' => $item->slug,
+                'image_url' => $item->image_url,
                 'flash_sale' => $sales->activeFor($item, $now),
             ])->values();
 

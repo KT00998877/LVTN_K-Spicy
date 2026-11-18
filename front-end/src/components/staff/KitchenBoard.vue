@@ -13,13 +13,13 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
  * - Clear overdue highlighting without chaos
  */
 
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useKitchenStore, ShortageError } from '@/stores/staffKitchen'
 import { useToast } from '@/composables/useStaffUtils'
 import { useAppDialog } from '@/composables/useAppDialog'
 import type { OrderItemStatus } from '@/types/staff'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import type { KitchenItem, KitchenShortage } from '@/api/staff'
 import { staffKitchen } from '@/api/staff'
 import ShortageDialog from '@/components/staff/ShortageDialog.vue'
@@ -34,13 +34,17 @@ const { pendingItems, preparingItems, readyItems, loading, error, updatingIds } 
 const toast = useToast()
 const appDialog = useAppDialog()
 const router = useRouter()
+const activeOrderType = ref<KitchenItem['order']['order_type']>('DINE_IN')
+const initialTabSelected = ref(false)
+const tabChosenManually = ref(false)
 const route = useNotificationOrderTarget(() => {
-    const groups = new Map<number, { id: number; status: string }>()
+    const groups = new Map<number, { id: number; status: string; order_type: KitchenItem['order']['order_type'] }>()
     for (const entry of [...pendingItems.value, ...preparingItems.value, ...readyItems.value]) {
-        if (!groups.has(entry.order.id)) groups.set(entry.order.id, { id: entry.order.id, status: entry.item.status })
+        if (!groups.has(entry.order.id)) groups.set(entry.order.id, { id: entry.order.id, status: entry.item.status, order_type: entry.order.order_type })
     }
     return [...groups.values()]
 }, order => {
+    activeOrderType.value = order.order_type
     const paths: Record<string, string> = { PENDING: 'queue', PREPARING: 'preparing', READY: 'ready' }
     if (order.status !== props.status) void router.replace({ path: `/staff/kitchen/${paths[order.status]}`, query: { order_id: order.id } })
 })
@@ -57,7 +61,10 @@ const shortageTarget = ref<{ orderId: number; itemId: number; dishName: string; 
 
 onMounted(() => {
     clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
-    void refresh()
+    void refresh().finally(() => {
+        if (!tabChosenManually.value) selectTabWithOrders()
+        initialTabSelected.value = true
+    })
 
 })
 
@@ -113,19 +120,50 @@ const sections = computed(() => {
     const sorted = [...groups.values()].sort(
         (a, b) => (a.order.placed_at ? Date.parse(a.order.placed_at) : 0) - (b.order.placed_at ? Date.parse(b.order.placed_at) : 0) || a.order.id - b.order.id
     )
-    return [
+    const orderTypes: { type: KitchenItem['order']['order_type']; label: string; icon: string }[] = [
         { type: 'DINE_IN', label: 'Tại bàn', icon: '🪑' },
         { type: 'TAKEAWAY', label: 'Mang đi', icon: '📦' },
         { type: 'ONLINE', label: 'Trực tuyến', icon: '🛵' },
-    ].filter(section => {
-        if (section.type === 'ONLINE') return sorted.some(g => g.order.order_type === 'ONLINE')
-        return true
-    }).map(section => ({
+    ]
+    return orderTypes.map(section => ({
         ...section,
         orders: sorted.filter(g => g.order.order_type === section.type),
         count: sorted.filter(g => g.order.order_type === section.type).length
     }))
 })
+
+function selectTabWithOrders(): void {
+    const linkedOrderId = Number(route.query.order_id)
+    const linkedOrder = linkedOrderId ? items.value.find(entry => entry.order.id === linkedOrderId) : undefined
+    if (linkedOrder) {
+        activeOrderType.value = linkedOrder.order.order_type
+        return
+    }
+
+    const available = sections.value.filter(section => section.count > 0)
+    available.sort((a, b) => {
+        const aPending = a.orders.some(order => order.entries.some(entry => entry.item.status === 'PENDING'))
+        const bPending = b.orders.some(order => order.entries.some(entry => entry.item.status === 'PENDING'))
+        if (aPending !== bPending) return Number(bPending) - Number(aPending)
+        const oldest = (section: typeof a) => {
+            const placedAt = section.orders[0]?.order.placed_at
+            return placedAt ? Date.parse(placedAt) : Infinity
+        }
+        return oldest(a) - oldest(b)
+    })
+    activeOrderType.value = available[0]?.type ?? 'DINE_IN'
+}
+
+function chooseTab(type: KitchenItem['order']['order_type']): void {
+    tabChosenManually.value = true
+    activeOrderType.value = type
+}
+
+watch([sections, updatingIds, shortageBusy, () => notifyingOrders.value.size], () => {
+    if (!initialTabSelected.value || updatingIds.value.length > 0 || shortageBusy.value || notifyingOrders.value.size > 0) return
+    if (sections.value.find(section => section.type === activeOrderType.value)?.count) return
+    selectTabWithOrders()
+}, { flush: 'post' })
 
 // Compute elapsed time in seconds for overdue detection
 function getElapsedSeconds(dateStr: string | null): number {
@@ -211,10 +249,18 @@ async function onShortageCancel(): Promise<void> {
         toast.warning('Đã hủy món. Quản lý đã được thông báo ẩn món khỏi thực đơn.')
         shortageTarget.value = null
     } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Không hủy được món')
+        toast.error(cancelErrorMessage(err))
     } finally {
         shortageBusy.value = false
     }
+}
+
+function cancelErrorMessage(err: unknown): string {
+    const response = (err as { response?: { status?: number; data?: { message?: string } } })?.response
+    if (response?.status === 409 && response.data?.message === 'Đơn đã thanh toán không thể huỷ món.') {
+        return response.data.message
+    }
+    return response?.data?.message ?? (err instanceof Error ? err.message : 'Không hủy được món')
 }
 
 async function onReady(entry: { order: { id: number }; item: { id: number } }): Promise<void> {
@@ -234,7 +280,7 @@ async function onCancel(entry: { order: { id: number }; item: { id: number; menu
         await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'CANCELLED', reason)
         toast.warning('Đã hủy món')
     } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Lỗi')
+        toast.error(cancelErrorMessage(err))
     }
 }
 useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && updatingIds.value.length === 0 && notifyingOrders.value.size === 0)
@@ -256,19 +302,13 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
         </header>
 
         <!-- Tab Navigation -->
-        <nav class="board-tabs" aria-label="Trạng thái bếp">
-            <RouterLink to="/staff/kitchen/queue" class="tab" :class="{ active: status === 'PENDING' }">
-                <span class="tab-label">Chờ nấu</span>
-                <span class="tab-count pending">{{ pendingItems.length }}</span>
-            </RouterLink>
-            <RouterLink to="/staff/kitchen/preparing" class="tab" :class="{ active: status === 'PREPARING' }">
-                <span class="tab-label">Đang nấu</span>
-                <span class="tab-count preparing">{{ preparingItems.length }}</span>
-            </RouterLink>
-            <RouterLink to="/staff/kitchen/ready" class="tab" :class="{ active: status === 'READY' }">
-                <span class="tab-label">Chờ bưng</span>
-                <span class="tab-count ready">{{ readyItems.length }}</span>
-            </RouterLink>
+        <nav class="board-tabs" aria-label="Loại đơn hàng">
+            <button v-for="section in sections" :key="section.type" type="button" class="tab"
+                :class="{ active: activeOrderType === section.type }" :aria-pressed="activeOrderType === section.type"
+                @click="chooseTab(section.type)">
+                <span class="tab-label">{{ section.icon }} {{ section.label }}</span>
+                <span class="tab-count" :class="{ 'has-orders': section.count > 0 }">{{ section.count }} đơn</span>
+            </button>
         </nav>
 
         <!-- Error/Loading State -->
@@ -279,10 +319,9 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
             Đang tải danh sách món...
         </div>
 
-        <!-- Main Content Grid -->
+        <!-- Orders for the selected type -->
         <div class="service-columns">
-            <!-- Each column = one order type -->
-            <section v-for="section in sections" :key="section.type" class="order-section" :data-type="section.type">
+            <section v-for="section in sections.filter(section => section.type === activeOrderType)" :key="section.type" class="order-section" :data-type="section.type">
                 <header class="section-heading">
                     <div class="section-title-row">
                         <span class="section-icon">{{ section.icon }}</span>
@@ -506,20 +545,25 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     background: var(--color-operations-surface);
     border-radius: 12px;
     border: 1px solid #2a2f3c;
+    overflow-x: auto;
 }
 
 .tab {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     padding: 14px 24px;
     background: transparent;
+    border: 1px solid transparent;
     border-radius: 8px;
-    text-decoration: none;
     color: #8b919e;
     font-size: 16px;
     font-weight: 600;
     transition: all 150ms ease;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: 1;
 }
 
 .tab:hover {
@@ -530,6 +574,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 .tab.active {
     background: #2d3342;
     color: #ffffff;
+    border-color: #505c70;
 }
 
 .tab-count {
@@ -539,21 +584,13 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     font-weight: 700;
     min-width: 36px;
     text-align: center;
+    background: #4b5563;
+    color: #f0f0f0;
 }
 
-.tab-count.pending {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.tab-count.preparing {
-    background: #ffedd5;
-    color: #c2410c;
-}
-
-.tab-count.ready {
-    background: #dcfce7;
-    color: #166534;
+.tab-count.has-orders {
+    background: #c91920;
+    color: #ffffff;
 }
 
 /* Alert States */
@@ -579,17 +616,15 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 /* Main Grid */
 .service-columns {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-    align-items: start;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Order Section */
 .order-section {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     min-width: 0;
     padding: 12px;
     background: var(--color-operations-surface);
@@ -610,7 +645,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 16px;
+    padding-bottom: 10px;
     border-bottom: 1px solid #2a2f3c;
 }
 
@@ -667,22 +702,40 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 /* Order Cards */
 .orders-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+@container kitchen (min-width: 620px) {
+    .orders-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container kitchen (min-width: 940px) {
+    .orders-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@container kitchen (min-width: 1250px) {
+    .orders-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@container kitchen (min-width: 1550px) {
+    .orders-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 .order-card {
+    min-width: 0;
     background: #141620;
-    border-radius: 12px;
-    padding: 16px;
-    border: 2px solid var(--color-operations-raised);
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px solid var(--color-operations-raised);
     transition: border-color 150ms ease;
 }
 
 .order-card.overdue {
-    border-color: #ef4444;
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+    border-color: #b45309;
+    box-shadow: inset 3px 0 #f59e0b;
 }
 
 /* Order Header */
@@ -690,9 +743,9 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--color-operations-raised);
 }
 
@@ -705,13 +758,13 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 }
 
 .order-number {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 800;
     color: #ffffff;
 }
 
 .order-code {
-    font-size: 14px;
+    font-size: 12px;
     color: var(--kds-muted);
     font-weight: 500;
 }
@@ -721,10 +774,10 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     flex-direction: column;
     align-items: flex-end;
     flex-shrink: 0;
-    font-size: 32px;
+    font-size: 22px;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
-    padding: 6px 12px;
+    padding: 5px 8px;
     border-radius: 8px;
 }
 
@@ -754,12 +807,12 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     flex-wrap: wrap;
     overflow-wrap: anywhere;
     display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 4px 10px;
+    margin-bottom: 10px;
 }
 
 .meta-item {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--kds-muted);
 }
 
@@ -767,15 +820,15 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 .items-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .item-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
-    gap: 12px;
-    padding: 12px;
+    gap: 8px;
+    padding: 8px;
     background: var(--color-operations-surface);
     border-radius: 8px;
     border-left: 4px solid #4b5563;
@@ -794,13 +847,13 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 }
 
 .item-qty {
-    font-size: 20px;
+    font-size: 15px;
     font-weight: 800;
     color: #f0f0f0;
     background: var(--color-operations-raised);
-    padding: 6px 8px;
+    padding: 5px 7px;
     border-radius: 8px;
-    min-width: 40px;
+    min-width: 32px;
     text-align: center;
 }
 
@@ -809,12 +862,12 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     overflow-wrap: anywhere;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
 }
 
 .item-name {
     line-height: 1.45;
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     color: #ffffff;
 }
@@ -829,9 +882,9 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     max-width: 100%;
     flex: 0 0 auto;
     overflow-wrap: anywhere;
-    padding: 4px 10px;
+    padding: 3px 7px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
 }
 
@@ -847,18 +900,18 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 .item-note {
     margin: 0;
-    padding: 10px 12px;
+    padding: 6px 8px;
     background: rgba(251, 191, 36, 0.1);
     border-left: 3px solid #fbbf24;
     border-radius: 0 6px 6px 0;
-    font-size: 14px;
+    font-size: 12px;
     color: #fcd34d;
 }
 
 /* Cảnh báo thiếu nguyên liệu — phải nổi bật nhưng không tranh chấp với nút hành động */
 .shortage-hint {
     margin: 6px 0 0;
-    padding: 8px 12px;
+    padding: 6px 8px;
     background: rgba(228, 38, 61, 0.12);
     border-left: 3px solid var(--chili-red, #e4263d);
     border-radius: 0 6px 6px 0;
@@ -872,15 +925,15 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
 }
 
 .action-btn {
     min-height: 44px;
-    padding: 12px 16px;
+    padding: 8px 10px;
     border: none;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     transition: all 150ms ease;
@@ -938,7 +991,7 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 .action-btn.notify {
     background: #8b5cf6;
     color: #ffffff;
-    padding: 12px 20px;
+    padding: 8px 12px;
 }
 
 .action-btn.notify:hover:not(:disabled) {
@@ -947,8 +1000,8 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 /* Ready State */
 .ready-indicator {
-    margin-top: 16px;
-    padding: 14px;
+    margin-top: 10px;
+    padding: 9px;
     background: rgba(34, 197, 94, 0.1);
     border-radius: 8px;
     border: 1px solid rgba(34, 197, 94, 0.3);
@@ -962,13 +1015,14 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 /* Shipper Action */
 .shipper-action {
-    margin-top: 12px;
-    padding-top: 12px;
+    margin-top: 9px;
+    padding-top: 9px;
     border-top: 1px dashed #2a2f3c;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
     gap: 12px;
+    flex-direction: column;
 }
 
 .shipper-label {
@@ -976,26 +1030,12 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     color: var(--kds-muted);
 }
 
-/* Responsive: use the board width after sidebar and layout padding. */
-@container kitchen (min-width: 740px) {
-    .service-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@container kitchen (min-width: 1140px) {
-    .service-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .service-columns:has(> :last-child:nth-child(2)) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
 @container kitchen (max-width: 739px) {
     .board-header { flex-direction: column; align-items: stretch; padding: 16px; }
     .header-left { flex-wrap: wrap; gap: 12px; min-width: 0; }
     .board-title { font-size: 22px; overflow-wrap: anywhere; }
-    .board-tabs { flex-direction: column; }
-    .tab { justify-content: space-between; padding: 12px; }
-    .order-time { font-size: 28px; padding: 6px 8px; }
-    .shipper-action { flex-direction: column; align-items: stretch; }
+    .tab { flex: 0 0 auto; padding: 12px; }
+    .order-time { font-size: 22px; padding: 5px 8px; }
 }
 
 @media (max-width: 600px) {
@@ -1012,8 +1052,8 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 }
 
 .order-status {
-    margin-top: 16px;
-    padding-top: 12px;
+    margin-top: 10px;
+    padding-top: 8px;
     border-top: 1px solid var(--color-operations-raised);
     color: var(--kds-muted);
     font-size: 14px;

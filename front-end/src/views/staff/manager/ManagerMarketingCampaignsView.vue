@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAppDialog } from '@/composables/useAppDialog'
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import {
     cancelMarketingCampaign,
     createMarketingCampaign,
@@ -65,6 +66,9 @@ const filtered = computed(() => {
 onMounted(async () => {
     await Promise.all([loadCampaigns(), loadOptions()])
 })
+useRealtimeRefresh(async () => {
+    try { campaigns.value = await fetchMarketingCampaigns() } catch { /* Giữ danh sách hiện tại khi làm mới thất bại. */ }
+}, () => !loading.value && !saving.value && !modalOpen.value, 10000)
 
 async function loadCampaigns() {
     loading.value = true

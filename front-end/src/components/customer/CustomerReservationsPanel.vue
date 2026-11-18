@@ -13,6 +13,7 @@ import { useAppDialog } from '@/composables/useAppDialog'
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import {
     normalizeReservation,
+    restaurantNow,
     validateReservation,
     type ReservationForm,
     type ReservationOptions,
@@ -216,7 +217,7 @@ useRealtimeRefresh(async () => { items.value = (await fetchMyReservations()).dat
                     <div class="edit-grid">
                         <div class="edit-field">
                             <label :for="`reservation-date-${item.id}`">Ngày đặt bàn</label>
-                            <input :id="`reservation-date-${item.id}`" v-model="editForm.reserved_date" type="date" required
+                            <input :id="`reservation-date-${item.id}`" v-model="editForm.reserved_date" type="date" required :min="restaurantNow(options?.timezone ?? 'Asia/Ho_Chi_Minh').slice(0, 10)"
                                 :aria-invalid="!!editErrors.reserved_date" :aria-describedby="editErrors.reserved_date ? `reservation-date-error-${item.id}` : undefined"
                                 @blur="validateField('reserved_date')" />
                             <p v-if="editErrors.reserved_date" :id="`reservation-date-error-${item.id}`" class="field-error">{{ editErrors.reserved_date }}</p>

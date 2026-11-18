@@ -39,6 +39,7 @@ class CustomerNotificationController extends Controller
     {
         $request->validate(['unread' => ['sometimes', 'boolean']]);
         app(\App\Services\ComboNotificationService::class)->syncForUser($request->user());
+        app(\App\Services\FlashSaleNotificationService::class)->syncForUser($request->user());
 
         $query = $this->owned($request);
         if ($request->boolean('unread')) $query->whereNull('read_at');

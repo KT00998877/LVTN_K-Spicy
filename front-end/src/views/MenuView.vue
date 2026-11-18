@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useToast } from '@/composables/useStaffUtils'
 import { parseFiltersFromQuery, serializeFiltersToQuery } from '@/api/menu'
+import apiClient from '@/api/client'
 import type { MenuItemCard } from '@/types/home'
 import { imageUrl } from '@/utils/image'
 
@@ -46,11 +47,20 @@ const resultText = computed(() => {
     if (totalCount.value === 0) return 'Không có món nào'
     return `${totalCount.value} món ngon`
 })
-const flashSaleItems = computed(() => items.value.filter(item => item.flash_sale && Date.parse(item.flash_sale.ends_at) > currentTime.value))
-const featuredFlashSale = computed(() => flashSaleItems.value[0] ?? null)
-const saleTiming = computed(() => {
-    const sale = featuredFlashSale.value?.flash_sale
-    if (!sale) return null
+interface FlashSaleItem {
+    name: string
+    slug: string
+    image_url: string | null
+    flash_sale: NonNullable<MenuItemCard['flash_sale']>
+}
+const flashSaleItems = ref<FlashSaleItem[]>([])
+async function loadFlashSales() {
+    try {
+        const response = await apiClient.get<{ data: FlashSaleItem[] }>('/menu/flash-sales')
+        flashSaleItems.value = response.data.data
+    } catch { /* Giữ danh sách đang hiển thị nếu lần làm mới thất bại. */ }
+}
+function saleTiming(sale: FlashSaleItem['flash_sale']) {
     const end = Date.parse(sale.ends_at)
     const total = end - Date.parse(sale.starts_at)
     const remaining = Math.max(0, end - currentTime.value)
@@ -64,13 +74,14 @@ const saleTiming = computed(() => {
         remainingPercent: total > 0 ? Math.max(0, Math.min(100, remaining / total * 100)) : 0,
         endsAt: new Date(end).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
     }
-})
+}
 
 /**
  * Khởi tạo từ URL (đầu tiên) — sau đó watcher sẽ tự sync khi URL đổi.
  */
 onMounted(async () => {
     countdownTimer = setInterval(() => { currentTime.value = Date.now() }, 1000)
+    void loadFlashSales()
     await menuStore.initFromQuery(queryFilters.value)
     // Fetch cart để biết badge count
     await cartStore.fetchCart()
@@ -179,7 +190,7 @@ watch(modalVisible, async (val) => {
         await cartStore.fetchCart(true)
     }
 })
-useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadCategories(true)]), () => !menuStore.loading && !menuStore.loadingMore, 15000)
+useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadCategories(true), loadFlashSales()]), () => !menuStore.loading && !menuStore.loadingMore, 15000)
 </script>
 
 <template>
@@ -201,25 +212,27 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
 
                     <!-- Menu Section -->
                     <section class="menu-section" aria-label="Danh sách món">
-                        <section v-if="featuredFlashSale?.flash_sale && saleTiming" class="flash-sale-feature" aria-label="Flash Sale đang diễn ra">
-                            <img class="flash-sale-feature__image" :src="imageUrl(featuredFlashSale.image_url)" :alt="featuredFlashSale.name" @error="(e) => (e.target as HTMLImageElement).src = '/logo/logo.png'" />
+                        <section v-if="flashSaleItems.some(item => Date.parse(item.flash_sale.ends_at) > currentTime)" class="flash-sale-list" aria-label="Các món Flash Sale đang diễn ra">
+                          <article v-for="item in flashSaleItems.filter(item => Date.parse(item.flash_sale.ends_at) > currentTime)" :key="item.slug" class="flash-sale-feature">
+                            <img class="flash-sale-feature__image" :src="imageUrl(item.image_url)" :alt="item.name" @error="(e) => (e.target as HTMLImageElement).src = '/logo/logo.png'" />
                             <div class="flash-sale-feature__content">
                                 <span class="flash-sale-feature__eyebrow">FLASH SALE ĐANG DIỄN RA</span>
-                                <h2>{{ featuredFlashSale.name }}</h2>
+                                <h2>{{ item.name }}</h2>
                                 <div class="flash-sale-feature__prices">
-                                    <span class="flash-sale-feature__price">{{ formatPrice(featuredFlashSale.flash_sale.price) }}</span>
-                                    <s>{{ formatPrice(featuredFlashSale.flash_sale.original_price) }}</s>
-                                    <span class="flash-sale-feature__discount">Giảm {{ formatPrice(featuredFlashSale.flash_sale.discount) }}</span>
+                                    <span class="flash-sale-feature__price">{{ formatPrice(item.flash_sale.price) }}</span>
+                                    <s>{{ formatPrice(item.flash_sale.original_price) }}</s>
+                                    <span class="flash-sale-feature__discount">Giảm {{ formatPrice(item.flash_sale.discount) }}</span>
                                 </div>
                                 <div class="flash-sale-feature__time">
-                                    <span>Còn <strong>{{ saleTiming.countdown }}</strong></span>
-                                    <span>Kết thúc {{ saleTiming.endsAt }}</span>
+                                    <span>Còn <strong>{{ saleTiming(item.flash_sale).countdown }}</strong></span>
+                                    <span>Kết thúc {{ saleTiming(item.flash_sale).endsAt }}</span>
                                 </div>
-                                <div class="flash-sale-feature__track" role="progressbar" aria-label="Thời gian Flash Sale còn lại" :aria-valuenow="Math.round(saleTiming.remainingPercent)" aria-valuemin="0" aria-valuemax="100">
-                                    <span :style="{ width: `${saleTiming.remainingPercent}%` }"></span>
+                                <div class="flash-sale-feature__track" role="progressbar" :aria-label="`Thời gian Flash Sale của ${item.name} còn lại`" :aria-valuenow="Math.round(saleTiming(item.flash_sale).remainingPercent)" aria-valuemin="0" aria-valuemax="100">
+                                    <span :style="{ width: `${saleTiming(item.flash_sale).remainingPercent}%` }"></span>
                                 </div>
-                                <p v-if="flashSaleItems.length > 1" class="flash-sale-feature__more">Xem thêm các món Flash Sale ngay bên dưới.</p>
+                                <router-link class="flash-sale-feature__link" :to="{ path: '/thuc-don', query: { search: item.name } }">Xem món →</router-link>
                             </div>
+                          </article>
                         </section>
                         <!-- Results Header -->
                         <header class="results-header">
@@ -368,7 +381,8 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
     gap: 32px;
 }
 
-.flash-sale-feature { display: grid; grid-template-columns: 190px minmax(0, 1fr); overflow: hidden; margin-bottom: 28px; border-radius: 16px; background: #5b101a; color: #fff; }
+.flash-sale-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 14px; margin-bottom: 28px; }
+.flash-sale-feature { display: grid; grid-template-columns: 150px minmax(0, 1fr); overflow: hidden; border-radius: 16px; background: #5b101a; color: #fff; }
 .flash-sale-feature__image { width: 100%; height: 100%; min-height: 205px; object-fit: cover; background: #240809; }
 .flash-sale-feature__content { min-width: 0; padding: 20px 24px; }
 .flash-sale-feature__eyebrow { color: #ffd19c; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
@@ -381,7 +395,8 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
 .flash-sale-feature__time strong { color: #fff; font-size: 16px; font-variant-numeric: tabular-nums; }
 .flash-sale-feature__track { height: 8px; overflow: hidden; margin-top: 9px; border-radius: 999px; background: #9d4b54; }
 .flash-sale-feature__track span { display: block; height: 100%; border-radius: inherit; background: #ffbe5b; transition: width .8s linear; }
-.flash-sale-feature__more { margin: 8px 0 0; color: #f6dfe0; font-size: 12px; }
+.flash-sale-feature__link { display: inline-block; margin-top: 12px; color: #fff; font-size: 13px; font-weight: 700; text-underline-offset: 3px; }
+.flash-sale-feature__link:focus-visible { outline: 2px solid #ffbe5b; outline-offset: 3px; }
 
 /* ===== RESULTS HEADER ===== */
 .results-header {
@@ -514,7 +529,7 @@ useRealtimeRefresh(() => Promise.all([menuStore.loadItems(true), menuStore.loadC
         padding: 0 16px;
         margin-bottom: 16px;
     }
-    .flash-sale-feature { margin: 0 16px 20px; }
+    .flash-sale-list { margin: 0 16px 20px; }
     .flash-sale-feature { grid-template-columns: 104px minmax(0, 1fr); border-radius: 12px; }
     .flash-sale-feature__image { min-height: 190px; }
     .flash-sale-feature__content { padding: 12px; }

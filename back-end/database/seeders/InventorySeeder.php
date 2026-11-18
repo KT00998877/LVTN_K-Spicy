@@ -331,6 +331,7 @@ class InventorySeeder extends Seeder
 
         $recipes = [
             // Topping
+            'them-mi'            => [$id('NL001') => 1],
             'them-trung'         => [$id('NL015') => 1],
             'them-pho-mai'       => [$id('NL016') => 0.05],
             'them-bo'            => [$id('NL003') => 0.05],

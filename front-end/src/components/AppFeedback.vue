@@ -163,10 +163,10 @@ function toastIcon(type: 'success' | 'error' | 'warning' | 'info'): string {
     box-shadow: 0 24px 80px rgb(32 12 14 / 28%);
 }
 .feedback-dialog::backdrop { background: rgb(35 15 16 / 56%); backdrop-filter: blur(2px); }
-.feedback-dialog__panel { padding: 26px 28px 22px; }
+.feedback-dialog__panel { display: flex; flex-direction: column; max-height: 80dvh; padding: 26px 28px 22px; }
 .feedback-dialog__eyebrow { color: #a71b22; font-size: 10px; font-weight: 800; letter-spacing: 1.7px; }
 .feedback-dialog__title { margin: 8px 0 8px; color: #302321; font-size: 21px; line-height: 1.3; font-weight: 800; }
-.feedback-dialog__message { margin: 0; color: #6f5b54; font-size: 14px; line-height: 1.6; white-space: pre-line; }
+.feedback-dialog__message { margin: 0; overflow-y: auto; color: #6f5b54; font-size: 14px; line-height: 1.6; white-space: pre-line; }
 .feedback-dialog__field { display: grid; gap: 7px; margin-top: 18px; color: #45332f; font-size: 13px; font-weight: 700; }
 .feedback-dialog__field input { box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid #dfccc2; border-radius: 10px; padding: 10px 12px; background: #fff; color: #302321; font: inherit; font-weight: 500; }
 .feedback-dialog__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }

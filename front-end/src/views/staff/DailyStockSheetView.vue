@@ -44,6 +44,21 @@
       </section>
 
       <form v-if="rows.length" @submit.prevent="save">
+        <section v-if="canEdit" class="sheet-completion" aria-label="Hoàn tất đếm và chốt sổ">
+          <div class="sheet-completion__heading">
+            <div>
+              <span class="sheet-completion__eyebrow">HOÀN TẤT KIỂM KHO</span>
+              <h3>Giờ hoàn tất đếm</h3>
+            </div>
+            <span class="sheet-completion__progress">Đã đếm {{ countedCount }}/{{ rows.length }}</span>
+          </div>
+          <div class="sheet-completion__controls">
+            <input id="counted-at" v-model="countTime" type="datetime-local" step="1" :min="`${today}T00:00:00`" aria-label="Giờ hoàn tất đếm" />
+            <button type="button" class="manager-button" @click="countTime = vietnamNow()">Lấy giờ hiện tại</button>
+            <button type="submit" class="manager-button" :disabled="saving">{{ saving ? 'Đang lưu…' : 'Lưu nháp' }}</button>
+            <button v-if="canClose" type="button" class="manager-button primary" :disabled="saving || countedCount !== rows.length || !countTime" @click="closeSheet">Xem lại và chốt sổ</button>
+          </div>
+        </section>
         <div class="sheet-controls">
           <label for="stock-filter">Hiển thị</label>
           <select id="stock-filter" v-model="rowFilter"><option value="all">Tất cả</option><option value="uncounted">Chưa đếm</option><option value="variance">Có chênh lệch</option></select>
@@ -74,20 +89,6 @@
           </table>
         </div>
         <p v-if="rowFilter !== 'all' && !visibleGroups.length" class="sheet-hint">Không có nguyên liệu nào trong bộ lọc này.</p>
-        <div v-if="canEdit" class="sheet-actions">
-          <label for="counted-at">Giờ hoàn tất đếm</label>
-          <input id="counted-at" v-model="countTime" type="datetime-local" step="1" :min="`${today}T00:00:00`" />
-          <button type="button" class="manager-button" @click="countTime = vietnamNow()">Lấy giờ hiện tại</button>
-          <button type="submit" class="manager-button" :disabled="saving">{{ saving ? 'Đang lưu…' : 'Lưu nháp' }}</button>
-          <button v-if="canClose" type="button" class="manager-button primary" :disabled="saving || countedCount !== rows.length || !countTime" @click="reviewOpen = true">Xem lại và chốt sổ</button>
-        </div>
-        <section v-if="reviewOpen && canClose" class="sheet-review" aria-label="Xem lại trước khi chốt">
-          <h3>Xem lại trước khi chốt</h3>
-          <p>Đã đếm {{ countedCount }}/{{ rows.length }} nguyên liệu. {{ reviewDifferenceRows.length }} nguyên liệu khác số tham chiếu. Giờ đếm: {{ countTime.replace('T', ' ') }}.</p>
-          <ul v-if="reviewDifferenceRows.length"><li v-for="row in reviewDifferenceRows" :key="row.ingredient_id">{{ row.name }}: tồn hệ thống {{ qty(systemStock(row)) }} {{ row.unit }}, bếp đếm {{ qty(Number(row.counted_input)) }} {{ row.unit }}. {{ row.explanation || 'Chưa có lý do' }}</li></ul>
-          <p v-if="sheet.baseline">Đây là lần chốt mốc khởi tạo; số khác tồn hệ thống sẽ được ghi nhận khi chốt.</p>
-          <div class="sheet-actions"><button type="button" class="manager-button" @click="reviewOpen = false">Quay lại chỉnh sửa</button><button type="button" class="manager-button primary" :disabled="saving || countedCount !== rows.length || !countTime" @click="closeSheet">{{ saving ? 'Đang xử lý…' : 'Xác nhận chốt sổ' }}</button></div>
-        </section>
       </form>
       <p v-else class="manager-notice">Chưa có nguyên liệu đang sử dụng.</p>
     </template>
@@ -99,7 +100,9 @@ import { computed, onMounted, ref } from 'vue'
 import api from '@/api/client'
 import { useStaffStore } from '@/stores/staff'
 import { useAppDialog } from '@/composables/useAppDialog'
+import { useToast } from '@/composables/useStaffUtils'
 const appDialog = useAppDialog()
+const toast = useToast()
 
 interface StockItem {
   ingredient_id: number
@@ -159,7 +162,6 @@ const groupedRows = computed(() => {
   }))
 })
 const rowFilter = ref<'all' | 'uncounted' | 'variance'>('all')
-const reviewOpen = ref(false)
 const visibleGroups = computed(() => groupedRows.value.map(group => {
   const entries = group.rows.filter(row => rowFilter.value === 'all'
     || (rowFilter.value === 'uncounted' && row.counted_input.trim() === '')
@@ -220,7 +222,6 @@ async function load() {
     const response = await api.get<{ data: Sheet }>(`/staff/daily-stock-sheets/${selectedDate.value}`)
     sheet.value = response.data.data
     rows.value = sheet.value.items.map(item => ({ ...item, counted_input: item.counted_qty === null ? '' : String(item.counted_qty) }))
-    reviewOpen.value = false
   } catch (e) { error.value = message(e) }
   finally { loading.value = false }
 }
@@ -252,7 +253,15 @@ async function save() {
 
 async function closeSheet() {
   if (!canClose.value || saving.value || countedCount.value !== rows.value.length || !countTime.value) return
-  if (!await appDialog.confirm({ title: 'Chốt sổ kho hôm nay?', message: 'Sau khi chốt, số đếm sẽ bị khóa và không thể chỉnh sửa.', confirmLabel: 'Chốt sổ kho', tone: 'warning' })) return
+  const differences = reviewDifferenceRows.value.map(row => `${row.name}: tồn hệ thống ${qty(systemStock(row))} ${row.unit}, bếp đếm ${qty(Number(row.counted_input))} ${row.unit}. ${row.explanation || 'Chưa có lý do'}`)
+  const reviewMessage = [
+    `Giờ hoàn tất đếm: ${countTime.value.replace('T', ' ')}.`,
+    `Đã đếm ${countedCount.value}/${rows.value.length} nguyên liệu. Có ${differences.length} nguyên liệu chênh lệch so với số tham chiếu.`,
+    ...differences,
+    ...(sheet.value?.baseline ? ['Đây là lần chốt mốc khởi tạo; số khác tồn hệ thống sẽ được ghi nhận khi chốt.'] : []),
+    'Sau khi chốt, số đếm sẽ bị khóa và không thể chỉnh sửa.',
+  ].join('\n')
+  if (!await appDialog.confirm({ title: 'Xem lại trước khi chốt', message: reviewMessage, confirmLabel: 'Xác nhận chốt sổ', cancelLabel: 'Quay lại chỉnh sửa', tone: 'warning' })) return
   saving.value = true
   error.value = ''
   success.value = ''
@@ -264,6 +273,7 @@ async function closeSheet() {
     await load()
     await loadHistory()
     success.value = 'Đã chốt sổ kho ngày.'
+    toast.success('Đã chốt sổ kho ngày thành công.')
   } catch (e) { error.value = message(e) }
   finally { saving.value = false }
 }
@@ -273,13 +283,19 @@ onMounted(() => { void load(); void loadHistory() })
 
 <style scoped>
 .daily-stock-page { display: flex; flex-direction: column; gap: 18px; }
-.sheet-toolbar, .sheet-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sheet-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sheet-completion { padding: 18px 20px; border: 1px solid var(--color-border-strong); border-radius: 12px; background: var(--color-brand-soft); }
+.sheet-completion__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sheet-completion__eyebrow { color: var(--color-brand-ink); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.sheet-completion h3 { margin: 3px 0 0; font-size: 18px; }
+.sheet-completion__progress { color: var(--color-brand-ink); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.sheet-completion__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sheet-completion__controls input { min-height: 42px; padding: 9px 11px; border: 1px solid var(--color-border-strong); border-radius: 8px; background: white; font: inherit; font-variant-numeric: tabular-nums; }
+.sheet-completion__controls input:focus-visible { outline: 2px solid var(--color-brand-action); outline-offset: 2px; }
+.sheet-completion__controls .manager-button { min-height: 42px; }
 .sheet-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
 .sheet-controls label { font-weight: 600; }
 .sheet-controls select { padding: 9px 11px; border: 1px solid var(--color-border-strong); border-radius: 7px; font: inherit; background: white; }
-.sheet-review { margin: 16px 0; padding: 16px; border: 1px solid var(--color-border-strong); border-radius: 10px; background: var(--color-brand-soft); }
-.sheet-review h3 { margin: 0 0 8px; }
-.sheet-review ul { padding-left: 20px; }
 .sheet-toolbar label { font-weight: 600; }
 .sheet-toolbar input { padding: 9px 11px; border: 1px solid var(--color-border-strong); border-radius: 7px; font: inherit; }
 .status { padding: 5px 10px; border-radius: 999px; background: #eef2f1; font-size: 13px; }
@@ -303,7 +319,7 @@ td textarea { width: 190px; max-width: 100%; padding: 8px; border: 1px solid #a9
 .unit { margin-left: 5px; }
 .negative { color: #b42318; font-weight: 700; }
 .sheet-hint { margin: 10px 0; }
-.sheet-actions input { padding: 9px; border: 1px solid var(--color-border-strong); border-radius: 7px; font: inherit; }
+@media (max-width: 640px) { .sheet-completion { padding: 16px; } .sheet-completion__controls input { width: 100%; } .sheet-completion__controls .manager-button { flex: 1 1 auto; } }
 .recent-sheets h3 { font-size: 15px; margin: 0 0 8px; }
 .recent-sheets > div { display: flex; gap: 8px; flex-wrap: wrap; }
 .recent-sheets [aria-current="date"] { border-color: var(--color-brand-ink); color: var(--color-brand-ink); }

@@ -83,4 +83,27 @@ class ReservationNotificationsTest extends TestCase
         $this->getJson('/api/reservations/status?request_key='.$key)->assertOk()
             ->assertJsonPath('data.status', 'CANCELLED');
     }
+
+    public function test_customer_and_cashier_can_authorize_only_their_own_notification_channels(): void
+    {
+        config(['broadcasting.default' => 'reverb']);
+        $this->seed(DatabaseSeeder::class);
+        require base_path('routes/channels.php');
+        $customer = User::where('email', 'customer@micay.local')->firstOrFail();
+        $cashier = User::where('email', 'cashier@micay.local')->firstOrFail();
+        $socketId = '123.456';
+
+        $this->actingAs($customer, 'sanctum')
+            ->postJson('/api/broadcasting/auth', ['socket_id' => $socketId, 'channel_name' => 'private-customer.'.$customer->id])
+            ->assertJsonStructure(['auth']);
+        $this->postJson('/api/broadcasting/auth', ['socket_id' => $socketId, 'channel_name' => 'private-staff.'.$cashier->id])
+            ->assertForbidden();
+
+        auth()->forgetGuards();
+        $this->actingAs($cashier, 'sanctum')
+            ->postJson('/api/broadcasting/auth', ['socket_id' => $socketId, 'channel_name' => 'private-staff.'.$cashier->id])
+            ->assertJsonStructure(['auth']);
+        $this->postJson('/api/broadcasting/auth', ['socket_id' => $socketId, 'channel_name' => 'private-customer.'.$customer->id])
+            ->assertForbidden();
+    }
 }
