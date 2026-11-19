@@ -137,6 +137,7 @@ onMounted(async () => {
     try { checkoutConfig.value = (await api.get('/checkout/config')).data }
     catch { quoteError.value = 'Không tải được cấu hình giao hàng. Vui lòng tải lại trang.' }
     recipientName.value = authStore.user?.name ?? ''
+    if (!recipientPhone.value) recipientPhone.value = authStore.user?.phone ?? ''
     // Tự động lấy GPS ngay khi mount nếu đang ở chế độ Giao hàng và chưa có vị trí.
     autoLocateOnOnline()
 })

@@ -127,7 +127,7 @@ class AuthService
         // Kiểm tra is_active
         if (!$user->is_active) {
             $this->log($user, 'login_inactive', $identifier, $request, false);
-            throw ValidationException::withMessages(['email' => [$genericError]]);
+            throw ValidationException::withMessages(['email' => ['Tài khoản đã bị khóa.']]);
         }
 
         // Thành công → reset counter

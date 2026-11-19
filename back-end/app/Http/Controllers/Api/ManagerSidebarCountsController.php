@@ -20,7 +20,7 @@ class ManagerSidebarCountsController extends Controller
             'stocktakes' => DB::table('stocktakes')->where('status', 'OPEN')->count(),
             'stock_requests' => DB::table('stock_requests')->where('status', 'OPEN')->count(),
             'out_of_stock' => DB::table('ingredients')->where('is_active', true)->where('quantity_in_stock', '<=', 0)->count(),
-            'live_chat' => DB::table('live_chat_sessions')->where('status', 'waiting')->count(),
+            'live_chat' => DB::table('live_chat_sessions')->where('status', 'waiting')->whereNotNull('last_message_at')->count(),
         ]]);
     }
 }

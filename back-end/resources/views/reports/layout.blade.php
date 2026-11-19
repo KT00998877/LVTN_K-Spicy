@@ -38,7 +38,7 @@
             min-width: 120px;
         }
         .summary-card .label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-        .summary-card .value { font-size: 16px; font-weight: 800; color: #D71920; }
+        .summary-card .value { font-family: DejaVu Sans, sans-serif; font-size: 16px; font-weight: 700; color: #D71920; }
         h2.section-title {
             font-size: 13px;
             color: #1F2937;
@@ -67,7 +67,7 @@
         }
         table.data-table tr:nth-child(even) { background: #f9fafb; }
         table.data-table tfoot td {
-            font-weight: 800;
+            font-weight: 700;
             background: #fef3c7;
             border-top: 2px solid #D71920;
         }

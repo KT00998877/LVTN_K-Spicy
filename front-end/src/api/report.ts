@@ -2,23 +2,6 @@ import apiClient from './client'
 import type { ReportExportParams, ReportFormat, ReportType } from '@/types/report'
 
 /**
- * Tạo URL tải file báo cáo (Excel/PDF).
- * Endpoint: GET /api/staff/reports/export
- */
-export function buildReportUrl(params: ReportExportParams): string {
-    const search = new URLSearchParams()
-    search.set('type', params.type)
-    search.set('format', params.format)
-    if (params.from) search.set('from', params.from)
-    if (params.to) search.set('to', params.to)
-    if (params.status) search.set('status', params.status)
-    if (params.order_type) search.set('order_type', params.order_type)
-    // apiClient.defaults.baseURL luôn kết thúc bằng '/api' → trả về path trực tiếp
-    const base = (apiClient.defaults.baseURL ?? '').replace(/\/+$/, '')
-    return `${base}/staff/reports/export?${search.toString()}`
-}
-
-/**
  * Tải file về và trigger download trong browser.
  * Dùng link tạm thời + revoke để tránh memory leak.
  */
@@ -26,23 +9,22 @@ export async function downloadReport(
     params: ReportExportParams,
     filename?: string,
 ): Promise<{ filename: string; size: number }> {
-    const url = buildReportUrl(params)
-    const response = await fetch(url, {
-        headers: { Accept: params.format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-        credentials: 'include',
-    })
-    if (!response.ok) {
-        // Cố gắng parse JSON error để show message
-        let message = `HTTP ${response.status}`
-        try {
-            const json = await response.json()
-            message = json.message || json.error || message
-        } catch {
-            /* ignore */
+    let blob: Blob
+    try {
+        const response = await apiClient.get<Blob>('/staff/reports/export', {
+            params,
+            responseType: 'blob',
+            headers: { Accept: params.format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        })
+        blob = response.data
+    } catch (error: any) {
+        const data = error?.response?.data
+        if (data instanceof Blob && data.type.includes('json')) {
+            const json = JSON.parse(await data.text())
+            throw new Error(json.message || json.error || error.message)
         }
-        throw new Error(message)
+        throw error
     }
-    const blob = await response.blob()
     const finalName = filename ?? makeFilename(params)
     triggerDownload(blob, finalName)
     return { filename: finalName, size: blob.size }

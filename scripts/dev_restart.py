@@ -15,6 +15,11 @@ import sys
 import time
 import urllib.request
 
+try:
+    import psutil
+except ImportError as exc:
+    raise SystemExit("Install the restart helper with: python -m pip install psutil") from exc
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_DIR = ROOT / "back-end" / "storage" / "logs"
@@ -31,6 +36,37 @@ def port_open(port: int) -> bool:
     with socket.socket() as sock:
         sock.settimeout(0.5)
         return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def free_ports(ports: tuple[int, ...]) -> None:
+    listeners = {
+        conn.pid
+        for conn in psutil.net_connections(kind="tcp")
+        if conn.status == psutil.CONN_LISTEN and conn.laddr
+        and conn.laddr.port in ports and conn.pid
+    }
+    if os.getpid() in listeners:
+        raise SystemExit("This launcher is listening on a required port; cannot restart itself.")
+    processes = []
+    for pid in sorted(listeners):
+        try:
+            process = psutil.Process(pid)
+            print(f"Stopping process on a dev port (PID {pid})...", flush=True)
+            process.terminate()
+            processes.append(process)
+        except psutil.NoSuchProcess:
+            pass
+    _, alive = psutil.wait_procs(processes, timeout=8)
+    for process in alive:
+        process.kill()
+    psutil.wait_procs(alive, timeout=5)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if all(not port_open(port) for port in ports):
+            return
+        time.sleep(0.2)
+    occupied = [port for port in ports if port_open(port)]
+    raise SystemExit(f"Could not free dev ports: {occupied}")
 
 
 def wait_for_http(process: subprocess.Popen, url: str, name: str) -> None:
@@ -64,9 +100,7 @@ def main() -> None:
     npm = require_command("npm.cmd" if os.name == "nt" else "npm")
     if not (ROOT / "front-end" / "node_modules").is_dir():
         raise SystemExit("Run npm install in front-end first.")
-    for port in (8000, 8002, 8080, 5173):
-        if port_open(port):
-            raise SystemExit(f"Port {port} is already in use. Stop that service first.")
+    free_ports((8000, 8001, 8002, 8080, 5173))
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     processes: list[tuple[str, subprocess.Popen, object]] = []

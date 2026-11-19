@@ -69,9 +69,6 @@ class LiveChatController extends Controller
             ]);
         });
 
-        // Nhân viên cần biết có khách mới ngay, nên phát sự kiện hàng chờ.
-        if ($created) app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
-
         return response()->json([
             'success' => true,
             'data' => $this->sessionPayload($session),
@@ -125,6 +122,7 @@ class LiveChatController extends Controller
             'content' => 'required|string|max:2000',
         ]);
 
+        $firstMessage = $session->last_message_at === null;
         $message = DB::transaction(function () use ($session, $validated) {
             $message = LiveChatMessage::create([
                 'session_id' => $session->id,
@@ -142,6 +140,7 @@ class LiveChatController extends Controller
         $message->setRelation('session', $session);
 
         app(LiveChatBroadcaster::class)->dispatch(new LiveChatMessageSent($session, $message));
+        if ($firstMessage) app(LiveChatBroadcaster::class)->dispatch(new LiveChatSessionUpdated($session));
 
         return response()->json([
             'success' => true,

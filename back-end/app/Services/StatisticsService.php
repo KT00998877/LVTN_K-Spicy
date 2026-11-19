@@ -1121,18 +1121,49 @@ class StatisticsService
             ->whereIn('item.order_id', $ids)
             ->selectRaw('item.order_id, SUM(-tx.quantity * COALESCE(NULLIF(tx.unit_price, 0), NULLIF(ingredient.import_price, 0), 0)) as cost, COUNT(DISTINCT item.id) as costed_items, SUM(CASE WHEN tx.unit_price <= 0 AND ingredient.import_price <= 0 THEN 1 ELSE 0 END) as unpriced_lines, COUNT(DISTINCT CASE WHEN tx.unit_price <= 0 AND ingredient.import_price > 0 THEN item.id END) as estimated_items')
             ->groupBy('item.order_id')->get()->keyBy('order_id');
+        $orderCosts = DB::table('inventory_transactions as tx')
+            ->join('ingredients as ingredient', 'ingredient.id', '=', 'tx.ingredient_id')
+            ->where('tx.reference_type', 'order')
+            ->where('tx.type', 'EXPORT')
+            ->where('tx.quantity', '<', 0)
+            ->whereIn('tx.reference_id', $ids)
+            ->selectRaw('tx.reference_id as order_id, SUM(-tx.quantity * COALESCE(NULLIF(tx.unit_price, 0), NULLIF(ingredient.import_price, 0), 0)) as cost, SUM(CASE WHEN tx.unit_price <= 0 AND ingredient.import_price <= 0 THEN 1 ELSE 0 END) as unpriced_lines, SUM(CASE WHEN tx.unit_price <= 0 AND ingredient.import_price > 0 THEN 1 ELSE 0 END) as estimated_items')
+            ->groupBy('tx.reference_id')->get()->keyBy('order_id');
+        $costedItemIds = DB::table('inventory_transactions')
+            ->where('reference_type', 'order_item')->where('type', 'EXPORT')->where('quantity', '<', 0)
+            ->whereIn('reference_id', DB::table('order_items')->whereIn('order_id', $ids)->select('id'))
+            ->pluck('reference_id')->all();
+        $missingItems = DB::table('order_items')->whereIn('order_id', $ids)
+            ->where('status', '!=', 'CANCELLED')->whereNotIn('id', $costedItemIds)
+            ->get(['id', 'order_id', 'menu_item_id', 'quantity']);
+        $recipes = DB::table('menu_item_ingredient as recipe')
+            ->join('ingredients as ingredient', 'ingredient.id', '=', 'recipe.ingredient_id')
+            ->whereIn('recipe.menu_item_id', $missingItems->pluck('menu_item_id')->unique()->all())
+            ->get(['recipe.menu_item_id', 'recipe.quantity_required', 'recipe.waste_factor', 'ingredient.import_price'])
+            ->groupBy('menu_item_id');
+        $estimatedMissingCosts = [];
+        foreach ($missingItems as $item) {
+            $lines = $recipes->get($item->menu_item_id);
+            if (!$lines || $lines->contains(fn ($line) => (float) $line->import_price <= 0)) continue;
+            $itemCost = $lines->sum(fn ($line) => ceil((float) $line->quantity_required * (float) $line->waste_factor * (int) $item->quantity) * (float) $line->import_price);
+            $estimatedMissingCosts[$item->order_id] = ($estimatedMissingCosts[$item->order_id] ?? 0) + $itemCost;
+        }
+        $estimatedMissingCounts = $missingItems->filter(fn ($item) => ($recipes->get($item->menu_item_id))?->isNotEmpty()
+            && !$recipes->get($item->menu_item_id)->contains(fn ($line) => (float) $line->import_price <= 0))
+            ->countBy('order_id');
 
         $byDay = [];
         foreach ($orders as $order) {
             $date = Carbon::parse($order->completed_at, 'UTC')->setTimezone(self::TZ)->toDateString();
             $row = $byDay[$date] ?? ['date' => $date, 'orders' => 0, 'revenue' => 0.0, 'cost' => 0.0, 'profit' => null, 'missing_cost_items' => 0, 'estimated_cost_items' => 0];
-            $cost = $costs->get($order->id);
+            $orderCost = $orderCosts->get($order->id);
+            $cost = $orderCost ?? $costs->get($order->id);
             $row['orders']++;
             $row['revenue'] += (float) $order->total_amount - (float) ($shipping[$order->id] ?? 0);
-            $row['cost'] += (float) ($cost?->cost ?? 0);
-            $row['missing_cost_items'] += max(0, (int) ($itemCounts[$order->id] ?? 0) - (int) ($cost?->costed_items ?? 0))
+            $row['cost'] += (float) ($cost?->cost ?? 0) + ($orderCost ? 0 : (float) ($estimatedMissingCosts[$order->id] ?? 0));
+            $row['missing_cost_items'] += ($orderCost ? 0 : max(0, (int) ($itemCounts[$order->id] ?? 0) - (int) ($cost?->costed_items ?? 0) - (int) ($estimatedMissingCounts[$order->id] ?? 0)))
                 + (int) ($cost?->unpriced_lines ?? 0);
-            $row['estimated_cost_items'] += (int) ($cost?->estimated_items ?? 0);
+            $row['estimated_cost_items'] += (int) ($cost?->estimated_items ?? 0) + ($orderCost ? 0 : (int) ($estimatedMissingCounts[$order->id] ?? 0));
             $byDay[$date] = $row;
         }
 

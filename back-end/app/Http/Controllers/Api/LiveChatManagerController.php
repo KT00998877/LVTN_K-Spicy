@@ -38,6 +38,7 @@ class LiveChatManagerController extends Controller
 
         $waiting = LiveChatSession::query()
             ->waiting()
+            ->whereNotNull('last_message_at')
             ->with('assignedStaff')
             ->orderBy('created_at')
             ->get();
