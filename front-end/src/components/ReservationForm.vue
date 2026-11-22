@@ -23,6 +23,7 @@ const success = ref('')
 const bookingStatus = ref<ReservationStatus | null>(null)
 const receiptId = ref<number | null>(null)
 const availableTimes = ref<string[]>([])
+const availabilityLoaded = ref(false)
 const availabilityLoading = ref(false)
 const availabilityError = ref('')
 const message = ref('')
@@ -65,7 +66,10 @@ onMounted(() => {
     void loadOptions()
     timer = setInterval(() => { now.value = Date.now() + clockOffset }, 1000)
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+    clearInterval(timer)
+    availabilityVersion++
+})
 
 function validate(field?: string) {
     if (!options.value) return
@@ -85,27 +89,47 @@ function validate(field?: string) {
 watch(form, () => { if (!submitting.value && !success.value) validate() })
 watch(today, () => { if (attempted.value || touched.reserved_date) validate() })
 let availabilityVersion = 0
-watch(() => [form.reserved_date, form.guest_count, form.location, !!options.value], async () => {
+const canCheckAvailability = computed(() =>
+    options.value && /^\d{4}-\d{2}-\d{2}$/.test(form.reserved_date) &&
+    Number.isInteger(form.guest_count) && form.guest_count >= 1 && form.guest_count <= options.value.max_guests,
+)
+const selectedTimeUnavailable = computed(() =>
+    availabilityLoaded.value && !!form.reserved_time && !availableTimes.value.includes(form.reserved_time),
+)
+
+async function refreshAvailability(background = false) {
+    if (!canCheckAvailability.value) return
     const version = ++availabilityVersion
-    form.reserved_time = ''
-    availableTimes.value = []
-    availabilityError.value = ''
-    if (!options.value || !/^\d{4}-\d{2}-\d{2}$/.test(form.reserved_date) || !Number.isInteger(form.guest_count) || form.guest_count < 1 || form.guest_count > options.value.max_guests) return
-    availabilityLoading.value = true
+    if (!background) availabilityLoading.value = true
     try {
         const times = await getReservationAvailability(form.reserved_date, form.guest_count, form.location)
-        if (version === availabilityVersion) {
+        if (version !== availabilityVersion) return
+        if (times.length !== availableTimes.value.length || times.some((time, index) => time !== availableTimes.value[index])) {
             availableTimes.value = times
-            if (preferredTime && times.length) {
-                const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5))
-                form.reserved_time = [...times].sort((a, b) => Math.abs(minutes(a) - minutes(preferredTime)) - Math.abs(minutes(b) - minutes(preferredTime)))[0]!
-            }
         }
-    } catch {
-        if (version === availabilityVersion) availabilityError.value = 'Chưa kiểm tra được giờ còn bàn. Bạn có thể nhập giờ thủ công.'
+        availabilityLoaded.value = true
+        availabilityError.value = ''
+        if (!background && preferredTime && times.length) {
+            const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5))
+            form.reserved_time = [...times].sort((a, b) => Math.abs(minutes(a) - minutes(preferredTime)) - Math.abs(minutes(b) - minutes(preferredTime)))[0]!
+        }
+    } catch (error) {
+        if (version !== availabilityVersion) return
+        if (background) throw error
+        availabilityError.value = 'Chưa kiểm tra được giờ còn bàn. Bạn có thể nhập giờ thủ công.'
     } finally {
-        if (version === availabilityVersion) availabilityLoading.value = false
+        if (!background && version === availabilityVersion) availabilityLoading.value = false
     }
+}
+
+watch([() => form.reserved_date, () => form.guest_count, () => form.location, () => !!options.value], () => {
+    availabilityVersion++
+    form.reserved_time = ''
+    availableTimes.value = []
+    availabilityLoaded.value = false
+    availabilityLoading.value = false
+    availabilityError.value = ''
+    void refreshAvailability()
 })
 
 async function submit() {
@@ -148,7 +172,11 @@ async function submit() {
         submitting.value = false
     }
 }
-useRealtimeRefresh(async () => { const latest = await getReservationOptions(); options.value = latest; clockOffset = Date.parse(latest.server_now) - Date.now() }, () => !submitting.value && !success.value, 10000)
+useRealtimeRefresh(
+    () => refreshAvailability(true),
+    () => !!canCheckAvailability.value && !availabilityLoading.value && !submitting.value && !success.value,
+    20000,
+)
 useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatus(requestKey) }, () => !!success.value && bookingStatus.value === 'PENDING', 3000)
 </script>
 
@@ -191,7 +219,7 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
                 </div>
                 <div class="form-group wide" role="group" :aria-labelledby="`${id}-time-label`" :aria-describedby="errors.reserved_time ? `${id}-time-error` : undefined" :aria-invalid="!!errors.reserved_time" tabindex="-1">
                     <strong :id="`${id}-time-label`">Giờ đặt bàn * <span v-if="form.reserved_date">— còn bàn cho {{ form.guest_count }} khách</span></strong>
-                    <p v-if="preferredTime && form.reserved_time" class="helper">AI gợi ý giờ {{ form.reserved_time }} gần với giờ bạn hỏi. Hãy kiểm tra trước khi gửi.</p>
+                    <p v-if="preferredTime && form.reserved_time && !selectedTimeUnavailable" class="helper">AI gợi ý giờ {{ form.reserved_time }} gần với giờ bạn hỏi. Hãy kiểm tra trước khi gửi.</p>
                     <p v-if="!form.reserved_date" class="helper">Chọn ngày để xem giờ còn bàn.</p>
                     <p v-else-if="availabilityLoading" class="helper" role="status">Đang kiểm tra giờ còn bàn...</p>
                     <template v-else-if="availabilityError">
@@ -206,6 +234,7 @@ useRealtimeRefresh(async () => { bookingStatus.value = await getReservationStatu
                         </div>
                         <p class="helper">Giờ còn bàn có thể thay đổi trước khi gửi yêu cầu.</p>
                     </template>
+                    <p v-if="selectedTimeUnavailable" class="field-error" role="status">Giờ {{ form.reserved_time }} vừa hết chỗ. Vui lòng chọn giờ khác.</p>
                     <p v-if="errors.reserved_time" :id="`${id}-time-error`" class="field-error">{{ errors.reserved_time }}</p>
                 </div>
                 <div v-if="tables" class="form-group wide">

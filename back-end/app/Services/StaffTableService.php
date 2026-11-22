@@ -382,9 +382,14 @@ class StaffTableService
             if ($r->status !== $status && !in_array($status, $transitions[$r->status] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => ['Không thể chuyển trạng thái đặt bàn này.']]);
             }
-            if ($r->status !== $status && $status === 'NO_SHOW') {
+            if ($r->status !== $status && in_array($status, ['NO_SHOW', 'ARRIVED'], true)) {
                 $at = \Carbon\CarbonImmutable::parse($r->reserved_date->format('Y-m-d').' '.$r->reserved_time, config('reservations.timezone'));
-                if (\Carbon\CarbonImmutable::now(config('reservations.timezone'))->lessThan($at->addMinutes(config('reservations.hold_minutes')))) {
+                $expired = \Carbon\CarbonImmutable::now(config('reservations.timezone'))
+                    ->greaterThanOrEqualTo($at->addMinutes(config('reservations.hold_minutes')));
+                if ($status === 'ARRIVED' && $expired) {
+                    throw ValidationException::withMessages(['status' => ['Lượt đặt đã hết thời gian giữ bàn.']]);
+                }
+                if ($status === 'NO_SHOW' && !$expired) {
                     throw ValidationException::withMessages(['status' => ['Chỉ đánh dấu khách không đến sau khi hết thời gian giữ bàn.']]);
                 }
             }

@@ -33,6 +33,7 @@ const DailyStockSheetView  = () => import('../views/staff/DailyStockSheetView.vu
 // Cashier
 const CashierInvoicesView  = () => import('../views/staff/cashier/CashierInvoicesView.vue')
 const CashierReservationsView = () => import('../views/staff/cashier/CashierReservationsView.vue')
+const StaffTableScheduleView = () => import('../views/staff/StaffTableScheduleView.vue')
 const CashierRevenueView   = () => import('../views/staff/cashier/CashierRevenueView.vue')
 // Manager
 const ManagerDashboardView = () => import('../views/staff/manager/ManagerDashboardView.vue')
@@ -197,6 +198,7 @@ const router = createRouter({
             meta: { requiresStaffRole: ['CASHIER'] as StaffRole[] },
             children: [
                 { path: '', redirect: '/staff/cashier/invoices' },
+                { path: 'tables', name: 'cashier-table-schedule', component: StaffTableScheduleView, meta: { title: 'Lịch bàn' } },
                 { path: 'invoices',     name: 'cashier-invoices',     component: CashierInvoicesView,     meta: { title: 'Quản lý hóa đơn',  subtitle: 'Hóa đơn cần thanh toán và đã thanh toán' } },
                 { path: 'online-orders',name: 'cashier-online-orders',component: () => import('../views/staff/manager/ManagerOnlineOrdersView.vue'), meta: { title: 'Đơn giao hàng', subtitle: 'Xác nhận, từ chối, bàn giao shipper' } },
                 { path: 'reservations', name: 'cashier-reservations', component: CashierReservationsView, meta: { title: 'Đặt bàn trước',    subtitle: 'Xác nhận đặt bàn' } },
@@ -218,6 +220,8 @@ const router = createRouter({
             meta: { requiresStaffRole: ['MANAGER'] as StaffRole[] },
             children: [
                 { path: '', redirect: '/staff/manager/dashboard' },
+                { path: 'tables', name: 'manager-table-schedule', component: StaffTableScheduleView, meta: { title: 'Lịch bàn' } },
+                { path: 'reservations', name: 'manager-reservations', component: CashierReservationsView, meta: { title: 'Đặt bàn trước', subtitle: 'Xác nhận đặt bàn' } },
                 { path: 'accounts', name: 'manager-accounts', component: () => import('../views/staff/manager/ManagerAccountsView.vue'), meta: { title: 'Quản lý tài khoản' } },
                 { path: 'permissions', name: 'manager-permissions', component: () => import('../views/staff/manager/ManagerAccountsView.vue'), meta: { title: 'Phân quyền' } },
                 { path: 'security', redirect: '/staff/manager/dashboard' },

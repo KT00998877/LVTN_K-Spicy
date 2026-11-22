@@ -129,6 +129,10 @@ const managerGroups = [
         { path: '/staff/manager/stock-transactions', label: 'Lịch sử kho' },
         { path: '/staff/manager/daily-stock', label: 'Sổ kho hằng ngày' },
     ] },
+    { id: 'tables', label: 'Quản lý bàn', items: [
+        { path: '/staff/manager/tables', label: 'Lịch bàn' },
+        { path: '/staff/manager/reservations', label: 'Đặt bàn' },
+    ] },
     { id: 'sales', label: 'Đơn hàng & hóa đơn', items: [
         { path: '/staff/manager/orders', label: 'Đơn hàng' },
         { path: '/staff/manager/invoices', label: 'Hóa đơn' },
@@ -186,6 +190,7 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
         { path: '/staff/kitchen/daily-stock', label: 'Sổ kho hằng ngày', roles: ['KITCHEN'] },
     ],
     CASHIER: [
+        { path: '/staff/cashier/tables', label: 'Lịch bàn', roles: ['CASHIER'] },
         { path: '/staff/cashier/invoices',      label: 'Hóa đơn',            roles: ['CASHIER'] },
         { path: '/staff/cashier/online-orders', label: 'Đơn giao hàng',      roles: ['CASHIER'] },
         { path: '/staff/cashier/reservations',  label: 'Đặt bàn',            roles: ['CASHIER'] },
@@ -219,8 +224,8 @@ const menuItems = computed<MenuItem[]>(() => {
         })
     }
     if (staffStore.currentRole === 'CASHIER') {
-        return base.map((item, idx) => {
-            if (idx === 0) return { ...item, badge: paymentsStore.unpaidInvoices.length }
+        return base.map((item) => {
+            if (item.path === '/staff/cashier/invoices') return { ...item, badge: paymentsStore.unpaidInvoices.length }
             return item
         })
     }
