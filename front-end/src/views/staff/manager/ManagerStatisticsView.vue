@@ -209,35 +209,34 @@
                 <div class="stats-section__head">
                     <h2 id="ord-title" class="stats-section__title">Trạng thái đơn hàng</h2>
                     <span class="stats-section__meta">
-                        {{ formatInt(orderStatus?.total_orders ?? 0) }} đơn trong kỳ
+                        {{ formatInt(finalOrderTotal) }} đơn đã kết thúc trong kỳ
                     </span>
                 </div>
                 <div class="stats-section__body">
                     <WidgetState
                         :loading="statsStore.loading.orderStatus"
                         :error="statsStore.errors.orderStatus ?? null"
-                        :empty="!orderStatus || (orderStatus.breakdown?.length ?? 0) === 0"
-                        empty-message="Chưa có đơn nào trong kỳ."
+                        :empty="finalOrderTotal === 0"
+                        empty-message="Chưa có đơn hoàn thành hoặc đã hủy trong kỳ."
                         @retry="statsStore.retry('orderStatus')"
                     >
                         <StatsBarChart
-                            v-if="orderStatus && orderStatus.breakdown.length"
-                            :labels="orderStatus.breakdown.map((b) => statusLabel(b.status))"
-                            :data="orderStatus.breakdown.map((b) => b.count)"
+                            :labels="finalOrderBreakdown.map((b) => b.label)"
+                            :data="finalOrderBreakdown.map((b) => b.count)"
                             label="Số đơn theo trạng thái"
                             :ariaLabel="'Biểu đồ thanh ngang trạng thái đơn'"
-                            :height="Math.max(180, orderStatus.breakdown.length * 38)"
+                            :height="180"
                         />
                     </WidgetState>
                 </div>
-                <ul v-if="orderStatus && orderStatus.breakdown.length" class="stats-status-list" aria-label="Chi tiết trạng thái">
-                    <li v-for="b in orderStatus.breakdown" :key="`st-${b.status}`">
+                <ul v-if="finalOrderTotal > 0" class="stats-status-list" aria-label="Chi tiết trạng thái">
+                    <li v-for="b in finalOrderBreakdown" :key="b.status">
                         <span class="stats-status-list__chip" :class="`stats-status-list__chip--${b.status.toLowerCase()}`">
-                            {{ statusLabel(b.status) }}
+                            {{ b.label }}
                         </span>
                         <span class="stats-status-list__val">
                             <strong>{{ formatInt(b.count) }}</strong>
-                            <small>· {{ b.percentage.toFixed(1) }}%</small>
+                            <small>· {{ (b.count / finalOrderTotal * 100).toFixed(1) }}%</small>
                         </span>
                     </li>
                 </ul>
@@ -534,7 +533,14 @@ const route = useRoute()
 
 const overview = computed(() => statsStore.overview)
 const revenueChart = computed(() => statsStore.revenueChart)
-const orderStatus = computed(() => statsStore.orderStatus)
+const finalOrderBreakdown = computed(() => [
+    { status: 'COMPLETED', label: 'Hoàn thành' },
+    { status: 'CANCELLED', label: 'Đã hủy' },
+].map((entry) => ({
+    ...entry,
+    count: statsStore.orderStatus?.breakdown.find((row) => row.status === entry.status)?.count ?? 0,
+})))
+const finalOrderTotal = computed(() => finalOrderBreakdown.value.reduce((total, row) => total + row.count, 0))
 const topProducts = computed(() => statsStore.topProducts)
 const categories = computed(() => statsStore.categories)
 const payments = computed(() => statsStore.payments)
@@ -573,21 +579,6 @@ const orderTypeLabels = computed(() => statsStore.orderTypeRevenue.map(x => ORDE
 const orderTypeValues = computed(() => statsStore.orderTypeRevenue.map(x => x.amount))
 function paymentColor(code: string): string {
     return PAYMENT_COLORS[code] ?? '#d71920'
-}
-
-const STATUS_LABELS: Record<string, string> = {
-    PENDING: 'Chờ xác nhận',
-    CONFIRMED: 'Đã xác nhận',
-    PREPARING: 'Đang nấu',
-    READY: 'Sẵn sàng',
-    SERVED: 'Đã phục vụ',
-    DELIVERING: 'Đang giao',
-    DELIVERED: 'Đã giao',
-    COMPLETED: 'Hoàn thành',
-    CANCELLED: 'Đã hủy',
-}
-function statusLabel(code: string): string {
-    return STATUS_LABELS[code] ?? code
 }
 
 const SEVERITY_LABELS: Record<string, string> = {
