@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             LoyaltyTiersSeeder::class,
             CategoriesAndMenuItemsSeeder::class,
+            MenuItemDescriptionsSeeder::class,
             InventorySeeder::class,
             PurchaseOrderPackagingSeeder::class,
             SupplierPricesSeeder::class,

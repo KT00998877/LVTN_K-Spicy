@@ -81,12 +81,7 @@ function handleFavorite(e: Event) {
     <article
         class="food-card"
         :class="{ 'food-card--sold-out': item.is_available === false }"
-        :tabindex="item.is_available === false ? -1 : 0"
-        :aria-disabled="item.is_available === false ? 'true' : undefined"
         :title="soldOutState?.detail"
-        @click="handleAdd"
-        @keydown.enter="handleAdd"
-        @keydown.space.prevent="handleAdd"
     >
         <!-- Image -->
         <div class="card-image-wrap" :class="{ 'card-image-wrap--combo': showCombo && combo }">
@@ -146,6 +141,8 @@ function handleFavorite(e: Event) {
 
             <!-- Rating badge góc dưới trái -->
             <RatingBadge :menu-item-id="item.id" :rating-summary="item.rating_summary" variant="badge" class="card-rating" />
+            <RouterLink class="card-image-link" :to="{ name: 'menu-item-detail', params: { slug: item.slug } }"
+                :aria-label="'Xem chi tiết ' + item.name" />
         </div>
 
         <!-- Body -->
@@ -198,7 +195,6 @@ function handleFavorite(e: Event) {
     border: 1px solid var(--color-gray-200);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    cursor: pointer;
     height: 100%;
     min-width: 0;
     transition:
@@ -217,13 +213,6 @@ function handleFavorite(e: Event) {
     transform: translateY(-1px);
 }
 
-.food-card:focus-visible {
-    outline: 2px solid var(--color-chili-red);
-    outline-offset: 2px;
-    border-color: var(--color-chili-red);
-}
-
-.food-card--sold-out { cursor: default; }
 .food-card--sold-out:hover { transform: none; border-color: var(--color-gray-200); box-shadow: none; }
 
 .favorite-btn {
@@ -294,6 +283,8 @@ function handleFavorite(e: Event) {
 
 .card-image-wrap--combo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .card-image-wrap--combo .card-image { min-width: 0; min-height: 0; }
+.card-image-link { position: absolute; inset: 0; z-index: 1; }
+.card-image-link:focus-visible { outline: 3px solid var(--color-white); outline-offset: -5px; }
 .card-drink-placeholder { display: grid; place-items: center; padding: 12px; background: #fff1e7; color: #8f2318; font-weight: 700; text-align: center; }
 .card-combo-plus { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--color-chili-red); font-size: 22px; font-weight: 800; box-shadow: var(--shadow-sm); }
 

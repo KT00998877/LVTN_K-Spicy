@@ -89,6 +89,12 @@ const router = createRouter({
             meta: { title: 'Thực đơn - Mì Cay Hàn Quốc' },
         },
         {
+            path: '/thuc-don/:slug',
+            name: 'menu-item-detail',
+            component: () => import('../views/MenuItemDetailView.vue'),
+            meta: { title: 'Chi tiết món - Mì Cay Hàn Quốc' },
+        },
+        {
             path: '/mon-dac-sac',
             name: 'featured-menu',
             component: FeaturedMenuView,
@@ -101,10 +107,22 @@ const router = createRouter({
             meta: { title: 'Món yêu thích - Mì Cay Hàn Quốc', requiresAuth: true },
         },
         {
+            path: '/gio-hang',
+            name: 'cart',
+            component: CheckoutView,
+            meta: { title: 'Giỏ hàng - Mì Cay Hàn Quốc', requiresAuth: true },
+        },
+        {
             path: '/thanh-toan',
             name: 'checkout',
             component: CheckoutView,
             meta: { title: 'Thanh toán - Mì Cay Hàn Quốc', requiresAuth: true },
+        },
+        {
+            path: '/thanh-toan/ma-giam-gia',
+            name: 'checkout-vouchers',
+            component: CheckoutView,
+            meta: { title: 'Chọn mã giảm giá - Mì Cay Hàn Quốc', requiresAuth: true },
         },
         {
             path: '/about',

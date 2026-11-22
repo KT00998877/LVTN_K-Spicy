@@ -84,7 +84,7 @@ onMounted(async () => {
     void loadFlashSales()
     await menuStore.initFromQuery(queryFilters.value)
     // Fetch cart để biết badge count
-    await cartStore.fetchCart()
+    if (authStore.isAuthenticated) await cartStore.fetchCart()
     if (authStore.isAuthenticated) await favoritesStore.load()
 })
 onUnmounted(() => { if (countdownTimer) clearInterval(countdownTimer) })
@@ -139,7 +139,7 @@ function handleAddToCart(item: MenuItemCard) {
         image_url: item.image_url,
         category_slug: item.category_slug,
         suggestions: item.suggestions ?? [],
-    })
+    }, true)
 }
 
 /**
@@ -149,6 +149,11 @@ async function handleModalAddCombo(payload: {
     main: { menu_item_id: number; quantity: number; spicy_level: number; note: string; topping_ids: number[] }
     suggestion_id: number
 }) {
+    if (!authStore.isAuthenticated) {
+        cartStore.closeModal()
+        await router.push({ name: 'login', query: { redirect: route.fullPath } })
+        return
+    }
     if (!await cartStore.addCombo(payload.main, payload.suggestion_id)) {
         toast.error(cartStore.error ?? 'Chưa thể thêm combo. Vui lòng thử lại.')
     }
@@ -164,6 +169,11 @@ async function handleModalSubmit(payload: {
     note: string
     topping_ids: number[]
 }) {
+    if (!authStore.isAuthenticated) {
+        cartStore.closeModal()
+        await router.push({ name: 'login', query: { redirect: route.fullPath } })
+        return
+    }
     if (modalItem.value) {
         await cartStore.updateItem(modalItem.value.id, {
             quantity: payload.quantity,
@@ -186,7 +196,7 @@ async function handleModalSubmit(payload: {
  * Khi modal đóng → cập nhật cart count trên navbar.
  */
 watch(modalVisible, async (val) => {
-    if (!val) {
+    if (!val && authStore.isAuthenticated) {
         await cartStore.fetchCart(true)
     }
 })

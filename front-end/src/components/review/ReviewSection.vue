@@ -9,14 +9,14 @@
  * Dùng cho FoodDetailModal (mở rộng) hoặc OrderDetailView.
  */
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import ReviewList from './ReviewList.vue'
 import ReviewFormModal from './ReviewFormModal.vue'
-import StarRating from './StarRating.vue'
 import { fetchReviewEligibility, deleteReview } from '@/api/review'
 import { useAuthStore } from '@/stores/auth'
 import { useAppDialog } from '@/composables/useAppDialog'
 import { useToast } from '@/composables/useStaffUtils'
-import type { Review, ReviewEligibility } from '@/types/review'
+import type { ReviewEligibility } from '@/types/review'
 
 const props = defineProps<{
     menuItem: { id: number; name: string; image_url?: string | null }
@@ -30,14 +30,14 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const route = useRoute()
 const appDialog = useAppDialog()
 const toast = useToast()
 const eligibility = ref<ReviewEligibility | null>(null)
 const loadingEligibility = ref(false)
 const showModal = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
-const refreshing = ref(false)
-const listRef = ref<InstanceType<typeof ReviewList> | null>(null)
+const reviewListVersion = ref(0)
 
 async function loadEligibility() {
     if (!authStore.isAuthenticated) {
@@ -70,22 +70,16 @@ async function handleDelete() {
     try {
         await deleteReview(eligibility.value.existing_review.id)
         await loadEligibility()
-        listRef.value?.$el?.dispatchEvent(new Event('refresh'))
-        // Trigger reload by re-mounting key in parent if needed
-        refreshLocal()
+        reviewListVersion.value++
         emit('changed')
     } catch {
         toast.error('Không thể xóa đánh giá. Vui lòng thử lại.')
     }
 }
 
-function refreshLocal() {
-    refreshing.value = true
-    setTimeout(() => { refreshing.value = false }, 100)
-}
-
-async function handleSubmitted(review: Review) {
+async function handleSubmitted() {
     await loadEligibility()
+    reviewListVersion.value++
     emit('changed')
 }
 
@@ -127,19 +121,12 @@ onMounted(() => {
                 </div>
             </div>
             <div v-else-if="!authStore.isAuthenticated" class="actions">
-                <a href="/dang-nhap" class="btn btn-outline">Đăng nhập để đánh giá</a>
+                <RouterLink :to="{ name: 'login', query: { redirect: route.fullPath } }" class="btn btn-outline">Đăng nhập để đánh giá</RouterLink>
             </div>
         </header>
 
         <!-- Review list -->
-        <div :key="refreshing.toString()">
-            <ReviewList
-                ref="listRef"
-                :menu-item-id="menuItem.id"
-                :compact="compact"
-                @changed="emit('changed')"
-            />
-        </div>
+        <ReviewList :key="reviewListVersion" :menu-item-id="menuItem.id" :compact="compact" />
 
         <!-- Modal -->
         <ReviewFormModal

@@ -49,25 +49,24 @@ const checkoutConfig = ref<{ restaurant_address: string; latitude: number; longi
 const quote = ref<{ shipping_fee: number; distance_km: number; discount: number; total: number; max_points: number; balance: number; combo_discount?: number; voucher?: VoucherPreview | null; voucher_error?: string | null } | null>(null)
 const quoteLoading = ref(false)
 const quoteError = ref('')
-/** Voucher đã chọn (null nếu chưa áp dụng / đã bỏ). */
-const voucherCode = ref<string | null>(null)
-const voucherPreview = ref<VoucherPreview | null>(null)
-/** Mã voucher đến từ banner/chuông ưu đãi (?voucher=CODE) — tự áp dụng 1 lần. */
 const route = useRoute()
-const voucherFromLink = computed(() => {
+const isCartStep = computed(() => route.name === 'cart')
+const isVoucherStep = computed(() => route.name === 'checkout-vouchers')
+const isCheckoutStep = computed(() => !isCartStep.value && !isVoucherStep.value)
+const voucherCode = computed(() => {
     const raw = route.query.voucher
-    return typeof raw === 'string' ? raw.trim().toUpperCase() : null
+    return typeof raw === 'string' ? raw.trim().toUpperCase() || null : null
 })
 let quoteRevision = 0
 let quoteTimer: ReturnType<typeof setTimeout> | undefined
 const money = (value: number) => `${value.toLocaleString('vi-VN')}đ`
-watch([orderType, location, points, () => cart.value?.version, voucherCode], () => {
+watch([isCheckoutStep, orderType, location, points, () => cart.value?.version, voucherCode], () => {
     const revision = ++quoteRevision
     clearTimeout(quoteTimer)
     quote.value = null
     quoteError.value = ''
     quoteLoading.value = false
-    if (!cart.value || (orderType.value === 'ONLINE' && !location.value)) return
+    if (!isCheckoutStep.value || !cart.value?.items.length || (orderType.value === 'ONLINE' && !location.value)) return
     quoteLoading.value = true
     quoteTimer = setTimeout(async () => {
         try {
@@ -81,7 +80,7 @@ watch([orderType, location, points, () => cart.value?.version, voucherCode], () 
             if (revision === quoteRevision) quoteError.value = (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Không lấy được phí giao hàng. Hãy thử lại.'
         } finally { if (revision === quoteRevision) quoteLoading.value = false }
     }, 300)
-})
+}, { immediate: true })
 onBeforeUnmount(() => { quoteRevision++; clearTimeout(quoteTimer) })
 
 /**
@@ -114,7 +113,7 @@ const subtotalFormatted = computed(() => cart.value?.subtotal_formatted ?? '0 đ
 
 const canCheckout = computed(() => {
     if (isEmpty.value) return false
-    if (!quote.value || quoteLoading.value) return false
+    if (!quote.value || quoteLoading.value || quote.value.voucher_error) return false
     if (orderType.value === 'ONLINE') {
         return recipientOk.value && phoneOk.value && addressOk.value
     }
@@ -130,16 +129,26 @@ function showAddressField(): boolean {
 
 onMounted(async () => {
     if (!authStore.isAuthenticated) {
-        router.replace({ name: 'login', query: { redirect: '/thanh-toan' } })
+        router.replace({ name: 'login', query: { redirect: route.fullPath } })
         return
     }
     await cartStore.fetchCart(true)
-    try { checkoutConfig.value = (await api.get('/checkout/config')).data }
-    catch { quoteError.value = 'Không tải được cấu hình giao hàng. Vui lòng tải lại trang.' }
     recipientName.value = authStore.user?.name ?? ''
     if (!recipientPhone.value) recipientPhone.value = authStore.user?.phone ?? ''
-    // Tự động lấy GPS ngay khi mount nếu đang ở chế độ Giao hàng và chưa có vị trí.
+    if (isCheckoutStep.value) await startCheckout()
+})
+
+async function startCheckout() {
     autoLocateOnOnline()
+    if (checkoutConfig.value) return
+    try { checkoutConfig.value = (await api.get('/checkout/config')).data }
+    catch {
+        if (isCheckoutStep.value) quoteError.value = 'Không tải được cấu hình giao hàng. Vui lòng tải lại trang.'
+    }
+}
+
+watch(isCheckoutStep, isCheckout => {
+    if (isCheckout) void startCheckout()
 })
 
 /** Tự động lấy vị trí hiện tại của khách khi chọn chế độ giao hàng lần đầu. */
@@ -157,7 +166,7 @@ function autoLocateOnOnline(): void {
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     )
 }
-watch(orderType, () => autoLocateOnOnline(), { immediate: true })
+watch(orderType, () => { if (isCheckoutStep.value) autoLocateOnOnline() })
 
 /** Khi toạ độ thay đổi (GPS / click / kéo ghim). */
 function onLocationChange(point: { latitude: number; longitude: number; address: string }) {
@@ -181,12 +190,14 @@ function onResolvedAddress(address: string) {
 const lastGeocodedAddress = ref('')
 
 function onVoucherApplied(preview: VoucherPreview) {
-    voucherPreview.value = preview
-    voucherCode.value = preview.code
+    if (!isVoucherStep.value) return
+    void router.replace({ name: 'checkout', query: { ...route.query, voucher: preview.code } })
 }
 function onVoucherCleared() {
-    voucherPreview.value = null
-    voucherCode.value = null
+    if (!isVoucherStep.value || !voucherCode.value) return
+    const query = { ...route.query }
+    delete query.voucher
+    void router.replace({ name: 'checkout-vouchers', query })
 }
 watch(deliveryAddress, value => {
     if (value.trim() && value.trim() !== lastGeocodedAddress.value) {
@@ -229,7 +240,7 @@ async function handleModalSubmit(payload: {
 }
 
 async function handleSubmitOrder() {
-    if (submitting.value || cartStore.isLoading || (isEmpty.value && !cartStore.pendingCheckout)) return
+    if (!isCheckoutStep.value || submitting.value || cartStore.isLoading || (isEmpty.value && !cartStore.pendingCheckout)) return
     if (!canCheckout.value && !cartStore.pendingCheckout) {
         successMessage.value = null
         if (orderType.value === 'ONLINE') {
@@ -302,10 +313,12 @@ function continueShopping() {
     <NavbarHome />
 
     <main class="checkout-page">
-        <div class="checkout-container">
+        <div class="checkout-container" :class="{ 'checkout-container--form': !isCartStep }">
             <header class="page-header">
-                <h1 class="page-title">Giỏ hàng & Thanh toán</h1>
-                <p class="page-subtitle">Kiểm tra lại các món ăn và chọn hình thức nhận hàng.</p>
+                <h1 class="page-title">{{ isCartStep ? 'Giỏ hàng' : isVoucherStep ? 'Chọn mã giảm giá' : 'Thông tin đơn hàng' }}</h1>
+                <p v-if="!isVoucherStep" class="page-subtitle">{{ isCartStep ? 'Kiểm tra các món trước khi đặt.' : 'Chọn hình thức nhận hàng và thanh toán.' }}</p>
+                <RouterLink v-if="isCheckoutStep" class="back-to-cart" :to="{ name: 'cart', query: route.query }">← Quay lại giỏ hàng</RouterLink>
+                <RouterLink v-else-if="isVoucherStep" class="back-to-cart" replace :to="{ name: 'checkout', query: route.query }">← Quay lại thanh toán</RouterLink>
             </header>
 
             <div v-if="error" class="alert alert-error" role="alert">{{ error }}</div>
@@ -313,7 +326,8 @@ function continueShopping() {
             <p v-if="submitting" role="status">Đang xử lý đặt món và thanh toán…</p>
             <div v-if="cartStore.pendingCheckout" class="alert" role="status">
                 Lần đặt hàng trước đang chờ xác định kết quả. Hãy kiểm tra lại trước khi sửa giỏ hoặc đặt đơn mới.
-                <button type="button" class="btn btn-primary" :disabled="submitting || cartStore.isLoading" @click="handleSubmitOrder">
+                <RouterLink v-if="!isCheckoutStep" class="btn btn-primary" :to="{ name: 'checkout', query: route.query }">Kiểm tra đơn đang xử lý</RouterLink>
+                <button v-else type="button" class="btn btn-primary" :disabled="submitting || cartStore.isLoading" @click="handleSubmitOrder">
                     {{ submitting ? 'Đang kiểm tra...' : 'Kiểm tra lại kết quả đặt hàng' }}
                 </button>
             </div>
@@ -335,9 +349,9 @@ function continueShopping() {
             </div>
 
             <!-- ===== Cart ===== -->
-            <div v-else class="checkout-grid">
+            <template v-else>
                 <!-- ===== Danh sách món ===== -->
-                <section class="cart-items">
+                <section v-if="isCartStep" class="cart-items">
                     <header class="cart-header">
                         <h2>Món đã chọn ({{ cart?.total_items ?? 0 }})</h2>
                         <button
@@ -423,32 +437,25 @@ function continueShopping() {
                             </div>
                         </article>
 
-                        <!-- Tiết kiệm combo (Phase 3) -->
-                        <div v-if="cart && cart.combo_discount > 0" class="combo-summary">
-                            <div class="combo-summary-head">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M8 2h8l-1 6H9L8 2z"></path>
-                                    <path d="M12 8v13"></path>
-                                    <path d="M7 21h10"></path>
-                                </svg>
-                                <span>Tiết kiệm combo</span>
-                                <strong>−{{ cart.combo_discount_formatted }}</strong>
-                            </div>
-                            <ul class="combo-summary-list">
-                                <li v-for="line in cart.combo_lines" :key="line.suggestion_id">
-                                    {{ line.title }}
-                                    <span v-if="line.quantity > 1">×{{ line.quantity }}</span>
-                                    <span class="combo-saving">−{{ line.saving.toLocaleString('vi-VN') }}đ</span>
-                                </li>
-                            </ul>
-                        </div>
                     </div>
+                    <footer class="cart-actions">
+                        <button type="button" class="btn-continue" @click="continueShopping">Tiếp tục chọn món</button>
+                        <button v-if="!cartStore.pendingCheckout" type="button" class="btn btn-primary"
+                            :disabled="cartStore.isLoading" @click="router.push({ name: 'checkout', query: route.query })">Đặt món</button>
+                    </footer>
                 </section>
 
-                <!-- ===== Tóm tắt & Submit ===== -->
-                <aside class="cart-summary-wrapper">
-                    <div class="cart-summary">
-                        <h2 class="summary-title">Thông tin đơn hàng</h2>
+                <section v-else-if="isVoucherStep" class="cart-summary" aria-label="Mã giảm giá">
+                    <VoucherInput
+                        :model-value="voucherCode"
+                        :subtotal="cart?.subtotal ?? 0"
+                        :disabled="submitting || !!cartStore.pendingCheckout"
+                        @applied="onVoucherApplied"
+                        @cleared="onVoucherCleared"
+                    />
+                </section>
+                <section v-else class="cart-summary">
+                        <h2 class="summary-title">Nhận hàng và thanh toán</h2>
 
                         <!-- Loại đơn -->
                         <div class="form-group">
@@ -551,14 +558,15 @@ function continueShopping() {
                             </p>
                         </div>
                         <div class="form-group">
-                            <VoucherInput
-                                v-model="voucherCode"
-                                :subtotal="cart?.subtotal ?? 0"
-                                :initial-code="voucherFromLink"
-                                :disabled="submitting || !!cartStore.pendingCheckout"
-                                @applied="onVoucherApplied"
-                                @cleared="onVoucherCleared"
-                            />
+                            <p class="form-label">Mã giảm giá</p>
+                            <p v-if="quote?.voucher_error" class="recipient-warn" role="alert">{{ quote.voucher_error }}</p>
+                            <p v-else-if="voucherCode" class="recipient-help">
+                                {{ quote?.voucher ? 'Đang áp dụng' : 'Đã chọn' }} <strong>{{ voucherCode }}</strong>
+                            </p>
+                            <RouterLink v-if="!submitting && !cartStore.pendingCheckout" class="btn btn-vouchers"
+                                :to="{ name: 'checkout-vouchers', query: route.query }">
+                                {{ voucherCode ? 'Đổi hoặc bỏ mã giảm giá' : 'Chọn mã giảm giá' }}
+                            </RouterLink>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="redeem-points">Dùng điểm giảm giá</label>
@@ -606,6 +614,22 @@ function continueShopping() {
                             </div>
                         </div>
 
+                        <section class="order-review" aria-labelledby="order-review-heading">
+                            <h2 id="order-review-heading">Món trong đơn</h2>
+                            <ul>
+                                <li v-for="item in cart?.items" :key="item.id" class="order-review-item">
+                                    <img v-if="item.menu_item.image_url" :src="imageUrl(item.menu_item.image_url)" alt="" loading="lazy" />
+                                    <div>
+                                        <strong>{{ item.menu_item.name }}</strong>
+                                        <p>Số lượng: {{ item.quantity }} · {{ spicyLabel(item.spicy_level) }}</p>
+                                        <p v-if="item.toppings.length">Topping: {{ item.toppings.map(topping => topping.name).join(', ') }}</p>
+                                        <p v-if="item.note">Ghi chú: {{ item.note }}</p>
+                                    </div>
+                                    <strong class="order-review-price">{{ item.subtotal_formatted }}</strong>
+                                </li>
+                            </ul>
+                        </section>
+
                         <!-- Tổng -->
                         <div class="summary-total">
                             <div class="total-row"><span>Tiền món</span><span>{{ subtotalFormatted }}</span></div>
@@ -615,9 +639,9 @@ function continueShopping() {
                             </div>
                             <div v-if="quote && quote.discount > 0" class="total-row voucher-row">
                                 <span>
-                                    <span v-if="voucherPreview">Voucher <strong>{{ voucherPreview.code }}</strong></span>
+                                    <span v-if="quote.voucher">Voucher <strong>{{ quote.voucher.code }}</strong></span>
                                     <span v-else>Giảm giá</span>
-                                    <span v-if="voucherPreview && points > 0"> + điểm</span>
+                                    <span v-if="quote.voucher && points > 0"> + điểm</span>
                                 </span>
                                 <span class="discount-amount">−{{ quote ? money(quote.discount) : '—' }}</span>
                             </div>
@@ -641,23 +665,15 @@ function continueShopping() {
                             <span v-else>Xác nhận đặt hàng</span>
                         </button>
 
-                        <button
-                            type="button"
-                            class="btn-continue"
-                            @click="continueShopping"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            Tiếp tục chọn món
-                        </button>
-                    </div>
-                </aside>
-            </div>
+                </section>
+            </template>
         </div>
     </main>
 
     <FooterHome />
 
     <FoodDetailModal
+        v-if="isCartStep"
         v-model:visible="modalVisible"
         :menu-item="modalMenuItem"
         :cart-item="modalItem"
@@ -667,6 +683,28 @@ function continueShopping() {
 </template>
 
 <style scoped>
+.back-to-cart { display: inline-block; margin-top: 8px; color: var(--color-chili-red); font-weight: 700; }
+.checkout-page a.btn { text-decoration: none; }
+.btn-vouchers { border: 1px solid var(--color-chili-red); color: var(--color-chili-red); min-height: 44px; }
+.order-review { margin-bottom: 24px; }
+.order-review h2 { margin: 0 0 12px; font-size: 18px; }
+.order-review ul { margin: 0; padding: 0; list-style: none; }
+.order-review-item {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--color-gray-200);
+}
+.order-review-item img { width: 56px; height: 56px; object-fit: cover; border-radius: var(--radius-md); }
+.order-review-item div { grid-column: 2; overflow-wrap: anywhere; }
+.order-review-item p { margin: 2px 0 0; color: var(--color-gray-600); font-size: 13px; }
+.order-review-price { white-space: nowrap; }
+@media (max-width: 420px) {
+    .order-review-item { grid-template-columns: 56px minmax(0, 1fr); }
+    .order-review-price { grid-column: 2; }
+}
 .checkout-page {
     min-height: 100vh;
     background: var(--color-gray-50);
@@ -744,19 +782,9 @@ function continueShopping() {
     to { transform: rotate(360deg); }
 }
 
-/* ===== Grid ===== */
-.checkout-grid {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 32px;
-    align-items: flex-start;
-}
-
-@media (max-width: 992px) {
-    .checkout-grid {
-        grid-template-columns: 1fr;
-    }
-}
+.checkout-container--form { max-width: 760px; }
+.cart-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.cart-actions .btn-continue { width: auto; }
 
 /* ===== Cart Items ===== */
 .cart-items {
@@ -932,62 +960,6 @@ function continueShopping() {
     color: var(--color-white);
 }
 
-/* ===== Combo saving (Phase 3) ===== */
-.combo-summary {
-    margin-top: 16px;
-    padding: 16px 18px;
-    border: 1px dashed var(--color-golden-yellow, #f5b301);
-    border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, rgba(245, 179, 1, 0.08), rgba(229, 57, 53, 0.06));
-}
-
-.combo-summary-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--color-charcoal-black);
-}
-
-.combo-summary-head svg {
-    color: var(--color-golden-yellow, #f5b301);
-    flex-shrink: 0;
-}
-
-.combo-summary-head strong {
-    margin-left: auto;
-    color: var(--color-chili-red);
-    font-weight: 800;
-}
-
-.combo-summary-list {
-    list-style: none;
-    margin: 12px 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.combo-summary-list li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--color-gray-600);
-}
-
-.combo-summary-list li span {
-    color: var(--color-gray-400);
-}
-
-.combo-summary-list .combo-saving {
-    margin-left: auto;
-    color: var(--color-chili-red);
-    font-weight: 700;
-}
-
 @media (max-width: 768px) {
     .cart-item {
         grid-template-columns: 80px 1fr auto;
@@ -1004,11 +976,6 @@ function continueShopping() {
 }
 
 /* ===== Summary ===== */
-.cart-summary-wrapper {
-    position: sticky;
-    top: 100px;
-}
-
 .cart-summary {
     background: var(--color-white);
     border-radius: var(--radius-2xl);

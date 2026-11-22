@@ -16,7 +16,6 @@
  * (component không gọi quote trực tiếp để tránh duplicate).
  */
 import { ref, onMounted } from 'vue'
-import apiClient from '@/api/client'
 import { previewVoucher, fetchActiveVouchers } from '@/api/voucher'
 import type { Voucher, VoucherPreview } from '@/types/voucher'
 
@@ -24,11 +23,6 @@ const props = defineProps<{
     modelValue: string | null
     subtotal: number
     disabled?: boolean
-    /**
-     * Mã cần tự áp dụng khi mount (vd khách bấm banner ưu đãi → /checkout?voucher=CODE).
-     * Component sẽ gọi preview và emit như khi khách tự nhập tay.
-     */
-    initialCode?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -37,7 +31,7 @@ const emit = defineEmits<{
     (e: 'cleared'): void
 }>()
 
-const codeInput = ref(props.modelValue ?? '')
+const codeInput = ref('')
 const appliedCode = ref<string | null>(props.modelValue ?? null)
 const preview = ref<VoucherPreview | null>(null)
 const loading = ref(false)
@@ -45,15 +39,7 @@ const error = ref<string | null>(null)
 const list = ref<Voucher[]>([])
 const listLoading = ref(false)
 
-onMounted(async () => {
-    await loadList()
-    // Mã đến từ banner/chuông ưu đãi → tự áp dụng luôn.
-    const initial = (props.initialCode ?? '').trim()
-    if (initial && initial !== appliedCode.value) {
-        codeInput.value = initial
-        await applyCode(initial)
-    }
-})
+onMounted(loadList)
 
 async function loadList() {
     listLoading.value = true
@@ -68,7 +54,7 @@ async function loadList() {
 
 async function applyCode(targetCode?: string) {
     const trimmed = ((targetCode ?? codeInput.value) ?? '').trim().toUpperCase()
-    if (!trimmed) return
+    if (!trimmed || props.disabled || loading.value) return
     loading.value = true
     error.value = null
     try {
@@ -85,10 +71,6 @@ async function applyCode(targetCode?: string) {
         } else {
             error.value = 'Không kiểm tra được mã. Vui lòng thử lại.'
         }
-        preview.value = null
-        appliedCode.value = null
-        emit('update:modelValue', null)
-        emit('cleared')
     } finally {
         loading.value = false
     }
@@ -124,16 +106,16 @@ function fmtMoney(n: number): string {
         </label>
 
         <!-- Đã áp dụng -->
-        <div v-if="appliedCode && preview" class="voucher-applied" role="status">
+        <div v-if="appliedCode" class="voucher-applied">
             <div class="applied-info">
-                <span class="applied-badge">{{ preview.code }}</span>
-                <span class="applied-name">{{ preview.name }}</span>
-                <span class="applied-amount">−{{ fmtMoney(preview.discount) }}</span>
+                <span class="applied-badge">{{ appliedCode }}</span>
+                <span v-if="preview" class="applied-name">{{ preview.name }}</span>
+                <span v-if="preview" class="applied-amount">−{{ fmtMoney(preview.discount) }}</span>
             </div>
             <button
                 type="button"
                 class="applied-clear"
-                :disabled="disabled"
+                :disabled="disabled || loading"
                 @click="clearApplied"
                 aria-label="Bỏ mã giảm giá"
             >
@@ -146,11 +128,12 @@ function fmtMoney(n: number): string {
         </div>
 
         <!-- Form nhập -->
-        <div v-else class="voucher-input-row">
+        <div class="voucher-input-row">
             <input
                 id="voucher-input"
                 v-model="codeInput"
                 type="text"
+                maxlength="50"
                 class="voucher-input"
                 placeholder="Nhập mã (vd: WELCOME10)"
                 autocomplete="off"
@@ -171,7 +154,7 @@ function fmtMoney(n: number): string {
         <p v-if="error" class="voucher-msg error" role="alert">{{ error }}</p>
 
         <!-- Danh sách voucher đang hiệu lực -->
-        <div v-if="!appliedCode && list.length" class="voucher-list">
+        <div v-if="list.length" class="voucher-list">
             <p class="voucher-list-title">Mã khuyến mãi có sẵn</p>
             <div class="voucher-list-grid">
                 <button
@@ -179,7 +162,7 @@ function fmtMoney(n: number): string {
                     :key="v.id"
                     type="button"
                     class="voucher-chip"
-                    :disabled="disabled || loading || props.subtotal < v.min_order_subtotal"
+                    :disabled="disabled || loading || v.code === appliedCode || props.subtotal < v.min_order_subtotal"
                     :title="props.subtotal < v.min_order_subtotal ? `Đơn tối thiểu ${fmtMoney(v.min_order_subtotal)}` : ''"
                     @click="pickFromList(v)"
                 >
@@ -192,7 +175,7 @@ function fmtMoney(n: number): string {
                 </button>
             </div>
         </div>
-        <p v-if="!appliedCode && !listLoading && !list.length" class="voucher-msg muted">
+        <p v-if="!listLoading && !list.length" class="voucher-msg muted">
             Hiện chưa có mã khuyến mãi nào.
         </p>
     </div>

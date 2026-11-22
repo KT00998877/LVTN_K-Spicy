@@ -97,8 +97,8 @@ export const useCartStore = defineStore('cart', {
                 if (valid() && !quiet) this.loadingCart = false
             }
         },
-        openAddModal(menuItem: MenuSelection): void {
-            if (!this.isLoggedIn) { window.location.href = '/dang-nhap?redirect=/thuc-don'; return }
+        openAddModal(menuItem: MenuSelection, allowGuest = false): void {
+            if (!allowGuest && !this.isLoggedIn) { window.location.href = '/dang-nhap?redirect=/thuc-don'; return }
             this.restoreCheckout()
             if (!this.canMutate) {
                 window.location.href = '/thanh-toan'

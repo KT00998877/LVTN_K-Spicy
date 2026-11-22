@@ -96,7 +96,7 @@ function loadPage(p: number) {
 <template>
     <div class="review-list" :class="{ compact }">
         <!-- Summary -->
-        <div v-if="showSummary" class="review-summary">
+        <div v-if="showSummary && (isOwnProps || summary)" class="review-summary">
             <div class="summary-avg">
                 <div class="avg-number">{{ displaySummary.average > 0 ? displaySummary.average.toFixed(1) : '—' }}</div>
                 <StarRating
@@ -118,7 +118,10 @@ function loadPage(p: number) {
         </div>
 
         <!-- Error -->
-        <div v-if="error" class="review-error" role="alert">{{ error }}</div>
+        <div v-if="error" class="review-error">
+            <p role="alert">{{ error }}</p>
+            <button type="button" class="page-btn" @click="load(currentPage)">Thử lại</button>
+        </div>
 
         <!-- Empty -->
         <div v-else-if="displayItems.length === 0 && !loading && !isOwnProps" class="review-empty">
@@ -133,7 +136,7 @@ function loadPage(p: number) {
         </div>
 
         <!-- Loading -->
-        <div v-else-if="loading" class="review-loading">Đang tải đánh giá...</div>
+        <div v-else-if="loading" class="review-loading" role="status">Đang tải đánh giá...</div>
 
         <!-- List -->
         <ul v-else class="reviews">
@@ -182,7 +185,7 @@ function loadPage(p: number) {
 </template>
 
 <style scoped>
-.review-list { display: flex; flex-direction: column; gap: 20px; }
+.review-list { display: flex; flex-direction: column; gap: 20px; container-type: inline-size; }
 
 /* Summary */
 .review-summary {
@@ -391,7 +394,7 @@ function loadPage(p: number) {
 .review-list.compact .review-summary { display: none; }
 
 /* Responsive */
-@media (max-width: 640px) {
+@container (max-width: 640px) {
     .review-summary {
         grid-template-columns: 1fr;
         gap: 16px;

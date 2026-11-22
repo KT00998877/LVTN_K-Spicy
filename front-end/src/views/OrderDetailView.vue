@@ -53,7 +53,7 @@ async function reorder(): Promise<void> {
     try {
         reorderResult.value = await reorderMyOrder(current.value.id)
         await cartStore.fetchCart(true)
-        if (reorderResult.value.added.length) await router.push('/thanh-toan')
+        if (reorderResult.value.added.length) await router.push({ name: 'cart' })
     } catch (err) {
         reorderError.value = (err as { response?: { data?: { message?: string } } }).response?.data?.message
             ?? 'Không thể đặt lại đơn. Vui lòng thử lại.'
@@ -527,7 +527,7 @@ useRealtimeRefresh(() => orderStore.fetchDetail(orderId.value, true), () => !!or
                         <p v-for="(item, index) in reorderResult.price_changes" :key="index">
                             {{ item.name }}: giá {{ formatCurrency(item.old_price) }} → {{ formatCurrency(item.new_price) }}.
                         </p>
-                        <router-link v-if="reorderResult.added.length" to="/thanh-toan">Xem giỏ hàng</router-link>
+                        <router-link v-if="reorderResult.added.length" :to="{ name: 'cart' }">Xem giỏ hàng</router-link>
                     </div>
                 </section>
                 <!-- ====== Header ====== -->

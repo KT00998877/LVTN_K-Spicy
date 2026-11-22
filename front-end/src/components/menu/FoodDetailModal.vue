@@ -344,7 +344,7 @@ useRealtimeRefresh(async () => { toppings.value = await fetchToppings() }, () =>
 
                             <!-- Header -->
                             <div class="section-header">
-                                <span class="header-badge">{{ isEditMode ? 'Cập nhật' : 'Thêm món' }}</span>
+                                    <span class="header-badge">{{ isEditMode ? 'Cập nhật' : 'Thêm món' }}</span>
                                 <h2 class="header-title">{{ menuItem?.name }}</h2>
                                 <p v-if="menuItem?.description" class="header-desc">{{ menuItem.description }}</p>
                                 

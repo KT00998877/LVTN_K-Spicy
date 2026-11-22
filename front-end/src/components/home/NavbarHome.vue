@@ -121,10 +121,10 @@ const isPrimaryActive = (name: string) => route.name === name
 function goToOrder() {
     closeMobileMenu()
     if (!isAuthenticated.value) {
-        router.push({ name: 'login', query: { redirect: '/thanh-toan' } })
+        router.push({ name: 'login', query: { redirect: '/gio-hang' } })
         return
     }
-    router.push('/thanh-toan')
+    router.push({ name: 'cart' })
 }
 
 function goToMenu() {
@@ -188,7 +188,7 @@ useRealtimeRefresh(
 
 const transparent = computed(() => isTransparent.value)
 const solid = computed(() => isSolid.value)
-const showMobileCTA = computed(() => !['menu', 'checkout', 'order-detail'].includes(String(route.name)))
+const showMobileCTA = computed(() => !['menu', 'cart', 'checkout', 'checkout-vouchers', 'order-detail'].includes(String(route.name)))
 </script>
 
 <template>
