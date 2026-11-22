@@ -2,8 +2,10 @@
 
 namespace App\Services\Marketing;
 
-use App\Models\{Campaign, MenuItem, Promotion};
+use App\Models\{Campaign, Category, MenuItem, MenuItemSuggestion, Promotion};
+use App\Services\{FlashSaleService, MenuAvailabilityService, MenuSuggestionService};
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * MarketingService — Build ngữ cảnh (context) từ DB để AI sinh content phong phú.
@@ -35,6 +37,8 @@ class MarketingService
             'store_info' => $this->getStoreInfo(),
             'campaigns'  => $this->listActiveCampaigns(),
             'menu_items' => $this->listPopularMenuItems(),
+            'combos'     => app(MenuSuggestionService::class)->featuredCombos(PHP_INT_MAX),
+            'flash_sales' => $this->flashSales(),
             'promotions' => $this->listActivePromotions(),
             'tones'      => ['FUN', 'WARM', 'PREMIUM', 'CASUAL', 'PUNCHY'],
             'channels'   => ['FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'ZALO', 'BLOG', 'EMAIL'],
@@ -94,7 +98,91 @@ class MarketingService
             }
         }
 
+        if (!empty($input['selections'])) {
+            $context['selections'] = $input['selections'];
+            $context = $this->refreshSelections($context);
+            $context['subject'] = trim($context['subject']) ?: mb_strimwidth(
+                implode(' · ', array_column($context['featured_items'], 'name')), 0, 200, '…'
+            );
+            $context['menu_item_id'] ??= collect($context['featured_items'])->pluck('cover_menu_item_id')->filter()->first();
+        }
+
         return $context;
+    }
+
+    public function refreshSelections(array $context): array
+    {
+        if (empty($context['selections'])) return $context;
+
+        $selections = collect($context['selections'])->unique(fn ($row) => $row['type'].':'.$row['id'])->values();
+        $ids = fn (string $type) => $selections->where('type', $type)->pluck('id')->all();
+        $menus = MenuItem::where('is_active', true)->whereIn('id', $ids('menu'))->get()->keyBy('id');
+        $combos = MenuItemSuggestion::with(['menuItem.category', 'suggestedItem.category'])
+            ->whereIn('id', $ids('combo'))->get()->keyBy('id');
+        $sales = $ids('flash_sale') ? $this->flashSales($ids('flash_sale'))->keyBy('id') : collect();
+        $promotions = $this->livePromotions()->with('items')->whereIn('id', $ids('promotion'))->get()->keyBy('id');
+        $targets = $promotions->flatMap(fn (Promotion $promotion) => $promotion->items);
+        $menuNames = MenuItem::whereIn('id', $targets->where('item_type', 'MENU_ITEM')->pluck('item_id'))->pluck('name', 'id');
+        $categoryNames = Category::whereIn('id', $targets->where('item_type', 'CATEGORY')->pluck('item_id'))->pluck('name', 'id');
+        $suggestions = app(MenuSuggestionService::class);
+
+        $context['featured_items'] = $selections->map(function ($row) use ($menus, $combos, $sales, $promotions, $suggestions, $menuNames, $categoryNames) {
+            $id = $row['id'];
+            $item = match ($row['type']) {
+                'menu' => $menus->get($id)?->only(['name', 'price', 'description']),
+                'combo' => ($combo = $combos->get($id)) && ($offer = $suggestions->promotionFor($combo)) ? [
+                    'name' => $offer['title'],
+                    'price' => $offer['combo_price'],
+                    'saving' => $offer['saving'],
+                    'components' => [$offer['main_item']['name'], $offer['suggested_item']['name']],
+                    'cover_menu_item_id' => $offer['main_item']['id'],
+                ] : null,
+                'flash_sale' => $sales->get($id),
+                'promotion' => ($promotion = $promotions->get($id)) ? [
+                    'name' => $promotion->name,
+                    'description' => $promotion->description,
+                    'kind' => $promotion->kind->value,
+                    'config' => $promotion->config,
+                    'conditions' => $promotion->conditions,
+                    'scope' => $promotion->items->map(fn ($target) => [
+                        'type' => $target->item_type,
+                        'name' => ($target->item_type === 'MENU_ITEM' ? $menuNames : $categoryNames)->get($target->item_id),
+                        'override' => $target->override,
+                    ])->all(),
+                    'starts_at' => $promotion->starts_at?->toIso8601String(),
+                    'ends_at' => $promotion->ends_at?->toIso8601String(),
+                ] : null,
+            };
+            if (!$item) {
+                throw ValidationException::withMessages([
+                    'selections' => ['Có món hoặc ưu đãi đã hết hiệu lực. Vui lòng cập nhật lại lựa chọn.'],
+                ]);
+            }
+            if (in_array($row['type'], ['menu', 'flash_sale'], true)) $item['cover_menu_item_id'] = (int) $id;
+
+            return ['type' => $row['type'], ...$item];
+        })->all();
+
+        return $context;
+    }
+
+    private function flashSales(?array $ids = null): Collection
+    {
+        $now = now();
+        $availability = app(MenuAvailabilityService::class);
+        $sales = app(FlashSaleService::class);
+
+        return MenuItem::where('is_active', true)->where('is_available', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->where('flash_sale_discount', '>', 0)->whereColumn('flash_sale_discount', '<', 'price')
+            ->where('flash_sale_starts_at', '<=', $now)->where('flash_sale_ends_at', '>', $now)
+            ->when($ids !== null, fn ($query) => $query->whereIn('id', $ids))
+            ->orderBy('flash_sale_ends_at')->orderBy('id')->get()
+            ->filter(fn (MenuItem $item) => $availability->status($item)['is_available'])
+            ->map(fn (MenuItem $item) => [
+                'id' => $item->id, 'name' => $item->name, 'description' => $item->description,
+                ...$sales->activeFor($item, $now),
+            ])->values();
     }
 
     public function getStoreInfo(): string
@@ -139,22 +227,19 @@ class MarketingService
     /** @return Collection<int, array<string,mixed>> */
     private function listActivePromotions(): Collection
     {
-        return Promotion::query()
-            ->where('is_active', true)
-            ->where(function ($q) {
-                $q->whereNull('starts_at')->orWhere('starts_at', '<=', now());
-            })
-            ->where(function ($q) {
-                $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
-            })
-            ->orderByDesc('id')
-            ->limit(20)
+        return $this->livePromotions()
             ->get()
             ->map(fn (Promotion $p) => [
                 'id'    => $p->id,
                 'name'  => $p->name,
                 'kind'  => $p->kind,
-                'value' => $p->value,
+                'value' => $p->config['value'] ?? null,
             ]);
+    }
+
+    private function livePromotions(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Promotion::live()->where(fn ($query) => $query->whereNull('usage_limit')
+            ->orWhereColumn('used_count', '<', 'usage_limit'));
     }
 }

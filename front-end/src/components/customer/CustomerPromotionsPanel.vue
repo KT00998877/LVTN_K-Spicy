@@ -81,7 +81,7 @@ onMounted(load)
                         <button type="button" class="promotion-action" @click="copyCode(item)">
                             {{ copyState[item.id] === 'copied' ? 'Đã sao chép' : copyState[item.id] === 'failed' ? 'Thử lại' : 'Sao chép' }}
                         </button>
-                        <router-link v-if="item.is_usable" :to="{ path: '/thanh-toan', query: { voucher: item.voucher_code } }" class="promotion-primary">Dùng mã</router-link>
+                        <router-link v-if="item.is_usable" :to="{ name: 'cart', query: { voucher: item.voucher_code } }" class="promotion-primary">Dùng mã</router-link>
                     </div>
                 </div>
             </article>

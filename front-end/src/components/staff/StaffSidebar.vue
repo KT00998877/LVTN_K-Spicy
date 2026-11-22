@@ -139,10 +139,9 @@ const managerGroups = [
         { path: '/staff/manager/online-orders', label: 'Đơn giao hàng' },
     ] },
     { id: 'promotions', label: 'Khuyến mãi & Voucher', items: [
-        { path: '/staff/manager/promotions', label: 'Mã giảm giá' },
+        { path: '/staff/manager/promotions', label: 'Mã giảm giá & Chiến dịch' },
         { path: '/staff/manager/flash-sales', label: 'Flash Sale' },
-        { path: '/staff/manager/marketing-campaigns', label: 'Chiến dịch ưu đãi' },
-        { path: '/staff/manager/marketing', label: 'AI Marketing Studio' },
+        { path: '/staff/manager/marketing', label: 'Quản lý bài viết' },
     ] },
     { id: 'accounts', label: 'Tài khoản & phân quyền', items: [
         { path: '/staff/manager/accounts', label: 'Tài khoản' },

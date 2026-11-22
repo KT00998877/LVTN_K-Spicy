@@ -17,7 +17,7 @@ class MarketingAiServiceProvider extends ServiceProvider
             apiKey: (string) config('ai.providers.gemini.api_key', ''),
             model: (string) config('ai.providers.gemini.model', 'gemini-2.0-flash'),
             baseUrl: (string) config('ai.providers.gemini.base_url'),
-            timeout: (int) config('ai.timeout', 30),
+            timeout: (int) config('ai.timeout', 60),
         ));
         $this->app->bind(GeminiCopyGenerator::class, fn ($app) => new GeminiCopyGenerator(
             $app->make(GeminiClient::class),

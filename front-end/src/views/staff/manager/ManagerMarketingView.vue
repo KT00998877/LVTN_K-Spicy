@@ -2,8 +2,7 @@
     <div class="marketing-page">
         <header class="page-head">
             <div>
-                <span class="eyebrow">AI MARKETING STUDIO</span>
-                <h2>Viết bài cho trang khách hàng</h2>
+                <h2>Quản lý bài viết</h2>
                 <p>Chọn chủ đề, đọc và chỉnh bản AI, rồi xuất bản khi đã sẵn sàng.</p>
             </div>
             <div class="head-cta">
@@ -175,7 +174,8 @@
                 <div class="form-intro">
                     <span class="eyebrow">BƯỚC 1 / 3</span>
                     <h3>Hôm nay bạn muốn kể chuyện gì?</h3>
-                    <p>Chọn một món hoặc nhập chủ đề. AI sẽ viết bài dài để bạn xem và chỉnh trước khi đăng.</p>
+                    <p>Chọn các món, combo hoặc ưu đãi muốn giới thiệu. Bạn cũng có thể viết bài từ một chủ đề riêng.</p>
+                    <p>Thân bài do AI viết phải có ít nhất 1.000 từ.</p>
                 </div>
                 <div class="grid">
                     <label class="field span-2">
@@ -192,17 +192,37 @@
                             <option v-for="t in (store.context?.tones ?? [])" :key="t" :value="t">{{ toneLabel(t) }}</option>
                         </select>
                     </label>
+                    <div class="field span-2">
+                        <label for="marketing-selection"><span>Nội dung quảng bá</span></label>
+                        <div class="content-picker">
+                            <select id="marketing-selection" v-model="selectionKey" :disabled="!store.context || selectedContent.length >= 20">
+                                <option value="">Chọn món, combo hoặc ưu đãi</option>
+                                <optgroup v-for="group in contentGroups" :key="group.type" :label="group.label">
+                                    <option v-for="item in group.items" :key="item.id" :value="group.type + ':' + item.id"
+                                        :disabled="selectedContent.some(selected => selected.type === group.type && selected.id === item.id)">
+                                        {{ item.name }}{{ item.price != null ? ' · ' + formatVnd(item.price) + ' đ' : '' }}
+                                    </option>
+                                    <option v-if="!group.items.length" disabled>Không có lựa chọn</option>
+                                </optgroup>
+                            </select>
+                            <button type="button" class="btn" :disabled="!selectionKey || selectedContent.length >= 20" @click="addContent">Thêm</button>
+                        </div>
+                        <ul v-if="selectedContent.length" class="content-chips" aria-label="Nội dung đã chọn">
+                            <li v-for="item in selectedContent" :key="item.type + ':' + item.id">
+                                {{ item.groupLabel }} · {{ item.name }}
+                                <button type="button" :aria-label="'Bỏ ' + item.groupLabel + ' ' + item.name"
+                                    @click="selectedContent = selectedContent.filter(selected => selected !== item)">×</button>
+                            </li>
+                        </ul>
+                        <small v-if="selectedContent.length >= 20" role="status">Đã chọn tối đa 20 mục.</small>
+                        <small v-if="store.contextLoading" role="status">Đang tải danh sách món và ưu đãi…</small>
+                        <button v-else-if="!store.context" type="button" class="btn" @click="loadContentOptions">Tải lại danh sách</button>
+                    </div>
                     <label class="field span-2">
-                        <span>Món ăn liên quan (nếu có)</span>
-                        <input v-model="dishQuery" type="text" list="marketing-menu-items" placeholder="Gõ tên món hoặc chọn gợi ý…" autocomplete="off" @input="onMenuItemChange" />
-                        <datalist id="marketing-menu-items">
-                            <option v-for="m in (store.context?.menu_items ?? [])" :key="m.id" :value="m.name" />
-                        </datalist>
-                        <small>Gõ tên món tự do; món có trong thực đơn sẽ được gắn kèm dữ liệu giá và mô tả.</small>
-                    </label>
-                    <label class="field span-2">
-                        <span>Chủ đề bài viết — nhập tại đây</span>
-                        <input ref="subjectInputRef" v-model="form.subject" type="text" maxlength="200" placeholder="Ví dụ: Một bữa mì cay ấm lòng ngày mưa" required />
+                        <span>Chủ đề bài viết</span>
+                        <input ref="subjectInputRef" v-model="form.subject" type="text" maxlength="200"
+                            placeholder="Ví dụ: Một bữa mì cay ấm lòng ngày mưa" :required="!selectedContent.length" />
+                        <small v-if="selectedContent.length">Có thể để trống để lấy chủ đề từ các mục đã chọn.</small>
                     </label>
                 </div>
 
@@ -435,7 +455,7 @@ import { useMarketingStudioStore } from '@/stores/marketingStudio'
 import { useBlogManagerStore } from '@/stores/blogManager'
 import VersionEditModal from '@/components/manager/promotions/VersionEditModal.vue'
 import BlogFormModal from '@/components/manager/promotions/BlogFormModal.vue'
-import type { CreateAssetPayload, MarketingAsset, MarketingVersion } from '@/api/marketing'
+import type { CreateAssetPayload, MarketingAsset, MarketingSelection, MarketingVersion } from '@/api/marketing'
 import type { ManagerBlog, BlogPayload } from '@/api/managerBlog'
 import { pushAssetVersionToBlog } from '@/api/marketing'
 import { imageUrl } from '@/utils/image'
@@ -455,8 +475,16 @@ const activeSection = ref<'asset' | 'blog'>('asset')
 const blogTab = ref<'list'>('list')
 const editingBlog = ref<ManagerBlog | null>(null)
 const subjectInputRef = ref<HTMLInputElement | null>(null)
-const dishQuery = ref('')
-const lastDishQuery = ref('')
+const selectionKey = ref('')
+const selectedContent = ref<Array<MarketingSelection & { name: string; groupLabel: string }>>([])
+const contentGroups = computed<Array<{
+    type: MarketingSelection['type']; label: string; items: Array<{ id: number; name: string; price?: number }>
+}>>(() => [
+    { type: 'menu', label: 'Món ăn', items: store.context?.menu_items ?? [] },
+    { type: 'combo', label: 'Combo', items: store.context?.combos?.map(item => ({ id: item.id, name: item.title, price: item.combo_price })) ?? [] },
+    { type: 'flash_sale', label: 'Flash Sale', items: store.context?.flash_sales ?? [] },
+    { type: 'promotion', label: 'Khuyến mãi', items: store.context?.promotions ?? [] },
+])
 const publishingVersionId = ref<number | null>(null)
 const websiteDraftIds = new Map<number, number>()
 const coverMenuItemId = ref<number | null>(null)
@@ -482,22 +510,28 @@ const form = reactive<{
     content_type: 'POST' | 'STORY' | 'REEL_SCRIPT' | 'BLOG_ARTICLE' | 'EMAIL_BLAST'
     tone: 'FUN' | 'WARM' | 'PREMIUM' | 'CASUAL' | 'PUNCHY'
     subject: string
-    menu_item_id: number | null
     news_section: 'NEWS' | 'OPENING' | 'PROMOTION'
 }>({
     channel: 'BLOG',
     content_type: 'BLOG_ARTICLE',
     tone: 'WARM',
     subject: '',
-    menu_item_id: null,
     news_section: 'NEWS',
 })
 
 onMounted(async () => {
-    await store.loadContext(true)
+    await loadContentOptions()
     store.setFilter({ channel: 'BLOG' })
     await store.loadAssets(1)
 })
+
+async function loadContentOptions() {
+    try {
+        await store.loadContext(true)
+    } catch {
+        toast.error('Không tải được danh sách món và ưu đãi.')
+    }
+}
 
 function switchSection(section: 'asset' | 'blog') {
     activeSection.value = section
@@ -629,33 +663,34 @@ function onFilterChange() {
     store.loadAssets(1)
 }
 
-function onMenuItemChange() {
-    const name = dishQuery.value.trim()
-    const wasSuggested = !form.subject.trim() || form.subject === lastDishQuery.value
-    const match = store.context?.menu_items.find((item) => item.name.toLocaleLowerCase('vi') === name.toLocaleLowerCase('vi'))
-    form.menu_item_id = match?.id ?? null
-    if (wasSuggested) form.subject = name
-    lastDishQuery.value = name
+function addContent() {
+    const [type, id] = selectionKey.value.split(':')
+    const group = contentGroups.value.find(group => group.type === type)
+    const item = group?.items.find(item => item.id === Number(id))
+    if (!group || !item || selectedContent.value.length >= 20 ||
+        selectedContent.value.some(selected => selected.type === group.type && selected.id === item.id)) return
+    selectedContent.value.push({ type: group.type, id: item.id, name: item.name, groupLabel: group.label })
+    selectionKey.value = ''
 }
 
 async function onCreate() {
-    if (!form.subject.trim()) {
-        toast.warning('Nhập chủ đề hoặc chọn món ăn để AI tự gợi ý.')
+    if (!form.subject.trim() && !selectedContent.value.length) {
+        toast.warning('Nhập chủ đề hoặc chọn nội dung muốn quảng bá.')
         return
     }
     const payload: CreateAssetPayload = {
         channel: form.channel,
         content_type: form.content_type,
         tone: form.tone,
-        subject: form.subject,
-        menu_item_id: form.menu_item_id,
+        subject: form.subject.trim(),
+        selections: selectedContent.value.map(({ type, id }) => ({ type, id })),
         news_section: form.news_section,
     }
     try {
         const created = await store.create(payload)
         tab.value = 'review'
         reviewId.value = created.id
-        coverMenuItemId.value = form.menu_item_id
+        coverMenuItemId.value = Number(created.context_payload?.menu_item_id) || null
         await store.loadAsset(created.id)
     } catch (e: any) {
         const validation = e?.response?.data?.errors
@@ -666,6 +701,7 @@ async function onCreate() {
             || (e?.code === 'ECONNABORTED' ? 'AI xử lý quá lâu. Hãy kiểm tra danh sách bản thảo trước khi thử lại.' : '')
             || 'Không kết nối được máy chủ. Vui lòng kiểm tra backend rồi thử lại.',
         )
+        if (validation?.selections) await loadContentOptions()
     }
 }
 
@@ -682,7 +718,12 @@ async function openReview(row: MarketingAsset) {
 
 async function onGenerate() {
     if (!store.current) return
-    await store.generateVersion(store.current.id)
+    try {
+        await store.generateVersion(store.current.id)
+    } catch (e: any) {
+        const errors = e?.response?.data?.errors
+        toast.error(errors?.body?.[0] || errors?.selections?.[0] || e?.response?.data?.message || 'Không tạo được phiên bản mới.')
+    }
 }
 
 async function onSelectVersion(vid: number) {
@@ -820,13 +861,6 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
     gap: 16px;
     flex-wrap: wrap;
     margin-bottom: 24px;
-}
-.page-head .eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    color: var(--color-chili-red, #d71920);
-    font-weight: 700;
 }
 .page-head h2 {
     margin: 6px 0 4px;
@@ -1090,6 +1124,13 @@ function formatVnd(n: number) { return n.toLocaleString('vi-VN') }
 .field { display: flex; flex-direction: column; min-width: 0; gap: 6px; font-size: 13px; }
 .field.span-2 { grid-column: span 2; }
 .field span { font-weight: 600; color: rgba(0, 0, 0, 0.7); }
+.content-picker { display: flex; gap: 8px; }
+.content-picker select { flex: 1; min-width: 0; }
+.content-chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0; }
+.content-chips li { display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 6px; background: #f6e9e9; color: #652527; }
+.content-chips button { min-width: 26px; min-height: 26px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; font-size: 18px; cursor: pointer; }
+.content-chips button:hover { background: #efd5d5; }
+.content-chips button:focus-visible { outline: 2px solid currentColor; }
 .field input,
 .field select {
     min-width: 0;

@@ -43,6 +43,16 @@ class MarketingCampaignTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('roles', function (Blueprint $table) {
+            $table->id();
+            $table->string('code');
+        });
+
+        Schema::create('user_role', function (Blueprint $table) {
+            $table->foreignId('user_id');
+            $table->foreignId('role_id');
+        });
+
         Schema::create('loyalty_tiers', function (Blueprint $table) {
             $table->id();
             $table->string('code');
@@ -90,6 +100,7 @@ class MarketingCampaignTest extends TestCase
             $table->unsignedInteger('recipient_count')->default(0);
             $table->foreignId('created_by')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('notifications', function (Blueprint $table) {
@@ -241,24 +252,23 @@ class MarketingCampaignTest extends TestCase
         Event::assertNotDispatched(CustomerPromoNotificationCreated::class);
     }
 
-    public function test_khach_chi_nhan_1_uu_dai_trong_24h(): void
+    public function test_khach_nhan_duoc_nhieu_chien_dich_trong_cung_ngay(): void
     {
         Event::fake([CustomerPromoNotificationCreated::class]);
 
         $this->voucher();
         $customer = $this->customer();
-        $this->campaign();
-
-        app(MarketingCampaignService::class)->send(MarketingCampaign::first());
+        $first = $this->campaign();
+        $service = app(MarketingCampaignService::class);
+        $this->assertSame(1, $service->send($first));
 
         // Campaign thứ 2 ngay sau đó.
         $this->voucher('MI-CAY-30');
-        $this->campaign(['voucher_code' => 'MI-CAY-30', 'name' => 'Campaign 2']);
-        $second = MarketingCampaign::orderByDesc('id')->first();
-
-        $sent = app(MarketingCampaignService::class)->send($second);
-
-        $this->assertSame(0, $sent, 'Khách đã nhận ưu đãi trong 24h thì không nhận thêm');
+        $second = $this->campaign(['voucher_code' => 'MI-CAY-30', 'name' => 'Campaign 2']);
+        $this->assertSame(1, $service->send($second));
+        $this->assertFalse($service->notifyUser($second, $customer));
+        $this->assertDatabaseCount('notifications', 2);
+        Event::assertDispatchedTimes(CustomerPromoNotificationCreated::class, 2);
     }
 
     public function test_campaign_chi_gui_mot_lan(): void

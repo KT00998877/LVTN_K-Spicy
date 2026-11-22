@@ -46,7 +46,6 @@ const ManagerReportView    = () => import('../views/staff/manager/ManagerReportV
 const ManagerStatisticsView = () => import('../views/staff/manager/ManagerStatisticsView.vue')
 // Phase 3 — Promotions & Vouchers management
 const ManagerPromotionsView = () => import('../views/staff/manager/ManagerPromotionsView.vue')
-const ManagerMarketingCampaignsView = () => import('../views/staff/manager/ManagerMarketingCampaignsView.vue')
 // Phase 6.1 — AI Marketing Studio
 const ManagerMarketingView = () => import('../views/staff/manager/ManagerMarketingView.vue')
 // Phase 2 — Inventory & Recipe
@@ -280,8 +279,8 @@ const router = createRouter({
                 { path: 'statistics', name: 'manager-statistics', component: ManagerStatisticsView, meta: { title: 'Thống kê tổng quan', subtitle: 'Dashboard end-to-end: KPI · Charts · Kho' } },
                 { path: 'promotions', name: 'manager-promotions', component: ManagerPromotionsView, meta: { title: 'Khuyến mãi & Voucher', subtitle: 'Quản lý mã giảm giá và chương trình khuyến mãi' } },
                 { path: 'flash-sales', name: 'manager-flash-sales', component: ManagerFlashSaleView, meta: { title: 'Flash Sale', subtitle: 'Đặt lịch giảm giá theo món' } },
-                { path: 'marketing-campaigns', name: 'manager-marketing-campaigns', component: ManagerMarketingCampaignsView, meta: { title: 'Chiến dịch ưu đãi', subtitle: 'Gửi ưu đãi kèm mã voucher tới khách thân thiết' } },
-                { path: 'marketing', name: 'manager-marketing', component: ManagerMarketingView, meta: { title: 'AI Marketing Studio', subtitle: 'Sinh & duyệt content tự động' } },
+                { path: 'marketing-campaigns', name: 'manager-marketing-campaigns', redirect: (to) => ({ name: 'manager-promotions', query: { ...to.query, tab: 'offers' }, hash: to.hash }) },
+                { path: 'marketing', name: 'manager-marketing', component: ManagerMarketingView, meta: { title: 'Quản lý bài viết', subtitle: 'Soạn, duyệt và xuất bản bài viết' } },
                 { path: 'report',    name: 'manager-report',    component: ManagerReportView,    meta: { title: 'Báo cáo doanh thu', subtitle: 'Báo cáo gọn nhẹ (Phase 2)' } },
             ],
         },

@@ -19,13 +19,16 @@ export type MarketingChannel = 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK' | 'ZALO' | 'B
 export type MarketingContentType = 'POST' | 'STORY' | 'REEL_SCRIPT' | 'BLOG_ARTICLE' | 'EMAIL_BLAST'
 export type MarketingTone = 'FUN' | 'WARM' | 'PREMIUM' | 'CASUAL' | 'PUNCHY'
 export type MarketingStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED'
+export type MarketingSelection = { type: 'menu' | 'combo' | 'flash_sale' | 'promotion'; id: number }
 
 export interface MarketingDraftContext {
     brand: string
     store_info: string
     campaigns: Array<{ id: number; name: string; slug: string }>
     menu_items: Array<{ id: number; name: string; price: number; image_url: string | null }>
-    promotions: Array<{ id: number; name: string; kind: string; value: number }>
+    combos: Array<{ id: number; title: string; combo_price: number }>
+    flash_sales: Array<{ id: number; name: string; price: number }>
+    promotions: Array<{ id: number; name: string; kind: string; value: number | null }>
     tones: MarketingTone[]
     channels: MarketingChannel[]
     content_types: MarketingContentType[]
@@ -72,6 +75,7 @@ export interface CreateAssetPayload {
     campaign_id?: number | null
     menu_item_id?: number | null
     promotion_id?: number | null
+    selections?: MarketingSelection[]
     news_section?: 'NEWS' | 'OPENING' | 'PROMOTION'
 }
 

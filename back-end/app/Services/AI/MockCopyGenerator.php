@@ -55,10 +55,26 @@ class MockCopyGenerator implements CopyGenerator
 
         $body = "# {$subject}\n\n**Thương hiệu:** {$brand}";
         if (isset($context['price'])) {
-            $body .= "\n**Giá:** ".number_format((float) $context['price'], 0, ',', '.').'đ';
+            $body .= "\nGiá: **".number_format((float) $context['price'], 0, ',', '.').'đ**';
         }
         if ($storeInfo !== '') {
             $body .= "\n\n{$storeInfo}";
+        }
+        if (!empty($context['featured_items'])) {
+            $body .= "\n\n## Món và ưu đãi nổi bật\n";
+            foreach ($context['featured_items'] as $item) {
+                $body .= "\n- **{$item['name']}**";
+                if (isset($item['price'])) {
+                    $body .= ' · **'.number_format((float) $item['price'], 0, ',', '.').'đ**';
+                }
+                if (!empty($item['components'])) {
+                    $body .= ' · '.implode(' + ', $item['components']);
+                }
+                if (!empty($item['ends_at'])) {
+                    $end = \Carbon\CarbonImmutable::parse($item['ends_at'])->setTimezone(config('reservations.timezone'));
+                    $body .= ' · đến '.$end->format('H:i d/m/Y');
+                }
+            }
         }
 
         return [

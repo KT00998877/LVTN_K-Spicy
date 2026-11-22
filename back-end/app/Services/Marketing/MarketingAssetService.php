@@ -2,7 +2,7 @@
 
 namespace App\Services\Marketing;
 
-use App\Models\{Blog, MarketingAsset, MarketingAssetVersion};
+use App\Models\{Blog, MarketingAsset, MarketingAssetVersion, MenuItem, MenuItemSuggestion};
 use App\Services\AI\AiManager;
 use App\Services\AI\Contracts\CopyGenerator;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +65,20 @@ class MarketingAssetService
         $next = ((int) $asset->versions()->max('version_number')) + 1;
 
         $copy = $this->ai->copy()->generate($context);
+        if ($asset->content_type === 'BLOG_ARTICLE') {
+            $html = \Illuminate\Support\Str::markdown((string) ($copy['body'] ?? ''), [
+                'html_input' => 'strip', 'allow_unsafe_links' => false,
+            ]);
+            $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $wordCount = preg_match_all('/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/u', $text);
+            $minimum = CopyGenerator::MIN_BLOG_WORDS;
+            if ($wordCount < $minimum) {
+                $message = isset($copy['meta']['fallback_reason']) || $this->ai->providerName() === 'mock'
+                    ? 'Trình sinh bài chưa tạo được bài dài. Hãy kiểm tra cấu hình Gemini rồi thử lại.'
+                    : "AI viết được {$wordCount} từ. Thân bài cần ít nhất {$minimum} từ. Vui lòng thử viết lại.";
+                throw ValidationException::withMessages(['body' => [$message]]);
+            }
+        }
 
         return MarketingAssetVersion::create([
             'asset_id'       => $asset->id,
@@ -251,8 +265,11 @@ class MarketingAssetService
             ? $options['menu_item_id']
             : (((array) $asset->context_payload)['menu_item_id'] ?? null);
         $coverImage = $menuItemId
-            ? \App\Models\MenuItem::query()->whereKey($menuItemId)->where('is_active', true)->value('image_url')
+            ? MenuItem::query()->whereKey($menuItemId)->where('is_active', true)->value('image_url')
             : null;
+        $content = $this->addMenuIllustrations($content, (array) $asset->context_payload, $coverImage);
+        $content = $this->emphasizeMenuDetails($content, (array) $asset->context_payload);
+        $content = app(\App\Services\BlogService::class)->sanitizeHtml($content);
 
         return DB::transaction(function () use ($asset, $version, $title, $excerpt, $content, $category, $newsSection, $authorId, $coverImage) {
             $blog = Blog::create([
@@ -282,6 +299,81 @@ class MarketingAssetService
 
             return $blog;
         });
+    }
+
+    private function addMenuIllustrations(string $content, array $context, ?string $coverImage): string
+    {
+        $selections = collect($context['selections'] ?? []);
+        if ($selections->isEmpty()) return $content;
+
+        $combos = MenuItemSuggestion::whereIn('id', $selections->where('type', 'combo')->pluck('id'))
+            ->get(['id', 'menu_item_id', 'suggested_item_id'])->keyBy('id');
+        $ids = $selections->flatMap(function (array $selection) use ($combos): array {
+            if (in_array($selection['type'], ['menu', 'flash_sale'], true)) return [(int) $selection['id']];
+            if ($selection['type'] === 'combo' && ($combo = $combos->get($selection['id']))) {
+                return [(int) $combo->menu_item_id, (int) $combo->suggested_item_id];
+            }
+
+            return [];
+        })->unique();
+        $items = MenuItem::whereIn('id', $ids)->whereNotNull('image_url')->get(['id', 'name', 'image_url'])->keyBy('id');
+        $images = [];
+        foreach ($ids as $id) {
+            $item = $items->get($id);
+            if (!$item || !$item->image_url || ($ids->count() === 1 && $item->image_url === $coverImage)) continue;
+            $images[$id] = [
+                'name' => $item->name,
+                'html' => '<figure><img src="'.e($item->image_url).'" alt="'.e($item->name).'"><figcaption>'.e($item->name).'</figcaption></figure>',
+            ];
+        }
+        if (!$images) return $content;
+
+        $content = preg_replace_callback('/<h[2-4]\b[^>]*>.*?<\/h[2-4]>/is', static function (array $match) use (&$images): string {
+            $heading = html_entity_decode(strip_tags($match[0]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $block = $match[0];
+            foreach ($images as $id => $image) {
+                if (mb_stripos($heading, $image['name']) === false) continue;
+                $block .= $image['html'];
+                unset($images[$id]);
+            }
+
+            return $block;
+        }, $content);
+
+        if ($images) {
+            $gallery = implode('', array_column($images, 'html'));
+            $openingEnd = strpos($content, '</p>');
+            $content = $openingEnd === false
+                ? $gallery.$content
+                : substr_replace($content, $gallery, $openingEnd + strlen('</p>'), 0);
+        }
+
+        return $content;
+    }
+
+    private function emphasizeMenuDetails(string $content, array $context): string
+    {
+        $names = [];
+        foreach ($context['featured_items'] ?? [] as $item) {
+            if ($item['type'] === 'promotion') continue;
+            $names[] = $item['name'];
+            array_push($names, ...($item['components'] ?? []));
+        }
+        if (!$names && !empty($context['menu_item_id'])) {
+            $name = MenuItem::whereKey($context['menu_item_id'])->value('name');
+            if ($name) $names[] = $name;
+        }
+        $names = array_map('mb_strtolower', $names);
+
+        return preg_replace_callback('~<strong>(.*?)</strong>~is', static function (array $match) use ($names): string {
+            $text = trim(html_entity_decode(strip_tags($match[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $isPrice = preg_match('/^\d+(?:[.,\h]\d+)*\h*(?:VNĐ|VND|đ|₫)$/iu', $text);
+            if ($isPrice || in_array(mb_strtolower($text), $names, true)) {
+                return '<strong class="menu-highlight">'.$match[1].'</strong>';
+            }
+
+            return $match[0];
+        }, $content);
     }
 
     private function generateBlogSlug(string $title): string

@@ -73,6 +73,10 @@ class MarketingAssetController extends Controller
             'campaign_id'   => 'nullable|integer|exists:campaigns,id',
             'menu_item_id'  => 'nullable|integer|exists:menu_items,id',
             'promotion_id'  => 'nullable|integer|exists:promotions,id',
+            'selections'    => 'sometimes|array|list|max:20',
+            'selections.*'  => 'required|array:type,id',
+            'selections.*.type' => 'required|in:menu,combo,flash_sale,promotion',
+            'selections.*.id' => 'required|integer|min:1',
             'news_section'  => 'required|string|in:NEWS,OPENING,PROMOTION',
         ]);
 
@@ -114,6 +118,7 @@ class MarketingAssetController extends Controller
             ? $asset->context_payload
             : [];
 
+        $context = $this->marketing->refreshSelections($context);
         $version = $this->assets->appendVersion($asset, $context);
 
         return response()->json([

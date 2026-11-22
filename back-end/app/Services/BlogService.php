@@ -28,15 +28,22 @@ class BlogService
         $config->set('Cache.DefinitionImpl', null);
         $config->set(
             'HTML.Allowed',
-            'p,br,strong,b,em,i,u,h2,h3,h4,h5,h6,ul,ol,li,'
+            'p,br,strong[class],b,em,i,u,h2,h3,h4,h5,h6,ul,ol,li,'
             .'a[href|title|target|rel],img[src|alt|title|width|height],'
-            .'blockquote,pre,code,hr,span,div',
+            .'blockquote,pre,code,hr,span,div,figure,figcaption',
         );
         $config->set('Attr.AllowedFrameTargets', ['_blank']);
+        $config->set('Attr.AllowedClasses', ['menu-highlight']);
         $config->set('URI.AllowedSchemes', [
             'http' => true,
             'https' => true,
         ]);
+        $config->set('HTML.DefinitionID', 'restaurant-blog');
+        $config->set('HTML.DefinitionRev', 2);
+        if ($definition = $config->maybeGetRawHTMLDefinition()) {
+            $definition->addElement('figure', 'Block', 'Flow', 'Common');
+            $definition->addElement('figcaption', 'Block', 'Flow', 'Common');
+        }
 
         $this->purifier = new HTMLPurifier($config);
     }

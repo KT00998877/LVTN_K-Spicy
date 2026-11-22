@@ -2,9 +2,7 @@
     <div class="promotions-page">
         <header class="page-head">
             <div>
-                <span class="eyebrow">CHIẾN DỊCH KHUYẾN MÃI</span>
                 <h2>Khuyến mãi &amp; Voucher</h2>
-                <p>Quản lý mã nhập tay và khuyến mãi tự động áp vào giỏ hàng.</p>
             </div>
             <div class="head-cta">
                 <button
@@ -57,7 +55,15 @@
                 :class="{ active: activeTab === 'campaign' }"
                 @click="activeTab = 'campaign'"
             >
-                Chiến dịch
+                Chiến dịch khuyến mãi
+            </button>
+            <button
+                role="tab"
+                :aria-selected="activeTab === 'offers'"
+                :class="{ active: activeTab === 'offers' }"
+                @click="activeTab = 'offers'"
+            >
+                Chiến dịch ưu đãi
             </button>
         </nav>
 
@@ -480,11 +486,14 @@
                 @close="closeCampaignDetail"
             />
         </template>
+
+        <ManagerMarketingCampaignsView v-if="activeTab === 'offers'" />
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 import { useAppDialog } from '@/composables/useAppDialog'
 import { useManagerPromotionsStore } from '@/stores/managerPromotions'
@@ -499,9 +508,20 @@ import PromotionUsagesDrawer from '@/components/manager/promotions/PromotionUsag
 import CampaignFormModal from '@/components/manager/promotions/CampaignFormModal.vue'
 import CampaignListTable from '@/components/manager/promotions/CampaignListTable.vue'
 import CampaignDetailDrawer from '@/components/manager/promotions/CampaignDetailDrawer.vue'
+import ManagerMarketingCampaignsView from './ManagerMarketingCampaignsView.vue'
 
-type Tab = 'voucher' | 'promotion' | 'campaign'
-const activeTab = ref<Tab>('voucher')
+const route = useRoute()
+const router = useRouter()
+type Tab = 'voucher' | 'promotion' | 'campaign' | 'offers'
+const activeTab = computed<Tab>({
+    get() {
+        const tab = route.query.tab
+        return tab === 'promotion' || tab === 'campaign' || tab === 'offers' ? tab : 'voucher'
+    },
+    set(tab) {
+        void router.replace({ query: { ...route.query, tab: tab === 'voucher' ? undefined : tab } })
+    },
+})
 
 const store = useManagerPromotionsStore()
 const appDialog = useAppDialog()
@@ -985,14 +1005,6 @@ useRealtimeRefresh(
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
-}
-.eyebrow {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.4px;
-    color: var(--chili, #d71920);
-    margin-bottom: 6px;
 }
 .page-head h2 {
     margin: 0 0 4px;

@@ -15,15 +15,11 @@ use Illuminate\Support\Str;
  *  - BR-MKT-01: chỉ campaign SCHEDULED mới được gửi; SENT/SKIPPED/CANCELLED là kết thúc.
  *  - BR-MKT-02: ưu đãi có mã voucher bắt buộc.
  *  - BR-MKT-03: chỉ gửi khi voucher còn hiệu lực và còn lượt sử dụng.
- *  - BR-MKT-04: mỗi khách tối đa 1 ưu đãi/ngày (chống spam).
  *  - BR-MKT-05: chỉ nhắm khách đã từng chi (khách thân thiết), trừ khi campaign
  *    nhắm tất cả (target_tier_ids rỗng) thì vẫn giới hạn khách đã đăng ký.
  */
 class MarketingCampaignService
 {
-    /** Số khách tối đa nhận 1 ưu đãi trong 1 ngày. */
-    public const DAILY_LIMIT = 1;
-
     /** Loại notification lưu trong bảng `notifications`. */
     public const NOTIFICATION_TYPE = 'customer.promo';
 
@@ -103,20 +99,10 @@ class MarketingCampaignService
     }
 
     /**
-     * Ghi 1 notification cho khách. Trả về false nếu khách đã nhận ưu đãi hôm nay.
+     * Ghi thông báo một lần cho mỗi cặp chiến dịch và khách.
      */
     public function notifyUser(MarketingCampaign $campaign, User $user): bool
     {
-        // BR-MKT-04: đã nhận ưu đãi khác trong 24h qua thì bỏ qua.
-        $alreadyRecently = DB::table('notifications')
-            ->where('notifiable_type', User::class)
-            ->where('notifiable_id', $user->id)
-            ->where('type', self::NOTIFICATION_TYPE)
-            ->where('created_at', '>=', now()->subDay())
-            ->exists();
-
-        if ($alreadyRecently) return false;
-
         $id = (string) Str::uuid();
         $data = [
             'event'        => 'PROMO_CAMPAIGN',

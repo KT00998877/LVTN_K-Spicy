@@ -880,6 +880,7 @@ input:focus, select:focus, textarea:focus {
     color: var(--color-gray-700);
 }
 .rich-content :deep(strong) { color: var(--color-charcoal-black); font-weight: 800; }
+.rich-content :deep(strong.menu-highlight) { font-size: calc(1em + 2pt); }
 .rich-content :deep(a) {
     color: var(--color-chili-red);
     text-decoration: underline;
@@ -895,6 +896,7 @@ input:focus, select:focus, textarea:focus {
     box-shadow: var(--shadow-sm);
 }
 .rich-content :deep(figure) { margin: 24px 0; }
+.rich-content :deep(figure img) { display: block; max-width: 640px; margin: 0 auto; }
 .rich-content :deep(figcaption) {
     font-size: 13px;
     color: var(--color-gray-500);

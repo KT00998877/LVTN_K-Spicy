@@ -52,7 +52,7 @@ async function openNotification(item: PromoNotification) {
         return
     }
     if (item.data.voucher_code) {
-        await router.push({ path: '/thanh-toan', query: { voucher: item.data.voucher_code } })
+        await router.push({ name: 'cart', query: { voucher: item.data.voucher_code } })
     }
 }
 </script>

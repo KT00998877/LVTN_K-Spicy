@@ -222,8 +222,7 @@ function formatDate(iso: string): string {
     <div class="campaigns-page">
         <header class="page-head">
             <div>
-                <span class="eyebrow">CHIẾN DỊCH ƯU ĐÃI</span>
-                <h2>Chiến dịch ưu đãi tới khách</h2>
+                <h3>Chiến dịch ưu đãi tới khách</h3>
                 <p>
                     Chọn thời điểm gửi ưu đãi. Hệ thống tự gửi thông báo
                     tới khách thân thiết kèm mã voucher, khách copy mã và áp dụng khi thanh toán.
@@ -413,15 +412,7 @@ function formatDate(iso: string): string {
     gap: 16px;
     flex-wrap: wrap;
 }
-.eyebrow {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.4px;
-    color: var(--chili, #d71920);
-    margin-bottom: 6px;
-}
-.page-head h2 { margin: 0 0 4px; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.page-head h3 { margin: 0 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 .page-head p { margin: 0; color: #6b5f54; font-size: 14px; max-width: 70ch; }
 .head-cta { display: flex; gap: 8px; }
 

@@ -4,7 +4,7 @@ return [
     'default' => env('AI_PROVIDER', 'mock'),
     'cache_ttl' => (int) env('AI_CACHE_TTL', 86400),
     'rate_limit_per_hour' => (int) env('AI_RATE_LIMIT_PER_HOUR', 100),
-    'timeout' => (int) env('AI_TIMEOUT', 30),
+    'timeout' => (int) env('AI_TIMEOUT', 60),
     'providers' => [
         'mock' => [
             'enabled' => true,
