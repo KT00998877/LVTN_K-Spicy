@@ -269,9 +269,9 @@ class InventoryService
                     'status' => 'Phiếu nhập đã bị huỷ, không thể xác nhận.',
                 ]);
             }
-            if ($purchaseOrder && $purchaseOrder->status !== PurchaseOrder::STATUS_SHIPPED) {
+            if ($purchaseOrder && ! $purchaseOrder->canReceive()) {
                 throw ValidationException::withMessages([
-                    'status' => 'Yêu cầu nhập phải ở trạng thái SHIPPED trước khi xác nhận kho.',
+                    'status' => 'Yêu cầu chưa ở trạng thái có thể xác nhận nhập kho.',
                 ]);
             }
 

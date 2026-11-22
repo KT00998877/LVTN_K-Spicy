@@ -151,26 +151,6 @@ export interface ReceiptPayload {
   }>
 }
 
-export interface SupplierAcceptPayload {
-  supplier_delivery_date: string
-  supplier_note?: string | null
-  items: Array<{
-    purchase_order_item_id: number
-    supplier_accepted_quantity: number
-    supplier_note?: string | null
-  }>
-}
-
-export interface SupplierShipPayload {
-  supplier_note?: string | null
-  items: Array<{
-    purchase_order_item_id: number
-    shipped_purchase_quantity: number
-    expiry_months: 1 | 2 | 3 | 4 | 5 | 6 | 12 | 24
-    supplier_note?: string | null
-  }>
-}
-
 interface PurchaseOrderListResponse {
   data: PurchaseOrder[]
   meta: { current_page: number; per_page: number; total: number; last_page: number }
@@ -195,19 +175,6 @@ export const purchaseOrdersApi = {
     api.patch<{ data: PurchaseOrder }>(`/staff/manager/purchase-orders/${id}/receipt`, payload),
   receive: (id: number, receivedAt: string) =>
     api.post<{ data: PurchaseOrder }>(`/staff/manager/purchase-orders/${id}/receive`, { received_at: receivedAt }),
-}
-
-export const supplierPurchaseOrdersApi = {
-  list: (params: Record<string, unknown> = {}) =>
-    api.get<PurchaseOrderListResponse>('/staff/supplier/purchase-orders', { params }),
-  get: (id: number) =>
-    api.get<{ data: PurchaseOrder }>(`/staff/supplier/purchase-orders/${id}`),
-  accept: (id: number, payload: SupplierAcceptPayload) =>
-    api.post<{ data: PurchaseOrder }>(`/staff/supplier/purchase-orders/${id}/accept`, payload),
-  reject: (id: number, rejectionReason: string) =>
-    api.post<{ data: PurchaseOrder }>(`/staff/supplier/purchase-orders/${id}/reject`, { rejection_reason: rejectionReason }),
-  ship: (id: number, payload: SupplierShipPayload) =>
-    api.post<{ data: PurchaseOrder }>(`/staff/supplier/purchase-orders/${id}/ship`, payload),
 }
 
 export function purchaseOrderError(error: unknown): string {

@@ -23,6 +23,8 @@ class PurchaseOrder extends Model
 
     public const STATUS_CANCELLED = 'CANCELLED';
 
+    public const RECEIVABLE_STATUSES = [self::STATUS_SENT, self::STATUS_SUPPLIER_ACCEPTED, self::STATUS_SHIPPED];
+
     protected $fillable = [
         'code', 'supplier_id', 'created_by', 'status',
         'requested_delivery_date', 'supplier_delivery_date',
@@ -43,6 +45,11 @@ class PurchaseOrder extends Model
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
+    }
+
+    public function canReceive(): bool
+    {
+        return in_array($this->status, self::RECEIVABLE_STATUSES, true);
     }
 
     public function supplier(): BelongsTo

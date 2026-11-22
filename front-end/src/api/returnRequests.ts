@@ -23,11 +23,5 @@ export const managerReturnRequestsApi = {
   create: (orderId: number, payload: { request_key: string; reason: string; items: Array<{ stock_import_item_id: number; quantity: number }> }) =>
     api.post<{ data: ReturnRequest }>(`/staff/manager/return-requests/purchase-orders/${orderId}`, payload),
   dispatch: (id: number) => api.post<{ data: ReturnRequest }>(`/staff/manager/return-requests/${id}/dispatch`),
-}
-
-export const supplierReturnRequestsApi = {
-  list: () => api.get<{ data: ReturnRequest[] }>('/staff/supplier/return-requests'),
-  accept: (id: number) => api.post<{ data: ReturnRequest }>(`/staff/supplier/return-requests/${id}/accept`),
-  reject: (id: number, rejection_reason: string) => api.post<{ data: ReturnRequest }>(`/staff/supplier/return-requests/${id}/reject`, { rejection_reason }),
-  receive: (id: number) => api.post<{ data: ReturnRequest }>(`/staff/supplier/return-requests/${id}/receive`),
+  receive: (id: number) => api.post<{ data: ReturnRequest }>(`/staff/manager/return-requests/${id}/receive`),
 }

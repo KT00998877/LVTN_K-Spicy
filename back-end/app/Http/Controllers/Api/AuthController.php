@@ -192,7 +192,7 @@ class AuthController extends Controller
 
         $result = $this->authService->login($data['identifier'], $data['password'], $request);
         $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
-        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'], $roles));
+        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
 
         if ($result['requires_two_factor']) {
             return response()->json([
@@ -230,7 +230,7 @@ class AuthController extends Controller
             $request,
         );
         $roles = $result['user']->roles()->pluck('code')->map(fn ($role) => strtoupper($role))->all();
-        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'], $roles));
+        $staffRoles = array_values(array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles));
 
         return response()->json([
             'success' => true,

@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">KHO & NGUYÊN LIỆU</span>
         <h2>Giá nhập</h2>
-        <p>{{ canEdit ? 'Cập nhật quy cách mua và giá nhập.' : 'Giá do nhà cung cấp cập nhật. Đơn giá được lưu vào yêu cầu khi gửi.' }}</p>
+        <p>Cập nhật quy cách mua và giá nhập. Đơn giá được chốt khi gửi yêu cầu.</p>
       </div>
     </header>
 
@@ -69,7 +69,7 @@ interface PriceRow {
 }
 
 const staff = useStaffStore()
-const canEdit = computed(() => staff.currentRole === 'SUPPLIER')
+const canEdit = computed(() => staff.currentRole === 'MANAGER')
 const rows = ref<PriceRow[]>([])
 const search = ref('')
 const loading = ref(false)
@@ -92,8 +92,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const path = canEdit.value ? '/staff/supplier/prices' : '/staff/manager/supplier-prices'
-    const response = await api.get<{ data: Omit<PriceRow, 'editPrice'>[] }>(path)
+    const response = await api.get<{ data: Omit<PriceRow, 'editPrice'>[] }>('/staff/manager/supplier-prices')
     rows.value = response.data.data.map(row => ({ ...row, editPrice: row.price,
       editUnit: row.code === 'NL024' ? 'hộp' : row.code === 'NL056' ? 'chai' : row.code === 'NL005' ? 'bịch' : ['NL020', 'NL021', 'NL043', 'NL044'].includes(row.code) ? 'thùng' : row.purchase_unit,
       editConversion: ['NL024', 'NL056'].includes(row.code) ? 1000 : ['NL005', 'NL020', 'NL021', 'NL043', 'NL044'].includes(row.code) ? 24 : row.conversion_quantity }))
@@ -107,7 +106,7 @@ async function save(row: PriceRow) {
   error.value = ''
   success.value = ''
   try {
-    const response = await api.put<{ packaging_id: number | null }>('/staff/supplier/prices', { ingredient_id: row.ingredient_id, packaging_id: row.packaging_id, purchase_unit: row.editUnit, conversion_quantity: row.editConversion, price: row.editPrice })
+    const response = await api.put<{ packaging_id: number | null }>('/staff/manager/supplier-prices', { ingredient_id: row.ingredient_id, packaging_id: row.packaging_id, purchase_unit: row.editUnit, conversion_quantity: row.editConversion, price: row.editPrice })
     row.price = row.editPrice
     row.purchase_unit = row.editUnit
     row.conversion_quantity = row.editConversion

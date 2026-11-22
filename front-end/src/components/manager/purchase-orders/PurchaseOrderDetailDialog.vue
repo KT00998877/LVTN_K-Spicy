@@ -44,14 +44,12 @@
           <div class="purchase-orders__table-wrap">
             <table class="purchase-orders__table">
               <thead>
-                <tr><th>Nguyên liệu</th><th class="is-number">Yêu cầu</th><th class="is-number">NCC nhận</th><th class="is-number">Đã gửi</th><th class="is-number">Đơn giá</th></tr>
+                <tr><th>Nguyên liệu</th><th class="is-number">Yêu cầu</th><th class="is-number">Đơn giá</th></tr>
               </thead>
               <tbody>
                 <tr v-for="item in order.items" :key="item.id">
                   <td><strong>{{ item.ingredient_name }}</strong><br><span class="purchase-order-muted">{{ item.ingredient_code }} · {{ item.purchase_unit }}</span></td>
                   <td class="is-number">{{ formatQuantity(item.requested_purchase_quantity) }}</td>
-                  <td class="is-number">{{ formatOptionalQuantity(item.supplier_accepted_quantity) }}</td>
-                  <td class="is-number">{{ formatOptionalQuantity(item.shipped_purchase_quantity) }}</td>
                   <td class="is-number">{{ formatMoney(item.purchase_unit_price) }}</td>
                 </tr>
               </tbody>
@@ -73,7 +71,7 @@
           <template v-if="order.stock_import">
             <div class="purchase-order-summary">
               <div><span>Phiếu nhập</span><strong>{{ order.stock_import.code }}</strong></div>
-              <div><span>Trạng thái</span><strong>{{ order.stock_import.status === 'CONFIRMED' ? 'Đã xác nhận' : 'Đang kiểm nhận' }}</strong></div>
+              <div><span>Trạng thái</span><strong>{{ order.stock_import.status === 'CONFIRMED' ? 'Đã xác nhận' : order.stock_import.status === 'CANCELLED' ? 'Đã hủy' : 'Đang kiểm nhận' }}</strong></div>
               <div><span>Lượng nhập kho</span><strong>{{ formatQuantity(totalStockQuantity) }}</strong></div>
               <div><span>Giá trị chấp nhận</span><strong>{{ formatMoney(receiptTotal) }}</strong></div>
             </div>
@@ -85,12 +83,12 @@
             <div class="purchase-orders__table-wrap">
               <table class="purchase-orders__table purchase-order-receipt-table">
                 <thead>
-                  <tr><th>Nguyên liệu</th><th class="is-number">Đã gửi</th><th>Thực nhận</th><th>Chấp nhận</th><th>Từ chối / lý do</th><th>Lô / HSD</th><th class="is-number">Thành tiền</th></tr>
+                  <tr><th>Nguyên liệu</th><th class="is-number">Dự kiến</th><th>Thực nhận</th><th>Chấp nhận</th><th>Từ chối / lý do</th><th>Lô / HSD</th><th class="is-number">Thành tiền</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="line in receiptLines" :key="line.purchase_order_item_id">
                     <td><strong>{{ line.ingredient_name }}</strong><br><span class="purchase-order-muted">{{ line.purchase_unit }}</span></td>
-                    <td class="is-number">{{ formatQuantity(shippedFor(line.purchase_order_item_id)) }}</td>
+                    <td class="is-number">{{ formatQuantity(expectedFor(line.purchase_order_item_id)) }}</td>
                     <td>
                       <label class="purchase-order-muted" :for="`delivered-${line.id}`">Số thực nhận</label>
                       <input :id="`delivered-${line.id}`" v-model.number="line.delivered_purchase_quantity" class="purchase-order-input" type="number" min="0" step="1" :disabled="receiptLocked || busy" />
@@ -106,7 +104,7 @@
                     </td>
                     <td>
                       <label class="purchase-order-muted" :for="`lot-${line.id}`">Mã lô</label>
-                      <input :id="`lot-${line.id}`" v-model.trim="line.supplier_lot_code" class="purchase-order-input" maxlength="60" readonly />
+                      <input :id="`lot-${line.id}`" v-model.trim="line.supplier_lot_code" class="purchase-order-input" maxlength="60" :disabled="receiptLocked || busy" />
                       <label class="purchase-order-muted" :for="`expiry-${line.id}`">Hạn sử dụng</label>
                       <input :id="`expiry-${line.id}`" v-model="line.expiry_date" class="purchase-order-input" type="date" :disabled="receiptLocked || busy" />
                     </td>
@@ -116,13 +114,13 @@
               </table>
             </div>
 
-            <div v-if="receiptLocked" class="purchase-order-help" role="status">
+            <div v-if="order.stock_import.status === 'CONFIRMED'" class="purchase-order-help" role="status">
               Phiếu đã xác nhận lúc {{ formatDateTime(order.stock_import.confirmed_at) }} và không thể sửa trực tiếp.
               <RouterLink class="purchase-order-link" :to="{ name: 'manager-stock-imports', query: { q: order.stock_import.code } }">Xem phiếu nhập</RouterLink>
               · <RouterLink class="purchase-order-link" :to="{ name: 'manager-stock-transactions', query: { reference_type: 'stock_import', reference_id: order.stock_import.id } }">Xem lịch sử kho</RouterLink>
             </div>
 
-            <div v-else class="purchase-order-actions">
+            <div v-else-if="canInspect && !receiptLocked" class="purchase-order-actions">
               <button class="purchase-order-button" type="button" :disabled="busy" @click="saveReceipt">
                 {{ busy ? 'Đang lưu…' : 'Lưu kiểm nhận' }}
               </button>
@@ -171,9 +169,7 @@ const receiptLines = ref<PurchaseOrderReceiptItem[]>([])
 
 const timeline = [
   { status: 'DRAFT' as const, label: 'Tạo yêu cầu' },
-  { status: 'SENT' as const, label: 'Đã gửi NCC' },
-  { status: 'SUPPLIER_ACCEPTED' as const, label: 'NCC chấp nhận' },
-  { status: 'SHIPPED' as const, label: 'NCC đã gửi' },
+  { status: 'SENT' as const, label: 'Đã gửi yêu cầu' },
   { status: 'RECEIVED' as const, label: 'Đã nhập kho' },
 ]
 
@@ -185,8 +181,10 @@ const statusRanks: Partial<Record<PurchaseOrderStatus, number>> = {
   RECEIVED: 4,
 }
 
-const canInspect = computed(() => order.value?.status === 'SHIPPED')
-const receiptLocked = computed(() => order.value?.stock_import?.status === 'CONFIRMED')
+const canInspect = computed(() =>
+  order.value?.status === 'SENT' || order.value?.status === 'SUPPLIER_ACCEPTED' || order.value?.status === 'SHIPPED',
+)
+const receiptLocked = computed(() => order.value?.stock_import?.status !== 'DRAFT')
 const receiptTotal = computed(() => receiptLines.value.reduce(
   (sum, line) => sum + line.accepted_purchase_quantity * line.purchase_unit_price,
   0,
@@ -344,8 +342,9 @@ function rejectedFor(line: PurchaseOrderReceiptItem) {
   return Math.max(0, Number(line.delivered_purchase_quantity || 0) - Number(line.accepted_purchase_quantity || 0))
 }
 
-function shippedFor(purchaseOrderItemId: number) {
-  return order.value?.items.find((item) => item.id === purchaseOrderItemId)?.shipped_purchase_quantity ?? 0
+function expectedFor(purchaseOrderItemId: number) {
+  const item = order.value?.items.find((line) => line.id === purchaseOrderItemId)
+  return item?.shipped_purchase_quantity ?? item?.supplier_accepted_quantity ?? item?.requested_purchase_quantity ?? 0
 }
 
 function isStageComplete(status: PurchaseOrderStatus) {
@@ -358,16 +357,14 @@ function timelineTime(status: PurchaseOrderStatus) {
   if (!order.value) return 'Chưa thực hiện'
   const value = status === 'DRAFT' ? order.value.created_at
     : status === 'SENT' ? order.value.sent_at
-      : status === 'SUPPLIER_ACCEPTED' ? order.value.supplier_responded_at
-        : status === 'SHIPPED' ? order.value.shipped_at
-          : order.value.received_at
+      : order.value.received_at
   return value ? formatDateTime(value) : 'Chưa thực hiện'
 }
 
 function statusLabel(status: PurchaseOrderStatus) {
   return ({
-    DRAFT: 'Bản nháp', SENT: 'Chờ phản hồi', SUPPLIER_ACCEPTED: 'Đã chấp nhận',
-    SUPPLIER_REJECTED: 'Đã từ chối', SHIPPED: 'Đang giao', RECEIVED: 'Đã nhập kho', CANCELLED: 'Đã hủy',
+    DRAFT: 'Bản nháp', SENT: 'Đã gửi, chờ kiểm nhận', SUPPLIER_ACCEPTED: 'Đã chấp nhận',
+    SUPPLIER_REJECTED: 'Đã từ chối', SHIPPED: 'Đã giao, chờ kiểm nhận', RECEIVED: 'Đã nhập kho', CANCELLED: 'Đã hủy',
   } as Record<PurchaseOrderStatus, string>)[status]
 }
 
@@ -382,9 +379,6 @@ function formatQuantity(value: number) {
   return Number(value).toLocaleString('vi-VN')
 }
 
-function formatOptionalQuantity(value: number | null) {
-  return value === null ? '—' : formatQuantity(value)
-}
 
 function formatMoney(value: number | null) {
   return value === null ? '—' : `${Number(value).toLocaleString('vi-VN')} đ`

@@ -372,7 +372,7 @@ Route::prefix('staff')->group(function () {
             Route::post('{id}/confirm',[\App\Http\Controllers\Api\ManagerStockImportController::class, 'confirm'])->whereNumber('id');
         });
 
-        // ----- Purchase orders: Manager lập/gửi, Supplier phản hồi/gửi hàng -----
+        // ----- Purchase orders: Quản lý gửi yêu cầu và kiểm nhận -----
         Route::middleware('staff:MANAGER')->prefix('manager/purchase-orders')->group(function () {
             $controller = \App\Http\Controllers\Api\ManagerPurchaseOrderController::class;
             Route::get('/', [$controller, 'index']);
@@ -388,31 +388,14 @@ Route::prefix('staff')->group(function () {
 
         Route::get('/manager/supplier-prices', [\App\Http\Controllers\Api\SupplierPriceController::class, 'index'])
             ->middleware('staff:MANAGER');
-        Route::get('/supplier/prices', [\App\Http\Controllers\Api\SupplierPriceController::class, 'index'])
-            ->middleware('staff:SUPPLIER');
-        Route::put('/supplier/prices', [\App\Http\Controllers\Api\SupplierPriceController::class, 'update'])
-            ->middleware('staff:SUPPLIER');
-
-        Route::middleware('staff:SUPPLIER')->prefix('supplier/purchase-orders')->group(function () {
-            $controller = \App\Http\Controllers\Api\SupplierPurchaseOrderController::class;
-            Route::get('/', [$controller, 'index']);
-            Route::get('/{id}', [$controller, 'show'])->whereNumber('id');
-            Route::post('/{id}/accept', [$controller, 'accept'])->whereNumber('id');
-            Route::post('/{id}/reject', [$controller, 'reject'])->whereNumber('id');
-            Route::post('/{id}/ship', [$controller, 'ship'])->whereNumber('id');
-        });
+        Route::put('/manager/supplier-prices', [\App\Http\Controllers\Api\SupplierPriceController::class, 'update'])
+            ->middleware('staff:MANAGER');
 
         Route::middleware('staff:MANAGER')->prefix('manager/return-requests')->group(function () {
             $controller = \App\Http\Controllers\Api\SupplierReturnRequestController::class;
             Route::get('/', [$controller, 'managerIndex']);
             Route::post('/purchase-orders/{orderId}', [$controller, 'store'])->whereNumber('orderId');
             Route::post('/{id}/dispatch', [$controller, 'dispatch'])->whereNumber('id');
-        });
-        Route::middleware('staff:SUPPLIER')->prefix('supplier/return-requests')->group(function () {
-            $controller = \App\Http\Controllers\Api\SupplierReturnRequestController::class;
-            Route::get('/', [$controller, 'supplierIndex']);
-            Route::post('/{id}/accept', [$controller, 'accept'])->whereNumber('id');
-            Route::post('/{id}/reject', [$controller, 'reject'])->whereNumber('id');
             Route::post('/{id}/receive', [$controller, 'receive'])->whereNumber('id');
         });
 

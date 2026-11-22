@@ -3,7 +3,7 @@
     <section class="purchase-orders__heading">
       <div>
         <h2>Yêu cầu nhập hàng</h2>
-        <p>Lập yêu cầu, theo dõi Nhà cung cấp K và kiểm nhận hàng trước khi cộng tồn kho.</p>
+        <p>Lập yêu cầu và kiểm nhận hàng để cập nhật tồn kho.</p>
       </div>
       <div class="purchase-order-actions">
         <button class="purchase-order-button" type="button" :disabled="ingredientsLoading || !ingredients.length" @click="openSuggested">
@@ -43,7 +43,7 @@
     <div v-else-if="orders.length === 0" class="purchase-order-state">
       <div>
         <strong>Chưa có yêu cầu phù hợp.</strong>
-        <p>{{ hasFilters ? 'Hãy thay đổi bộ lọc để xem yêu cầu khác.' : 'Tạo yêu cầu đầu tiên để gửi Nhà cung cấp K.' }}</p>
+        <p>{{ hasFilters ? 'Hãy thay đổi bộ lọc để xem yêu cầu khác.' : 'Tạo yêu cầu nhập hàng đầu tiên.' }}</p>
       </div>
     </div>
     <template v-else>
@@ -78,7 +78,7 @@
                   <button class="purchase-order-button purchase-order-button--quiet" type="button" @click="openDetail(row)">Xem</button>
                   <button v-if="row.status === 'DRAFT'" class="purchase-order-button purchase-order-button--quiet" type="button" :disabled="busyId === row.id" @click="openEdit(row)">Sửa</button>
                   <button v-if="row.status === 'DRAFT'" class="purchase-order-button purchase-order-button--quiet purchase-order-button--primary" type="button" :disabled="busyId === row.id" @click="sendOrder(row)">
-                    {{ busyId === row.id ? 'Đang gửi…' : 'Gửi NCC' }}
+                    {{ busyId === row.id ? 'Đang gửi…' : 'Gửi yêu cầu' }}
                   </button>
                   <button v-if="row.status === 'DRAFT' || row.status === 'SENT'" class="purchase-order-button purchase-order-button--quiet purchase-order-button--danger" type="button" :disabled="busyId === row.id" @click="cancelOrder(row)">Hủy</button>
                 </div>
@@ -137,10 +137,10 @@ const meta = reactive({ current_page: 1, per_page: 25, total: 0, last_page: 1 })
 
 const statusOptions: Array<{ value: PurchaseOrderStatus; label: string }> = [
   { value: 'DRAFT', label: 'Bản nháp' },
-  { value: 'SENT', label: 'Chờ nhà cung cấp' },
+  { value: 'SENT', label: 'Đã gửi, chờ kiểm nhận' },
   { value: 'SUPPLIER_ACCEPTED', label: 'Nhà cung cấp chấp nhận' },
   { value: 'SUPPLIER_REJECTED', label: 'Nhà cung cấp từ chối' },
-  { value: 'SHIPPED', label: 'Đang giao hàng' },
+  { value: 'SHIPPED', label: 'Đã giao, chờ kiểm nhận' },
   { value: 'RECEIVED', label: 'Đã nhập kho' },
   { value: 'CANCELLED', label: 'Đã hủy' },
 ]
@@ -227,8 +227,8 @@ function openDetail(order: PurchaseOrder) {
 async function sendOrder(order: PurchaseOrder) {
   const confirmed = await appDialog.confirm({
     title: `Gửi yêu cầu ${order.code}?`,
-    message: 'Sau khi gửi, nội dung yêu cầu sẽ không thể sửa. Nhà cung cấp K sẽ nhìn thấy yêu cầu này.',
-    confirmLabel: 'Gửi nhà cung cấp',
+    message: 'Sau khi gửi, đơn giá được chốt và bạn có thể mở kiểm nhận khi hàng về.',
+    confirmLabel: 'Gửi yêu cầu',
   })
   if (!confirmed) return
   await runAction(order.id, () => purchaseOrdersApi.send(order.id))

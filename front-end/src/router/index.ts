@@ -39,6 +39,7 @@ const ManagerDashboardView = () => import('../views/staff/manager/ManagerDashboa
 const ManagerMenuView      = () => import('../views/staff/manager/ManagerCatalogView.vue')
 const ManagerFlashSaleView = () => import('../views/staff/manager/ManagerMenuView.vue')
 const ManagerInventoryView = () => import('../views/staff/manager/ManagerStockView.vue')
+const ManagerWarehouseSection = () => import('../views/staff/manager/ManagerWarehouseSection.vue')
 const ManagerStaffView     = () => import('../views/staff/manager/ManagerStaffView.vue')
 const ManagerReportView    = () => import('../views/staff/manager/ManagerReportView.vue')
 // Phase 7 — Statistics dashboard (end-to-end với Phase 6 API).
@@ -59,9 +60,7 @@ const ManagerStockTransactionsView  = () => import('../views/staff/manager/Manag
 // Phase 3 — Combo nước uống (gợi ý món do quản lý cấu hình)
 const ManagerSuggestionsView        = () => import('../views/staff/manager/ManagerSuggestionsView.vue')
 const ManagerDeliveryRatingView    = () => import('../views/staff/manager/ManagerDeliveryRatingView.vue')
-const SupplierPurchaseOrdersView   = () => import('../views/staff/supplier/SupplierPurchaseOrdersView.vue')
 const SupplierPricesView           = () => import('../views/staff/SupplierPricesView.vue')
-const SupplierReturnRequestsView   = () => import('../views/staff/supplier/SupplierReturnRequestsView.vue')
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -214,17 +213,6 @@ const router = createRouter({
             ],
         },
         {
-            path: '/staff/supplier',
-            component: StaffLayout,
-            meta: { requiresStaffRole: ['SUPPLIER'] as StaffRole[] },
-            children: [
-                { path: '', redirect: '/staff/supplier/purchase-orders' },
-                { path: 'purchase-orders', name: 'supplier-purchase-orders', component: SupplierPurchaseOrdersView, meta: { title: 'Yêu cầu nhập hàng', subtitle: 'Phản hồi và xác nhận gửi hàng cho K-SPICY' } },
-                { path: 'prices', name: 'supplier-prices', component: SupplierPricesView, meta: { title: 'Giá nhập', subtitle: 'Cập nhật giá nguyên liệu cung cấp' } },
-                { path: 'return-requests', name: 'supplier-return-requests', component: SupplierReturnRequestsView, meta: { title: 'Yêu cầu trả hàng', subtitle: 'Phản hồi và xác nhận hàng nhà hàng trả' } },
-            ],
-        },
-        {
             path: '/staff/manager',
             component: StaffLayout,
             meta: { requiresStaffRole: ['MANAGER'] as StaffRole[] },
@@ -237,12 +225,27 @@ const router = createRouter({
                 { path: 'invoices', name: 'manager-invoices', component: () => import('../views/staff/manager/ManagerSalesView.vue'), meta: { title: 'Quản lý hóa đơn' } },
                 { path: 'online-orders', name: 'manager-online-orders', component: () => import('../views/staff/manager/ManagerOnlineOrdersView.vue'), meta: { title: 'Đơn giao hàng', subtitle: 'Xác nhận, từ chối, bàn giao shipper' } },
                 { path: 'live-chat', name: 'manager-live-chat', component: () => import('../views/staff/manager/ManagerLiveChatView.vue'), meta: { title: 'Tư vấn trực tiếp', subtitle: 'Trả lời khách đang chờ' } },
-                { path: 'ingredients', name: 'manager-ingredients', component: ManagerInventoryView, meta: { title: 'Nguyên liệu', subtitle: 'Danh sách nguyên liệu và đơn vị tính' } },
-                { path: 'ingredients/manager', name: 'manager-ingredients-crud', component: ManagerIngredientsView, meta: { title: 'Quản lý nguyên liệu', subtitle: 'CRUD nguyên liệu — Phase 2' } },
+                {
+                    path: 'inventory',
+                    component: ManagerWarehouseSection,
+                    props: { section: 'stock' },
+                    children: [
+                        { path: '', name: 'manager-inventory', component: ManagerInventoryView, meta: { title: 'Kho hàng', subtitle: 'Xem tồn kho và ghi nhận xuất kho' } },
+                        { path: '/staff/manager/ingredients', name: 'manager-ingredients', component: ManagerInventoryView, meta: { title: 'Nguyên liệu', subtitle: 'Danh sách nguyên liệu và đơn vị tính' } },
+                        { path: '/staff/manager/ingredients/manager', name: 'manager-ingredients-crud', component: ManagerIngredientsView, meta: { title: 'Quản lý nguyên liệu' } },
+                    ],
+                },
                 { path: 'recipes', name: 'manager-recipes', component: ManagerRecipeView, meta: { title: 'Công thức món ăn', subtitle: 'Định lượng nguyên liệu theo món' } },
-                { path: 'purchase-orders', name: 'manager-purchase-orders', component: ManagerPurchaseOrdersView, meta: { title: 'Yêu cầu nhập hàng', subtitle: 'Theo dõi Nhà cung cấp K và kiểm nhận hàng giao' } },
-                { path: 'supplier-prices', name: 'manager-supplier-prices', component: SupplierPricesView, meta: { title: 'Giá nhập', subtitle: 'Xem giá do nhà cung cấp cập nhật' } },
-                { path: 'stock-imports', name: 'manager-stock-imports', component: ManagerStockImportsView, meta: { title: 'Phiếu nhập kho', subtitle: 'DRAFT → CONFIRMED, có audit history' } },
+                {
+                    path: 'purchase-orders',
+                    component: ManagerWarehouseSection,
+                    props: { section: 'receiving' },
+                    children: [
+                        { path: '', name: 'manager-purchase-orders', component: ManagerPurchaseOrdersView, meta: { title: 'Yêu cầu nhập hàng', subtitle: 'Gửi yêu cầu và kiểm nhận hàng tại kho' } },
+                        { path: '/staff/manager/stock-imports', name: 'manager-stock-imports', component: ManagerStockImportsView, meta: { title: 'Phiếu nhập kho', subtitle: 'Theo dõi phiếu nháp và phiếu đã xác nhận' } },
+                        { path: '/staff/manager/supplier-prices', name: 'manager-supplier-prices', component: SupplierPricesView, meta: { title: 'Giá nhập', subtitle: 'Cập nhật quy cách mua và giá nhập' } },
+                    ],
+                },
                 { path: 'stock-transactions', name: 'manager-stock-transactions', component: ManagerStockTransactionsView, meta: { title: 'Lịch sử giao dịch kho', subtitle: 'IMPORT · EXPORT · WASTE · ADJUSTMENT' } },
                 { path: 'stocktake', redirect: '/staff/manager/inventory' },
                 { path: 'consumption', redirect: '/staff/manager/inventory' },
@@ -252,7 +255,6 @@ const router = createRouter({
                 { path: 'menu',      name: 'manager-menu',      component: ManagerMenuView,      meta: { title: 'Quản lý thực đơn',   subtitle: 'Món ăn, danh mục, topping' } },
                 { path: 'combos',    name: 'manager-combos',    component: ManagerSuggestionsView, meta: { title: 'Combo nước uống', subtitle: 'Gợi ý món đi kèm và giá combo' } },
                 { path: 'delivery-ratings', name: 'manager-delivery-ratings', component: ManagerDeliveryRatingView, meta: { title: 'Đánh giá giao hàng', subtitle: 'Chấm điểm dịch vụ giao và phân tích theo shipper' } },
-                { path: 'inventory', name: 'manager-inventory', component: ManagerInventoryView, meta: { title: 'Kho & Nguyên liệu',  subtitle: 'Nhập / xuất / điều chỉnh tồn kho' } },
                 { path: 'staff',     name: 'manager-staff',     component: ManagerStaffView,     meta: { title: 'Quản lý nhân viên',  subtitle: 'Tài khoản, phân quyền' } },
                 { path: 'statistics', name: 'manager-statistics', component: ManagerStatisticsView, meta: { title: 'Thống kê tổng quan', subtitle: 'Dashboard end-to-end: KPI · Charts · Kho' } },
                 { path: 'promotions', name: 'manager-promotions', component: ManagerPromotionsView, meta: { title: 'Khuyến mãi & Voucher', subtitle: 'Quản lý mã giảm giá và chương trình khuyến mãi' } },
@@ -285,7 +287,7 @@ const router = createRouter({
  * Lưu ý: dùng callback form `next` cho tương thích, nhưng đã await init()
  * để state được hydrate xong trước khi check guard (tránh race condition).
  */
-const staffRoots: Record<StaffRole, string> = { WAITER: '/staff/waiter/tables', KITCHEN: '/staff/kitchen/queue', CASHIER: '/staff/cashier/invoices', SHIPPER: '/staff/shipper', SUPPLIER: '/staff/supplier/purchase-orders', MANAGER: '/staff/manager/dashboard' }
+const staffRoots: Record<StaffRole, string> = { WAITER: '/staff/waiter/tables', KITCHEN: '/staff/kitchen/queue', CASHIER: '/staff/cashier/invoices', SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard' }
 
 router.beforeEach(async (to, _from) => {
     const authStore = useAuthStore()
@@ -336,7 +338,7 @@ router.beforeEach(async (to, _from) => {
                 WAITER:  '/staff/waiter/tables',
                 KITCHEN: '/staff/kitchen/queue',
                 CASHIER: '/staff/cashier/invoices',
-                SHIPPER: '/staff/shipper', SUPPLIER: '/staff/supplier/purchase-orders', MANAGER: '/staff/manager/dashboard',
+                SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard',
             }
             return root[staffStore.currentRole] ?? '/staff/login'
         }
@@ -347,7 +349,7 @@ router.beforeEach(async (to, _from) => {
             WAITER:  '/staff/waiter/tables',
             KITCHEN: '/staff/kitchen/queue',
             CASHIER: '/staff/cashier/invoices',
-            SHIPPER: '/staff/shipper', SUPPLIER: '/staff/supplier/purchase-orders', MANAGER: '/staff/manager/dashboard',
+            SHIPPER: '/staff/shipper', MANAGER: '/staff/manager/dashboard',
         }
         return root[staffStore.currentRole]
     }

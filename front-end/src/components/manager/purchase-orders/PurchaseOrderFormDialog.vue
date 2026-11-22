@@ -4,7 +4,7 @@
       <header class="purchase-order-dialog__header">
         <div>
           <h2>{{ editing ? `Sửa yêu cầu ${editing.code}` : 'Tạo yêu cầu nhập hàng' }}</h2>
-          <p class="purchase-order-help">{{ suggested ? 'Số lượng gợi ý đưa tồn lên gấp đôi mức tối thiểu. Kiểm tra và sửa trước khi lưu bản nháp.' : 'Lưu bản nháp trước khi gửi Nhà cung cấp K.' }}</p>
+          <p class="purchase-order-help">{{ suggested ? 'Số lượng gợi ý đưa tồn lên gấp đôi mức tối thiểu. Kiểm tra và sửa trước khi lưu bản nháp.' : 'Lưu bản nháp trước khi gửi yêu cầu nhập.' }}</p>
         </div>
         <button class="purchase-order-dialog__close" type="button" aria-label="Đóng form" :disabled="saving" @click="close">×</button>
       </header>

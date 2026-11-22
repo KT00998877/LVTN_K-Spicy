@@ -48,11 +48,13 @@ class PurchaseOrderReceiptService
 
             $totalCost = 0.0;
             foreach ($order->items()->with('ingredient')->lockForUpdate()->orderBy('ingredient_id')->get() as $item) {
-                $shipped = (int) $item->shipped_purchase_quantity;
+                $delivered = (int) ($item->shipped_purchase_quantity
+                    ?? $item->supplier_accepted_quantity
+                    ?? $item->requested_purchase_quantity);
                 $conversion = (int) $item->conversion_quantity;
                 $purchasePrice = (float) $item->purchase_unit_price;
-                $quantity = $this->stockQuantity($shipped, $conversion);
-                $subtotal = round($shipped * $purchasePrice, 2);
+                $quantity = $this->stockQuantity($delivered, $conversion);
+                $subtotal = round($delivered * $purchasePrice, 2);
                 $totalCost += $subtotal;
 
                 $import->items()->create([
@@ -62,12 +64,12 @@ class PurchaseOrderReceiptService
                     'quantity' => $quantity,
                     'unit' => $item->ingredient->unit,
                     'unit_price' => round($purchasePrice / $conversion, 2),
-                    'purchase_quantity' => $shipped,
+                    'purchase_quantity' => $delivered,
                     'purchase_unit' => $item->purchase_unit,
                     'conversion_quantity' => $conversion,
                     'purchase_unit_price' => $purchasePrice,
-                    'delivered_purchase_quantity' => $shipped,
-                    'accepted_purchase_quantity' => $shipped,
+                    'delivered_purchase_quantity' => $delivered,
+                    'accepted_purchase_quantity' => $delivered,
                     'rejected_purchase_quantity' => 0,
                     'subtotal' => $subtotal,
                     'expiry_date' => $item->expiry_date,
@@ -156,8 +158,8 @@ class PurchaseOrderReceiptService
 
     private function assertReceivable(PurchaseOrder $order): void
     {
-        if ($order->status !== PurchaseOrder::STATUS_SHIPPED) {
-            throw ValidationException::withMessages(['status' => 'Chỉ yêu cầu SHIPPED mới được kiểm nhận.']);
+        if (! $order->canReceive()) {
+            throw ValidationException::withMessages(['status' => 'Yêu cầu chưa ở trạng thái có thể kiểm nhận.']);
         }
     }
 

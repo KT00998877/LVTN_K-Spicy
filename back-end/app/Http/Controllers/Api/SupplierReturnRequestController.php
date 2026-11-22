@@ -25,14 +25,6 @@ class SupplierReturnRequestController extends Controller
             ->orderByDesc('id')->get()->map(fn ($request) => $this->present($request))]);
     }
 
-    public function supplierIndex(Request $request): JsonResponse
-    {
-        $supplierId = $this->supplierId($request);
-        return response()->json(['data' => SupplierReturnRequest::with(['purchaseOrder', 'items.stockImportItem.ingredient'])
-            ->whereHas('purchaseOrder', fn ($query) => $query->where('supplier_id', $supplierId))
-            ->orderByDesc('id')->get()->map(fn ($return) => $this->present($return))]);
-    }
-
     public function store(StoreSupplierReturnRequest $request, int $orderId): JsonResponse
     {
         $data = $request->validated();
@@ -89,22 +81,11 @@ class SupplierReturnRequestController extends Controller
         return response()->json(['data' => $this->present($created->load(['purchaseOrder', 'items.stockImportItem.ingredient']))], $isNew ? 201 : 200);
     }
 
-    public function accept(Request $request, int $id): JsonResponse
-    {
-        return $this->transition($id, $request, 'REQUESTED', 'ACCEPTED', true);
-    }
-
-    public function reject(Request $request, int $id): JsonResponse
-    {
-        $data = $request->validate(['rejection_reason' => ['required', 'string', 'max:2000']]);
-        return $this->transition($id, $request, 'REQUESTED', 'REJECTED', true, ['rejection_reason' => trim($data['rejection_reason'])]);
-    }
-
     public function dispatch(Request $request, int $id): JsonResponse
     {
         $return = DB::transaction(function () use ($id, $request) {
             $return = SupplierReturnRequest::with('items')->lockForUpdate()->findOrFail($id);
-            abort_unless($return->status === 'ACCEPTED', 409, 'NCC chưa chấp nhận yêu cầu trả hàng.');
+            abort_unless(in_array($return->status, ['REQUESTED', 'ACCEPTED'], true), 409, 'Yêu cầu không còn ở trạng thái có thể bàn giao.');
             $this->returns->create(PurchaseOrder::findOrFail($return->purchase_order_id), [
                 'request_key' => $return->request_key,
                 'reason' => $return->reason,
@@ -126,28 +107,18 @@ class SupplierReturnRequestController extends Controller
 
     public function receive(Request $request, int $id): JsonResponse
     {
-        return $this->transition($id, $request, 'DISPATCHED', 'RECEIVED', true);
-    }
-
-    private function transition(int $id, Request $actorRequest, string $from, string $to, bool $supplier, array $extra = []): JsonResponse
-    {
-        $return = DB::transaction(function () use ($id, $actorRequest, $from, $to, $supplier, $extra) {
-            $return = SupplierReturnRequest::with('purchaseOrder')->lockForUpdate()->findOrFail($id);
-            if ($supplier) abort_unless((int) $return->purchaseOrder->supplier_id === $this->supplierId($actorRequest), 404);
-            abort_unless($return->status === $from, 409, 'Yêu cầu không còn ở trạng thái phù hợp.');
-            $at = $to === 'RECEIVED' ? ['received_by' => $actorRequest->user()->id, 'received_at' => now()]
-                : ['supplier_responded_by' => $actorRequest->user()->id, 'supplier_responded_at' => now()];
-            $return->update(['status' => $to] + $at + $extra);
+        $return = DB::transaction(function () use ($id, $request) {
+            $return = SupplierReturnRequest::lockForUpdate()->findOrFail($id);
+            abort_unless($return->status === 'DISPATCHED', 409, 'Yêu cầu chưa ở trạng thái có thể xác nhận.');
+            $return->update([
+                'status' => 'RECEIVED',
+                'received_by' => $request->user()->id,
+                'received_at' => now(),
+            ]);
             return $return;
         });
-        return response()->json(['data' => $this->present($return->load(['purchaseOrder', 'items.stockImportItem.ingredient']))]);
-    }
 
-    private function supplierId(Request $request): int
-    {
-        $supplierId = $request->user()->supplier_id;
-        abort_unless($supplierId, 403, 'Tài khoản chưa liên kết nhà cung cấp.');
-        return (int) $supplierId;
+        return response()->json(['data' => $this->present($return->load(['purchaseOrder', 'items.stockImportItem.ingredient']))]);
     }
 
     private function present(SupplierReturnRequest $request): array

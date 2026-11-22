@@ -6,6 +6,7 @@ use App\Models\Ingredient;
 use App\Models\IngredientPackaging;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\StockImport;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +64,7 @@ class PurchaseOrderService
             foreach ($order->items as $item) {
                 $price = $this->supplierPrice($item);
                 if ($price === null || $price <= 0) {
-                    throw ValidationException::withMessages(['items' => "Nhà cung cấp chưa cập nhật giá nhập cho nguyên liệu {$item->ingredient_id}."]);
+                    throw ValidationException::withMessages(['items' => "Chưa có giá nhập cho nguyên liệu {$item->ingredient_id}."]);
                 }
                 $item->update(['purchase_unit_price' => $price]);
             }
@@ -86,120 +87,18 @@ class PurchaseOrderService
                 throw ValidationException::withMessages(['status' => 'Chỉ được hủy yêu cầu DRAFT hoặc SENT.']);
             }
 
+            $cancelledAt = now();
+            $order->stockImport()->where('status', StockImport::STATUS_DRAFT)->update([
+                'status' => StockImport::STATUS_CANCELLED,
+                'cancelled_by' => $actor->id,
+                'cancelled_at' => $cancelledAt,
+                'cancellation_reason' => 'Yêu cầu nhập hàng đã bị hủy.',
+            ]);
+
             $order->update([
                 'status' => PurchaseOrder::STATUS_CANCELLED,
                 'cancelled_by' => $actor->id,
-                'cancelled_at' => now(),
-            ]);
-
-            return $this->load($order);
-        });
-    }
-
-    public function accept(PurchaseOrder $order, array $data, User $actor): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $data, $actor) {
-            $order = PurchaseOrder::lockForUpdate()->findOrFail($order->id);
-            $this->assertSupplierOwnership($order, $actor);
-            $this->assertStatus($order, PurchaseOrder::STATUS_SENT);
-
-            $items = $order->items()->lockForUpdate()->get()->keyBy('id');
-            $submitted = collect($data['items'])->keyBy('purchase_order_item_id');
-            $this->assertCompleteItemSet($items, $submitted);
-
-            foreach ($items as $item) {
-                $input = $submitted->get($item->id);
-                $accepted = (int) $input['supplier_accepted_quantity'];
-                if ($accepted > $item->requested_purchase_quantity) {
-                    throw ValidationException::withMessages([
-                        'items' => "Số lượng chấp nhận của {$item->ingredient_id} vượt số lượng yêu cầu.",
-                    ]);
-                }
-                $price = $item->purchase_unit_price ?? $this->supplierPrice($item);
-                if ($price === null || $price <= 0) {
-                    throw ValidationException::withMessages(['items' => "Chưa có giá nhập cho nguyên liệu {$item->ingredient_id}."]);
-                }
-                $item->update([
-                    'supplier_accepted_quantity' => $accepted,
-                    'purchase_unit_price' => $price,
-                    'supplier_note' => $input['supplier_note'] ?? null,
-                ]);
-            }
-
-            $order->update([
-                'status' => PurchaseOrder::STATUS_SUPPLIER_ACCEPTED,
-                'supplier_delivery_date' => $data['supplier_delivery_date'],
-                'supplier_note' => $data['supplier_note'] ?? null,
-                'rejection_reason' => null,
-                'supplier_responded_by' => $actor->id,
-                'supplier_responded_at' => now(),
-            ]);
-
-            return $this->load($order);
-        });
-    }
-
-    public function reject(PurchaseOrder $order, string $reason, User $actor): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $reason, $actor) {
-            $order = PurchaseOrder::lockForUpdate()->findOrFail($order->id);
-            $this->assertSupplierOwnership($order, $actor);
-            $this->assertStatus($order, PurchaseOrder::STATUS_SENT);
-            $order->update([
-                'status' => PurchaseOrder::STATUS_SUPPLIER_REJECTED,
-                'rejection_reason' => $reason,
-                'supplier_responded_by' => $actor->id,
-                'supplier_responded_at' => now(),
-            ]);
-
-            return $this->load($order);
-        });
-    }
-
-    public function ship(PurchaseOrder $order, array $data, User $actor): PurchaseOrder
-    {
-        return DB::transaction(function () use ($order, $data, $actor) {
-            $order = PurchaseOrder::lockForUpdate()->findOrFail($order->id);
-            $this->assertSupplierOwnership($order, $actor);
-            $this->assertStatus($order, PurchaseOrder::STATUS_SUPPLIER_ACCEPTED);
-
-            $documentCode = sprintf('PX-%05d', $order->id);
-            $duplicateDocument = PurchaseOrder::where('supplier_id', $order->supplier_id)
-                ->where('supplier_document_code', $documentCode)
-                ->whereKeyNot($order->id)
-                ->exists();
-            if ($duplicateDocument) {
-                throw ValidationException::withMessages([
-                    'supplier_document_code' => 'Mã chứng từ đã được sử dụng.',
-                ]);
-            }
-
-            $items = $order->items()->lockForUpdate()->get()->keyBy('id');
-            $submitted = collect($data['items'])->keyBy('purchase_order_item_id');
-            $this->assertCompleteItemSet($items, $submitted);
-
-            foreach ($items as $item) {
-                $input = $submitted->get($item->id);
-                $shipped = (int) $input['shipped_purchase_quantity'];
-                if ($shipped > $item->supplier_accepted_quantity) {
-                    throw ValidationException::withMessages([
-                        'items' => "Số lượng gửi của {$item->ingredient_id} vượt số lượng đã chấp nhận.",
-                    ]);
-                }
-                $item->update([
-                    'shipped_purchase_quantity' => $shipped,
-                    'supplier_lot_code' => sprintf('ML_%05d', $item->id),
-                    'expiry_date' => now('Asia/Ho_Chi_Minh')->addMonthsNoOverflow((int) $input['expiry_months'])->toDateString(),
-                    'supplier_note' => $input['supplier_note'] ?? $item->supplier_note,
-                ]);
-            }
-
-            $order->update([
-                'status' => PurchaseOrder::STATUS_SHIPPED,
-                'supplier_document_code' => $documentCode,
-                'supplier_note' => $data['supplier_note'] ?? $order->supplier_note,
-                'shipped_by' => $actor->id,
-                'shipped_at' => now(),
+                'cancelled_at' => $cancelledAt,
             ]);
 
             return $this->load($order);
@@ -387,27 +286,11 @@ class PurchaseOrderService
         return $price === null ? null : (float) $price;
     }
 
-    private function assertSupplierOwnership(PurchaseOrder $order, User $actor): void
-    {
-        if (! $actor->supplier_id || (int) $actor->supplier_id !== (int) $order->supplier_id) {
-            abort(404);
-        }
-    }
-
     private function assertStatus(PurchaseOrder $order, string $expected): void
     {
         if ($order->status !== $expected) {
             throw ValidationException::withMessages([
                 'status' => "Yêu cầu phải ở trạng thái {$expected}.",
-            ]);
-        }
-    }
-
-    private function assertCompleteItemSet($items, $submitted): void
-    {
-        if ($items->count() !== $submitted->count() || $items->keys()->diff($submitted->keys())->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'items' => 'Phải cung cấp đúng và đủ các dòng hàng của yêu cầu.',
             ]);
         }
     }

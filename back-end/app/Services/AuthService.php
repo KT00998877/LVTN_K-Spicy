@@ -130,6 +130,8 @@ class AuthService
             throw ValidationException::withMessages(['email' => ['Tài khoản đã bị khóa.']]);
         }
 
+        $this->assertLoginRole($user);
+
         // Thành công → reset counter
         $this->resetFailedAttempts($user);
 
@@ -163,6 +165,15 @@ class AuthService
         ];
     }
 
+    private function assertLoginRole(User $user): void
+    {
+        $roles = $user->roles()->pluck('code')->all();
+        if (in_array('SUPPLIER', $roles, true)
+            && ! array_intersect(['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'], $roles)) {
+            throw ValidationException::withMessages(['email' => ['Tài khoản nhà cung cấp đã ngừng sử dụng.']]);
+        }
+    }
+
     /** @return array{user: User, token: string} */
     public function completeTwoFactorLogin(string $challengeToken, string $code, Request $request): array
     {
@@ -175,6 +186,8 @@ class AuthService
                 'code' => ['Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.'],
             ]);
         }
+
+        $this->assertLoginRole($user);
 
         if (!$this->verifyTwoFactorCode($user, $code)) {
             $this->log($user, 'login_two_factor_failed', $user->email, $request, false);

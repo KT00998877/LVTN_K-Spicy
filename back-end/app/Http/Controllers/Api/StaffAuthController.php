@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 /** Staff session endpoints; login delegates to the shared authentication flow. */
 class StaffAuthController extends Controller
 {
-    private const ALLOWED_ROLES = ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER', 'SUPPLIER'];
+    private const ALLOWED_ROLES = ['WAITER', 'KITCHEN', 'CASHIER', 'MANAGER', 'SHIPPER'];
 
     /** Staff session endpoints; login delegates to the shared authentication flow. */
     public function login(Request $request): JsonResponse
@@ -53,7 +53,7 @@ class StaffAuthController extends Controller
     /** Staff session endpoints; login delegates to the shared authentication flow. */
     private function choosePrimaryRole(array $staffRoles): ?string
     {
-        $priority = ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER', 'SUPPLIER'];
+        $priority = ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN', 'SHIPPER'];
         foreach ($priority as $p) {
             if (in_array($p, $staffRoles, true)) return $p;
         }

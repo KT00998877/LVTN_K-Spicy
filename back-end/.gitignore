@@ -39,6 +39,9 @@ Thumbs.db
 !/tests/Feature/SupplierPricesSeederTest.php
 !/tests/Feature/SpicyRecipeSeederTest.php
 !/tests/Feature/RecipeSupplierPriceTest.php
+!/tests/Feature/ManagerPurchaseOrderReceiptTest.php
+!/tests/Feature/PurchaseOrderDeliveryDateTest.php
+!/tests/Feature/SupplierPriceSnapshotTest.php
 !/tests/Feature/NonKitchenOrderItemTest.php
 !/tests/Feature/ReorderCancelledOrderTest.php
 !/tests/Feature/CartRemovalTest.php

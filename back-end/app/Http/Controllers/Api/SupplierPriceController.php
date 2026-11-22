@@ -9,15 +9,11 @@ use Illuminate\Support\Facades\DB;
 
 class SupplierPriceController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $isSupplierView = $request->is('api/staff/supplier/prices');
-        $supplierId = $isSupplierView ? $request->user()->supplier_id : null;
-        if ($isSupplierView) abort_unless($supplierId, 403);
         $ingredients = DB::table('ingredients as i')
             ->join('suppliers as s', 's.id', '=', 'i.supplier_id')
             ->where('i.is_active', true)
-            ->when($supplierId, fn ($query) => $query->where('i.supplier_id', $supplierId))
             ->orderBy('i.name')
             ->get(['i.id', 'i.code', 'i.name', 'i.unit', 'i.supplier_id', 'i.supplier_price', 's.name as supplier_name']);
 
@@ -61,8 +57,6 @@ class SupplierPriceController extends Controller
 
     public function update(Request $request): JsonResponse
     {
-        $supplierId = $request->user()->supplier_id;
-        abort_unless($supplierId, 403);
         $data = $request->validate([
             'ingredient_id' => ['required', 'integer', 'exists:ingredients,id'],
             'packaging_id' => ['nullable', 'integer', 'exists:ingredient_packagings,id'],
@@ -71,8 +65,9 @@ class SupplierPriceController extends Controller
             'conversion_quantity' => ['required', 'integer', 'min:1', 'max:1000000000'],
         ]);
         $ingredient = DB::table('ingredients')->where('id', $data['ingredient_id'])
-            ->where('supplier_id', $supplierId)->where('is_active', true)->first();
+            ->whereNotNull('supplier_id')->where('is_active', true)->first();
         abort_unless($ingredient, 404);
+        $supplierId = $ingredient->supplier_id;
         $unit = $data['purchase_unit'];
         $conversion = (int) $data['conversion_quantity'];
         if (in_array($ingredient->code, ['NL020', 'NL021', 'NL043', 'NL044'], true)) {
