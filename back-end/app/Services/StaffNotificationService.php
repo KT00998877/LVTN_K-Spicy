@@ -43,6 +43,19 @@ class StaffNotificationService
         $this->send($order, (int) $order->shipper_id, 'KITCHEN_READY', 'Đơn hàng đã được chế biến xong, vui lòng đến lấy hàng', '/staff/shipper');
     }
 
+    public function kitchenItemReadyForWaiter(Order $order, OrderItem $item): void
+    {
+        $tableCode = $order->tableSession?->table?->code;
+        $location = $tableCode ? "bàn {$tableCode}" : "đơn {$order->code}";
+        $message = "Món {$item->item_name} ×{$item->quantity} của {$location} đã sẵn sàng phục vụ.";
+        $path = "/staff/waiter/orders/{$order->id}";
+        if ($order->waiter_id) {
+            $this->send($order, (int) $order->waiter_id, 'KITCHEN_ITEM_READY', $message, $path, (string) $item->id);
+        } else {
+            $this->sendRole($order, 'WAITER', 'KITCHEN_ITEM_READY', $message, $path, (string) $item->id);
+        }
+    }
+
     public function kitchenItemCancelledForShipper(Order $order, OrderItem $item): void
     {
         if ($order->order_type !== 'ONLINE' || !$order->shipper_id || !$order->shipper_accepted_at) return;
@@ -53,10 +66,10 @@ class StaffNotificationService
         $this->send($order, (int) $order->shipper_id, 'KITCHEN_ITEM_CANCELLED', $message, '/staff/shipper', (string) $item->id);
     }
 
-    private function sendRole(Order $order, string $role, string $type, string $message, string $path): void
+    private function sendRole(Order $order, string $role, string $type, string $message, string $path, ?string $itemKey = null): void
     {
         $ids = User::where('is_active', true)->whereHas('roles', fn ($q) => $q->where('code', $role))->pluck('id');
-        foreach ($ids as $id) $this->send($order, (int) $id, $type, $message, $path);
+        foreach ($ids as $id) $this->send($order, (int) $id, $type, $message, $path, $itemKey);
     }
 
     private function send(Order $order, int $recipientId, string $type, string $message, string $path, ?string $itemKey = null): void

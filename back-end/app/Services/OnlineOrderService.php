@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  *     → confirm() → CONFIRMED
  *         → PREPARING (bếp nấu)
  *             → READY (bếp xong 1 món)
- *                 → READY_NOTIFY_SHIPPER (bếp bấm "Thông báo shipper" cho tất cả món)
+ *                 → READY_NOTIFY_SHIPPER (tự động khi tất cả món sẵn sàng)
  *                     → handover() → DELIVERING (manager/cashier bàn giao shipper)
  *                         → pickedUp() → DELIVERING (shipper xác nhận đã lấy)
  *                             → arrived() → DELIVERING (shipper xác nhận đã tới)
@@ -293,7 +293,7 @@ class OnlineOrderService
     /* ------------------------------------------------------------------ */
     /* Bàn giao cho shipper (manager / cashier)                             */
     /*   Chỉ bàn giao khi order.status = READY_NOTIFY_SHIPPER            */
-    /*   (bếp đã bấm "Thông báo shipper" sau khi hoàn thành tất cả món)  */
+    /*   (tất cả món đã sẵn sàng bàn giao)                             */
     /* ------------------------------------------------------------------ */
 
     public function handover(User $actor, int $id, int $shipperId): void

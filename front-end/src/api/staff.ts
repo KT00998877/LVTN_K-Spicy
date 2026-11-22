@@ -451,6 +451,7 @@ export interface KitchenShortage {
 export interface KitchenItem {
     order: {
         order_type: 'DINE_IN' | 'TAKEAWAY' | 'ONLINE'
+        shipper_id: number | null
         invoice_code: string | null
         id: number
         code: string

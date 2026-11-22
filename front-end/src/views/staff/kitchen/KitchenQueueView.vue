@@ -1,5 +1,5 @@
 <template>
-    <KitchenBoard status="PENDING" title="Món chờ chế biến" />
+    <KitchenBoard status="ACTIVE" title="Món cần chế biến" />
 </template>
 
 <script setup lang="ts">

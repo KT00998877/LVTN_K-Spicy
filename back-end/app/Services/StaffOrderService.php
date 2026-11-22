@@ -18,12 +18,12 @@ use Illuminate\Validation\ValidationException;
  * Khác với CartService (dành cho khách hàng đặt online):
  *  - Order gắn với table_session
  *  - Có thể thêm / sửa / xoá món khi đơn chưa hoàn tất
- *  - State machine cho order_items: PENDING → PREPARING → READY → SERVED
+ *  - State machine cho order_items: PENDING → READY → SERVED (PREPARING vẫn được hỗ trợ)
  *
  * BR:
  *  - BR-OD-01: order_items PENDING mới được phép sửa qty/note/spicy_level
  *  - BR-OD-02: order_items PREPARING/READY chỉ được cập nhật status (không sửa qty)
- *  - BR-OD-03: state machine theo BR05: PENDING → PREPARING|CANCELLED, PREPARING → READY|CANCELLED,
+ *  - BR-OD-03: state machine theo BR05: PENDING → PREPARING|READY|CANCELLED, PREPARING → READY|CANCELLED,
  *                                      READY → SERVED, SERVED → []
  *  - BR-OD-04: order.total_amount = order.subtotal - order.discount_amount
  */
@@ -31,7 +31,7 @@ class StaffOrderService
 {
     /** State machine cho order_item.status */
     public const ITEM_STATUS_TRANSITIONS = [
-        'PENDING'   => ['PREPARING', 'CANCELLED'],
+        'PENDING'   => ['PREPARING', 'READY', 'CANCELLED'],
         'PREPARING' => ['PENDING', 'READY', 'CANCELLED'],
         'READY'     => ['SERVED'],
         'SERVED'    => [],
@@ -312,7 +312,7 @@ class StaffOrderService
      * Cập nhật status 1 order_item (theo state machine).
      *
      * @param  bool  $allowShortage  true = bếp đã xem cảnh báo thiếu nguyên liệu và chọn
-     *                              "tiếp tục nấu". Chỉ áp dụng khi chuyển sang PREPARING.
+     *                              "tiếp tục nấu" hoặc xác nhận món đã hoàn thành.
      *
      * @return array{order:array, shortages:array, request_code:?string}
      */
@@ -373,11 +373,9 @@ class StaffOrderService
             $shortages = [];
             $requestCode = null;
 
-            if ($status === 'PREPARING') {
-                // Bếp bắt đầu nấu → trừ kho theo công thức đã chụp.
-                // Nếu thiếu nguyên liệu và bếp chưa đồng ý nấu tiếp → trả cảnh báo,
-                // KHÔNG đổi trạng thái món (bếp sẽ chọn tiếp tục hoặc hủy).
-                abort_if($byUser === null, 403, 'Cần đăng nhập để bắt đầu nấu.');
+            if ($status === 'PREPARING' || ($status === 'READY' && $item->inventory_deducted_at === null)) {
+                // Món xác nhận trực tiếp từ hàng chờ được trừ kho khi hoàn thành.
+                abort_if($byUser === null, 403, 'Cần đăng nhập để cập nhật món bếp.');
                 $consumption = app(InventoryConsumptionService::class)->deductForItem(
                     $item,
                     $byUser,
@@ -420,6 +418,8 @@ class StaffOrderService
                 );
             }
 
+            $previousOrderStatus = $order->status;
+
             // Cập nhật status tổng của order
             $allItems = OrderItem::where('order_id', $order->id)->get();
             $statuses = $allItems->where('status', '!=', 'CANCELLED')->pluck('status')->all();
@@ -429,21 +429,28 @@ class StaffOrderService
             } elseif (count(array_filter($statuses, fn ($s) => $s === 'SERVED')) === count($statuses)) {
                 $order->status = 'SERVED';
             } elseif (count(array_filter($statuses, fn ($s) => in_array($s, ['READY', 'SERVED']))) === count($statuses)) {
-                // Tất cả món hoàn thành
-                if (in_array($order->order_type, ['ONLINE', 'TAKEAWAY'])) {
-                    // Chuyển sang READY_NOTIFY_SHIPPER thay vì READY
-                    // Để phân biệt: READY = bếp xong nhưng chưa báo shipper,
-                    //              READY_NOTIFY_SHIPPER = bếp đã bấm thông báo shipper
-                    $order->status = 'READY';
-                } else {
-                    $order->status = 'READY';
-                }
+                $order->status = $order->order_type === 'DINE_IN' ? 'READY' : 'READY_NOTIFY_SHIPPER';
             } elseif (in_array('PREPARING', $statuses) || in_array('READY', $statuses) || in_array('SERVED', $statuses)) {
                 $order->status = 'PREPARING';
             } else {
                 $order->status = $order->order_type === 'ONLINE' || $order->order_type === 'TAKEAWAY' ? 'CONFIRMED' : 'PENDING';
             }
             $order->save();
+
+            if ($order->status === 'READY_NOTIFY_SHIPPER' && $previousOrderStatus !== $order->status) {
+                DB::table('order_events')->insert([
+                    'order_id' => $order->id,
+                    'actor_id' => $byUser?->id,
+                    'event' => 'KITCHEN_NOTIFY_SHIPPER',
+                    'status' => $order->status,
+                    'note' => 'Tất cả món đã sẵn sàng bàn giao.',
+                    'created_at' => $now,
+                ]);
+                app(StaffNotificationService::class)->kitchenReady($order);
+            }
+            if ($status === 'READY' && $order->order_type === 'DINE_IN') {
+                app(StaffNotificationService::class)->kitchenItemReadyForWaiter($order, $item);
+            }
 
             if ($status === 'CANCELLED') {
                 $this->recalcOrderTotals($order);

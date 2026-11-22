@@ -26,7 +26,6 @@ const WaiterOrdersView     = () => import('../views/staff/waiter/WaiterOrdersVie
 const WaiterOrderDetailView= () => import('../views/staff/waiter/WaiterOrderDetailView.vue')
 // Kitchen
 const KitchenQueueView     = () => import('../views/staff/kitchen/KitchenQueueView.vue')
-const KitchenPreparingView = () => import('../views/staff/kitchen/KitchenPreparingView.vue')
 const KitchenReadyView     = () => import('../views/staff/kitchen/KitchenReadyView.vue')
 const KitchenAvailabilityView = () => import('../views/staff/kitchen/KitchenAvailabilityView.vue')
 const DailyStockSheetView  = () => import('../views/staff/DailyStockSheetView.vue')
@@ -185,9 +184,9 @@ const router = createRouter({
             meta: { requiresStaffRole: ['KITCHEN'] as StaffRole[] },
             children: [
                 { path: '', redirect: '/staff/kitchen/queue' },
-                { path: 'queue',     name: 'kitchen-queue',     component: KitchenQueueView,     meta: { title: 'Món chờ chế biến', subtitle: 'Danh sách món cần làm' } },
-                { path: 'preparing', name: 'kitchen-preparing', component: KitchenPreparingView, meta: { title: 'Đang chế biến',    subtitle: 'Món đang nấu' } },
-                { path: 'ready',     name: 'kitchen-ready',     component: KitchenReadyView,     meta: { title: 'Món đã sẵn sàng',  subtitle: 'Chờ phục vụ mang ra' } },
+                { path: 'queue',     name: 'kitchen-queue',     component: KitchenQueueView,     meta: { title: 'Món cần chế biến', subtitle: 'Danh sách món cần làm' } },
+                { path: 'preparing', name: 'kitchen-preparing', redirect: to => ({ name: 'kitchen-queue', query: to.query }) },
+                { path: 'ready',     name: 'kitchen-ready',     component: KitchenReadyView,     meta: { title: 'Món đã sẵn sàng',  subtitle: 'Theo dõi món đã hoàn thành' } },
                 { path: 'availability', name: 'kitchen-availability', component: KitchenAvailabilityView, meta: { title: 'Báo hết món', subtitle: 'Cập nhật món và topping còn bán' } },
                 { path: 'daily-stock', name: 'kitchen-daily-stock', component: DailyStockSheetView, meta: { title: 'Sổ kho hằng ngày', subtitle: 'Đếm và chốt tồn cuối ngày' } },
             ],

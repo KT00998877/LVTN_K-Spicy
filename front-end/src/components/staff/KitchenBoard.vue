@@ -15,24 +15,20 @@ import { useNotificationOrderTarget } from '@/composables/useNotificationOrderTa
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useKitchenStore, ShortageError } from '@/stores/staffKitchen'
+import { useKitchenStore } from '@/stores/staffKitchen'
 import { useToast } from '@/composables/useStaffUtils'
-import { useAppDialog } from '@/composables/useAppDialog'
-import type { OrderItemStatus } from '@/types/staff'
 import { useRouter } from 'vue-router'
-import type { KitchenItem, KitchenShortage } from '@/api/staff'
+import type { KitchenItem } from '@/api/staff'
 import { staffKitchen } from '@/api/staff'
-import ShortageDialog from '@/components/staff/ShortageDialog.vue'
 
 const props = defineProps<{
-    status: OrderItemStatus
+    status: 'ACTIVE' | 'READY'
     title: string
 }>()
 
 const kitchenStore = useKitchenStore()
 const { pendingItems, preparingItems, readyItems, loading, error, updatingIds } = storeToRefs(kitchenStore)
 const toast = useToast()
-const appDialog = useAppDialog()
 const router = useRouter()
 const activeOrderType = ref<KitchenItem['order']['order_type']>('DINE_IN')
 const initialTabSelected = ref(false)
@@ -45,19 +41,15 @@ const route = useNotificationOrderTarget(() => {
     return [...groups.values()]
 }, order => {
     activeOrderType.value = order.order_type
-    const paths: Record<string, string> = { PENDING: 'queue', PREPARING: 'preparing', READY: 'ready' }
-    if (order.status !== props.status) void router.replace({ path: `/staff/kitchen/${paths[order.status]}`, query: { order_id: order.id } })
+    const destination = order.status === 'READY' ? 'kitchen-ready' : 'kitchen-queue'
+    if ((order.status === 'READY') !== (props.status === 'READY')) {
+        void router.replace({ name: destination, query: { order_id: order.id } })
+    }
 })
 const clock = ref(Date.now())
 
 const notifyingOrders = ref<Set<number>>(new Set())
 let clockTimer: ReturnType<typeof setInterval> | undefined
-
-// ====== Cảnh báo thiếu nguyên liệu (bếp tự quyết) ======
-const shortageOpen = ref(false)
-const shortageBusy = ref(false)
-const shortageList = ref<KitchenShortage[]>([])
-const shortageTarget = ref<{ orderId: number; itemId: number; dishName: string; orderCode: string } | null>(null)
 
 onMounted(() => {
     clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
@@ -74,10 +66,7 @@ onUnmounted(() => {
 })
 
 const items = computed(() => {
-    if (props.status === 'PENDING') return pendingItems.value
-    if (props.status === 'PREPARING') return preparingItems.value
-    if (props.status === 'READY') return readyItems.value
-    return []
+    return props.status === 'READY' ? readyItems.value : [...pendingItems.value, ...preparingItems.value]
 })
 
 async function refresh(): Promise<void> {
@@ -92,6 +81,18 @@ function isDeliveryOrder(group: { order: KitchenItem['order'] }): boolean {
     return group.order.order_type === 'ONLINE' || group.order.order_type === 'TAKEAWAY'
 }
 
+function readyMessage(order: KitchenItem['order']): string {
+    if (order.order_type === 'DINE_IN') return 'Phục vụ nhận thông báo theo từng món'
+    if (order.status === 'READY_NOTIFY_SHIPPER') {
+        if (order.order_type === 'TAKEAWAY') return 'Sẵn sàng bàn giao'
+        return order.shipper_id ? 'Đã thông báo shipper' : 'Sẵn sàng giao · Chờ phân công shipper'
+    }
+    if (order.status === 'READY') {
+        return order.order_type === 'ONLINE' ? 'Chưa thông báo shipper' : 'Chờ báo bàn giao'
+    }
+    return order.order_type === 'ONLINE' ? 'Sẽ báo shipper khi tất cả món hoàn thành' : 'Chờ các món còn lại'
+}
+
 async function onNotifyShipper(group: { order: KitchenItem['order']; entries: KitchenItem[] }) {
     if (!allItemsReady(group)) {
         toast.warning('Chưa hoàn thành tất cả món. Không thể thông báo shipper.')
@@ -101,11 +102,11 @@ async function onNotifyShipper(group: { order: KitchenItem['order']; entries: Ki
     notifyingOrders.value.add(group.order.id)
     try {
         await staffKitchen.notifyShipper(group.order.id)
-        toast.success('Đã thông báo shipper. Đơn sẵn sàng bàn giao.')
+        toast.success(readyMessage({ ...group.order, status: 'READY_NOTIFY_SHIPPER' }))
         await refresh()
     } catch (err: unknown) {
         const e = err as { response?: { data?: { message?: string } } }
-        toast.error(e?.response?.data?.message || 'Không thể thông báo shipper.')
+        toast.error(e?.response?.data?.message || 'Không thể báo đơn sẵn sàng bàn giao.')
     } finally {
         notifyingOrders.value.delete(group.order.id)
     }
@@ -159,8 +160,8 @@ function chooseTab(type: KitchenItem['order']['order_type']): void {
     activeOrderType.value = type
 }
 
-watch([sections, updatingIds, shortageBusy, () => notifyingOrders.value.size], () => {
-    if (!initialTabSelected.value || updatingIds.value.length > 0 || shortageBusy.value || notifyingOrders.value.size > 0) return
+watch([sections, updatingIds, () => notifyingOrders.value.size], () => {
+    if (!initialTabSelected.value || updatingIds.value.length > 0 || notifyingOrders.value.size > 0) return
     if (sections.value.find(section => section.type === activeOrderType.value)?.count) return
     selectTabWithOrders()
 }, { flush: 'post' })
@@ -187,102 +188,19 @@ function getElapsedClass(dateStr: string | null): string {
     return 'time-normal'
 }
 
-async function onUndo(entry: KitchenItem): Promise<void> {
-    try {
-        await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'PENDING')
-        toast.success('Đã hoàn tác, món trở về chờ nấu')
-    } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Không thể hoàn tác')
-    }
-}
-
 function spicyLabel(level: number): string {
     return level === 0 ? 'Không cay' : `Cấp ${level}`
 }
 
-async function onStart(entry: { order: { id: number; code: string }; item: { id: number; menu_item_name: string } }): Promise<void> {
-    try {
-        await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'PREPARING')
-        toast.success('Bắt đầu chế biến')
-    } catch (err) {
-        // Thiếu nguyên liệu → mở dialog để bếp quyết định nấu tiếp hay hủy món.
-        if (err instanceof ShortageError) {
-            shortageTarget.value = {
-                orderId: entry.order.id,
-                itemId: entry.item.id,
-                dishName: entry.item.menu_item_name,
-                orderCode: entry.order.code,
-            }
-            shortageList.value = err.shortages
-            shortageOpen.value = true
-            return
-        }
-        toast.error(err instanceof Error ? err.message : 'Lỗi')
-    }
-}
-
-/** Bếp chọn "Tiếp tục nấu": trừ tới 0, tạo yêu cầu nhập kho, vẫn nấu món này. */
-async function onShortageContinue(): Promise<void> {
-    const target = shortageTarget.value
-    if (!target) return
-    shortageBusy.value = true
-    try {
-        await kitchenStore.updateItemStatus(target.orderId, target.itemId, 'PREPARING', undefined, true)
-        shortageOpen.value = false
-        toast.success('Đã tiếp tục nấu. Đã gửi yêu cầu nhập kho cho quản lý.')
-        shortageTarget.value = null
-    } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Không bắt đầu được món')
-    } finally {
-        shortageBusy.value = false
-    }
-}
-
-/** Bếp chọn "Hủy món": hủy món với lý do hết nguyên liệu, quản lý sẽ ẩn món. */
-async function onShortageCancel(): Promise<void> {
-    const target = shortageTarget.value
-    if (!target) return
-    shortageBusy.value = true
-    try {
-        await kitchenStore.updateItemStatus(target.orderId, target.itemId, 'CANCELLED', 'Hết nguyên liệu')
-        shortageOpen.value = false
-        toast.warning('Đã hủy món. Quản lý đã được thông báo ẩn món khỏi thực đơn.')
-        shortageTarget.value = null
-    } catch (err) {
-        toast.error(cancelErrorMessage(err))
-    } finally {
-        shortageBusy.value = false
-    }
-}
-
-function cancelErrorMessage(err: unknown): string {
-    const response = (err as { response?: { status?: number; data?: { message?: string } } })?.response
-    if (response?.status === 409 && response.data?.message === 'Đơn đã thanh toán không thể huỷ món.') {
-        return response.data.message
-    }
-    return response?.data?.message ?? (err instanceof Error ? err.message : 'Không hủy được món')
-}
-
 async function onReady(entry: { order: { id: number }; item: { id: number } }): Promise<void> {
     try {
-        await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'READY')
+        await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'READY', undefined, true)
         toast.success('Đã hoàn thành món này')
     } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Lỗi')
     }
 }
 
-async function onCancel(entry: { order: { id: number }; item: { id: number; menu_item_name: string } }): Promise<void> {
-    if (!await appDialog.confirm({ title: 'Hủy món này?', message: `Món “${entry.item.menu_item_name}” sẽ bị hủy khỏi đơn.`, confirmLabel: 'Hủy món', tone: 'danger' })) return
-    const reason = (await appDialog.prompt({ title: 'Lý do hủy món', message: 'Ghi lại lý do để nhân viên phục vụ nắm được tình hình.', label: 'Lý do', initialValue: 'Hết nguyên liệu', confirmLabel: 'Gửi lý do' }))?.trim()
-    if (!reason) return
-    try {
-        await kitchenStore.updateItemStatus(entry.order.id, entry.item.id, 'CANCELLED', reason)
-        toast.warning('Đã hủy món')
-    } catch (err) {
-        toast.error(cancelErrorMessage(err))
-    }
-}
 useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && updatingIds.value.length === 0 && notifyingOrders.value.size === 0)
 </script>
 
@@ -393,56 +311,30 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
                                     </p>
                                 </div>
 
-                                <!-- Actions -->
-                                <div class="item-actions" v-if="['PENDING', 'PREPARING'].includes(status)">
-                                    <!-- PENDING: Start -->
-                                    <button v-if="status === 'PENDING'" class="action-btn start"
-                                        :disabled="updatingIds.includes(entry.item.id)" @click="onStart(entry)">
-                                        Bắt đầu nấu
-                                    </button>
-
-                                    <!-- PREPARING: Complete / Undo -->
-                                    <template v-if="status === 'PREPARING'">
-                                        <button class="action-btn undo" :disabled="updatingIds.includes(entry.item.id)"
-                                            @click="onUndo(entry)">
-                                            ↩ Hoàn tác
-                                        </button>
-                                        <button class="action-btn complete" :disabled="updatingIds.includes(entry.item.id)"
-                                            @click="onReady(entry)">
-                                            ✓ Xong
-                                        </button>
-                                    </template>
-
-                                    <!-- Cancel -->
-                                    <button v-if="['PENDING', 'PREPARING'].includes(status)"
-                                        class="action-btn cancel"
-                                        :title="`Hủy món ${entry.item.menu_item_name}`"
-                                        :aria-label="`Hủy món ${entry.item.menu_item_name}`"
-                                        :disabled="updatingIds.includes(entry.item.id)" @click="onCancel(entry)">
-                                        ✕
+                                <div v-if="status === 'ACTIVE'" class="item-actions">
+                                    <button type="button" class="action-btn complete"
+                                        :aria-label="`Xác nhận hoàn thành ${entry.item.menu_item_name}`"
+                                        :disabled="updatingIds.includes(entry.item.id)" @click="onReady(entry)">
+                                        {{ updatingIds.includes(entry.item.id) ? 'Đang xác nhận…' : 'Xác nhận hoàn thành' }}
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <footer v-if="status !== 'READY'" class="order-status">
-                            {{ status === 'PENDING' ? 'Chờ chế biến' : 'Đang chế biến' }}
-                        </footer>
-
                         <!-- Ready State Indicator -->
                         <div v-if="status === 'READY'" class="ready-indicator">
                             <span class="ready-text">
-                                {{ group.order.order_type === 'DINE_IN' ? 'Chờ phục vụ mang ra' : 'Món đã hoàn thành' }}
+                                {{ readyMessage(group.order) }}
                             </span>
                         </div>
 
-                        <!-- Notify Shipper (ONLINE/TAKEAWAY) -->
-                        <div v-if="status === 'READY' && isDeliveryOrder(group) && group.entries[0] === group.entries[0]"
+                        <!-- Đơn đã hoàn thành trước khi áp dụng thông báo tự động -->
+                        <div v-if="status === 'READY' && isDeliveryOrder(group) && group.order.status === 'READY'"
                             class="shipper-action">
                             <span class="shipper-label">Tất cả món đã xong</span>
-                            <button class="action-btn notify" :disabled="notifyingOrders.has(group.order.id) || !allItemsReady(group)"
+                            <button type="button" class="action-btn notify" :disabled="notifyingOrders.has(group.order.id) || !allItemsReady(group)"
                                 @click="onNotifyShipper(group)">
-                                {{ notifyingOrders.has(group.order.id) ? 'Đang thông báo...' : '📨 Thông báo shipper' }}
+                                {{ notifyingOrders.has(group.order.id) ? 'Đang thông báo…' : group.order.order_type === 'ONLINE' ? 'Thông báo shipper' : 'Báo sẵn sàng bàn giao' }}
                             </button>
                         </div>
                     </article>
@@ -450,16 +342,6 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
             </section>
         </div>
 
-        <!-- Cảnh báo thiếu nguyên liệu: bếp quyết nấu tiếp hay hủy món -->
-        <ShortageDialog
-            :open="shortageOpen"
-            :dish-name="shortageTarget?.dishName ?? ''"
-            :order-code="shortageTarget?.orderCode ?? ''"
-            :shortages="shortageList"
-            :busy="shortageBusy"
-            @continue="onShortageContinue"
-            @cancel="onShortageCancel"
-        />
     </div>
 </template>
 
@@ -945,16 +827,6 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     cursor: not-allowed;
 }
 
-.action-btn.start {
-    flex: 1;
-    background: var(--kds-action);
-    color: var(--color-white);
-}
-
-.action-btn.start:hover:not(:disabled) {
-    background: var(--kds-action-hover);
-}
-
 .action-btn.complete {
     background: #22c55e;
     color: #ffffff;
@@ -962,30 +834,6 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
 
 .action-btn.complete:hover:not(:disabled) {
     background: #16a34a;
-}
-
-.action-btn.undo {
-    background: #374151;
-    color: #d1d5db;
-}
-
-.action-btn.undo:hover:not(:disabled) {
-    background: #4b5563;
-}
-
-.action-btn.cancel {
-    flex: 0 0 44px;
-    min-width: 44px;
-    background: transparent;
-    color: var(--kds-muted);
-    border: 1px solid #374151;
-    padding: 12px;
-}
-
-.action-btn.cancel:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    border-color: #ef4444;
 }
 
 .action-btn.notify {
@@ -1049,15 +897,6 @@ useStaffLiveRefresh(() => kitchenStore.fetchAll(true), () => !loading.value && u
     font-size: 13px;
     font-weight: 600;
     line-height: 1.5;
-}
-
-.order-status {
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid var(--color-operations-raised);
-    color: var(--kds-muted);
-    font-size: 14px;
-    font-weight: 600;
 }
 
 .action-btn:focus-visible,

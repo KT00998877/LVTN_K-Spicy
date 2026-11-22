@@ -90,6 +90,66 @@ class NonKitchenOrderItemTest extends TestCase
         $this->assertSame($before - 1, (int) DB::table('ingredients')->where('code', 'NL020')->value('quantity_in_stock'));
     }
 
+    public function test_kitchen_completion_notifies_shipper_only_after_the_last_dish(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $actor = User::firstOrFail();
+        $shipper = User::whereHas('roles', fn ($query) => $query->where('code', 'SHIPPER'))->firstOrFail();
+        $order = Order::create([
+            'code' => 'TEST-KITCHEN-COMPLETE', 'customer_id' => $actor->id,
+            'order_type' => 'ONLINE', 'status' => 'CONFIRMED', 'placed_at' => now(),
+        ]);
+        $order->forceFill(['confirmed_at' => now(), 'shipper_id' => $shipper->id])->save();
+        $dish = MenuItem::where('slug', 'mi-cay-bo-nho')->firstOrFail();
+        $itemData = [
+            'menu_item_id' => $dish->id, 'item_name' => $dish->name,
+            'unit_price' => $dish->price, 'quantity' => 1, 'subtotal' => $dish->price, 'status' => 'PENDING',
+        ];
+        $pending = $order->items()->create($itemData);
+        $preparing = $order->items()->create($itemData);
+        $service = app(StaffOrderService::class);
+        $service->updateItemStatus($order->id, $preparing->id, 'PREPARING', null, $actor, true);
+        $notification = ['deduplication_key' => "KITCHEN_READY:{$order->id}:{$shipper->id}"];
+
+        $service->updateItemStatus($order->id, $pending->id, 'READY', null, $actor, true);
+        $this->assertSame('READY', $pending->fresh()->status);
+        $this->assertNotNull($pending->fresh()->inventory_deducted_at);
+        $this->assertDatabaseMissing('notifications', $notification);
+        $stockMovements = DB::table('inventory_transactions')->where('reference_type', 'order_item')
+            ->where('reference_id', $preparing->id);
+        $countBefore = $stockMovements->count();
+        $this->assertGreaterThan(0, $countBefore);
+
+        $service->updateItemStatus($order->id, $preparing->id, 'READY', null, $actor, true);
+        $this->assertSame($countBefore, $stockMovements->count());
+        $this->assertSame('READY_NOTIFY_SHIPPER', $order->fresh()->status);
+        $this->assertDatabaseHas('notifications', $notification);
+    }
+
+    public function test_kitchen_completion_notifies_waiter_for_each_ready_dish(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $actor = User::firstOrFail();
+        $waiter = User::whereHas('roles', fn ($query) => $query->where('code', 'WAITER'))->firstOrFail();
+        $order = Order::create([
+            'code' => 'TEST-TABLE-COMPLETE', 'waiter_id' => $waiter->id,
+            'order_type' => 'DINE_IN', 'status' => 'PENDING', 'placed_at' => now(),
+        ]);
+        $dish = MenuItem::where('slug', 'mi-cay-bo-nho')->firstOrFail();
+        $service = app(StaffOrderService::class);
+        $service->addItem($order->id, ['menu_item_id' => $dish->id, 'quantity' => 1, 'spicy_level' => 0], $actor);
+        $service->addItem($order->id, ['menu_item_id' => $dish->id, 'quantity' => 1, 'spicy_level' => 1], $actor);
+        $item = $order->items()->firstOrFail();
+
+        $service->updateItemStatus($order->id, $item->id, 'READY', null, $actor, true);
+
+        $this->assertSame('PREPARING', $order->fresh()->status);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $waiter->id,
+            'deduplication_key' => "KITCHEN_ITEM_READY:{$order->id}:{$item->id}:{$waiter->id}",
+        ]);
+    }
+
     public function test_takeaway_drink_is_ready_and_deducted_on_confirmation(): void
     {
         $this->seed(DatabaseSeeder::class);

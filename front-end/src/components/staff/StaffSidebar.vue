@@ -183,8 +183,7 @@ const menuByRole: Record<StaffRole, MenuItem[]> = {
         { path: '/staff/waiter/orders',       label: 'Đơn đang phục vụ',  roles: ['WAITER'] },
     ],
     KITCHEN: [
-        { path: '/staff/kitchen/queue',     label: 'Món chờ chế biến', roles: ['KITCHEN'] },
-        { path: '/staff/kitchen/preparing', label: 'Đang chế biến',    roles: ['KITCHEN'] },
+        { path: '/staff/kitchen/queue',     label: 'Món cần chế biến', roles: ['KITCHEN'] },
         { path: '/staff/kitchen/ready',     label: 'Món đã sẵn sàng',  roles: ['KITCHEN'] },
         { path: '/staff/kitchen/availability', label: 'Báo hết món', roles: ['KITCHEN'] },
         { path: '/staff/kitchen/daily-stock', label: 'Sổ kho hằng ngày', roles: ['KITCHEN'] },
@@ -217,9 +216,8 @@ const menuItems = computed<MenuItem[]>(() => {
     const base = menuByRole[staffStore.currentRole] ?? []
     if (staffStore.currentRole === 'KITCHEN') {
         return base.map((item, idx) => {
-            if (idx === 0) return { ...item, badge: kitchenStore.pendingItems.length }
-            if (idx === 1) return { ...item, badge: kitchenStore.preparingItems.length }
-            if (idx === 2) return { ...item, badge: kitchenStore.readyItems.length }
+            if (idx === 0) return { ...item, badge: kitchenStore.pendingItems.length + kitchenStore.preparingItems.length }
+            if (idx === 1) return { ...item, badge: kitchenStore.readyItems.length }
             return item
         })
     }

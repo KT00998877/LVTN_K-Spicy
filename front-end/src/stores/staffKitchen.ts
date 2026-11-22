@@ -87,10 +87,14 @@ export const useKitchenStore = defineStore('staffKitchen', {
                 this.readyItems = this.readyItems.filter(e => e.item.id !== itemId)
                 const updated = result.order.items.find(i => i.id === itemId)
                 if (entry && updated) {
+                    entry.order.status = result.order.status
                     Object.assign(entry.item, updated)
                     if (status === 'PENDING') this.pendingItems.push(entry)
                     if (status === 'PREPARING') this.preparingItems.push(entry)
                     if (status === 'READY') this.readyItems.push(entry)
+                }
+                for (const ready of this.readyItems) {
+                    if (ready.order.id === orderId) ready.order.status = result.order.status
                 }
             } catch (err) {
                 const shortages = shortagesFromError(err)

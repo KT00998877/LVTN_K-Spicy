@@ -62,6 +62,7 @@ class StaffKitchenController extends Controller
                 'id'            => (int) $i->order->id,
                 'code'          => $i->order->code,
                 'order_type'    => $i->order->order_type,
+                'shipper_id'    => $i->order->shipper_id ? (int) $i->order->shipper_id : null,
                 'invoice_code'  => $invoiceCodes[$i->order_id] ?? null,
                 'table_code'    => $i->order->tableSession?->table?->code,
                 'table_session_id' => $i->order->table_session_id ? (int) $i->order->table_session_id : null,
